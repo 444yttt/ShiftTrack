@@ -27,7 +27,12 @@ KEY_PATH = os.path.expanduser(
 
 
 def run(args, **kwargs):
-    return subprocess.run(args, check=True, text=True, capture_output=True, **kwargs)
+    result = subprocess.run(args, text=True, capture_output=True, **kwargs)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        print(detail[-1500:] if detail else "command failed")
+        raise SystemExit(result.returncode)
+    return result
 
 
 def b64url(data: bytes) -> str:
@@ -227,12 +232,13 @@ def create_distribution_identity(work: str) -> tuple[str, str]:
             f"{work}/cert.pem",
         ]
     )
-    run(
+    password = base64.b64encode(os.urandom(18)).decode()
+    open(f"{work}/p12pass", "w", encoding="utf-8").write(password)
+    exported = subprocess.run(
         [
             "openssl",
             "pkcs12",
             "-export",
-            "-legacy",
             "-inkey",
             f"{work}/key.pem",
             "-in",
@@ -240,14 +246,39 @@ def create_distribution_identity(work: str) -> tuple[str, str]:
             "-out",
             f"{work}/cert.p12",
             "-passout",
-            "pass:",
-        ]
+            "pass:" + password,
+        ],
+        text=True,
+        capture_output=True,
     )
+    if exported.returncode != 0:
+        exported = subprocess.run(
+            [
+                "openssl",
+                "pkcs12",
+                "-export",
+                "-legacy",
+                "-inkey",
+                f"{work}/key.pem",
+                "-in",
+                f"{work}/cert.pem",
+                "-out",
+                f"{work}/cert.p12",
+                "-passout",
+                "pass:" + password,
+            ],
+            text=True,
+            capture_output=True,
+        )
+    if exported.returncode != 0:
+        print((exported.stderr or "pkcs12 export failed")[-1500:])
+        raise SystemExit(exported.returncode)
     return certificate_id, certificate_name(f"{work}/cert.der")
 
 
 def install_identity(work: str) -> None:
     password = base64.b64encode(os.urandom(18)).decode()
+    p12_password = open(f"{work}/p12pass", encoding="utf-8").read()
     keychain = f"{work}/build.keychain-db"
     run(["security", "create-keychain", "-p", password, keychain])
     run(["security", "set-keychain-settings", "-lut", "21600", keychain])
@@ -264,11 +295,14 @@ def install_identity(work: str) -> None:
             "-k",
             keychain,
             "-P",
-            "",
+            p12_password,
+            "-A",
             "-T",
             "/usr/bin/codesign",
             "-T",
             "/usr/bin/security",
+            "-f",
+            "pkcs12",
         ]
     )
     run(
@@ -355,9 +389,13 @@ def main() -> None:
     print("自動署名はクラウド署名の権限で止まったため、配布用証明書で書き出します")
     with tempfile.TemporaryDirectory() as work:
         certificate_id, signing_certificate = create_distribution_identity(work)
-        install_identity(work)
-        profile_name = create_profile(work, bundle_resource_id(), certificate_id)
-        manual_export(profile_name, signing_certificate)
+        try:
+            install_identity(work)
+            profile_name = create_profile(work, bundle_resource_id(), certificate_id)
+            manual_export(profile_name, signing_certificate)
+        except BaseException:
+            api("DELETE", "/v1/certificates/" + certificate_id)
+            raise
     print("手動署名で書き出しました")
 
 
