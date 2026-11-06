@@ -19,6 +19,108 @@ enum PayMath {
         return wage + ride
     }
 
+    static func quote(
+        workplace: Workplace,
+        day: Date,
+        start: Int,
+        end: Int,
+        breakMinutes: Int,
+        customPay: Int?,
+        adjustment: Int,
+        includeTransport: Bool,
+        calendar: Calendar = .current
+    ) -> Int {
+        let transport = includeTransport ? max(0, workplace.transportAllowance) : 0
+        if let custom = customPay {
+            return max(0, custom + adjustment + transport)
+        }
+        if workplace.payIsDaily {
+            return max(0, max(0, workplace.dailyWage) + adjustment + transport)
+        }
+        let paid = workedMinutes(start: start, end: end, breakMinutes: breakMinutes)
+        guard paid > 0 else { return max(0, adjustment + transport) }
+        let holiday = workplace.holidayPayEnabled && workplace.holidayWeekdays.contains(calendar.component(.weekday, from: calendar.startOfDay(for: day)))
+        var weighted = 0
+        for offset in 0..<paid {
+            let minute = ((start + offset) % (24 * 60) + (24 * 60)) % (24 * 60)
+            weighted += rate(at: minute, holiday: holiday, workplace: workplace)
+        }
+        var amount = (weighted + 30) / 60
+        if workplace.overtimeEnabled {
+            let extraMinutes = max(0, paid - max(0, workplace.overtimeAfterMinutes))
+            if extraMinutes > 0 {
+                if workplace.overtimePerHour {
+                    amount += (max(0, workplace.overtimeExtra) * extraMinutes + 30) / 60
+                } else {
+                    amount += max(0, workplace.overtimeExtra)
+                }
+            }
+        }
+        return max(0, amount + adjustment + transport)
+    }
+
+    static func shiftYen(_ shift: WorkShift, includeTransport: Bool, calendar: Calendar = .current) -> Int {
+        guard let workplace = shift.workplace else { return 0 }
+        return quote(
+            workplace: workplace,
+            day: shift.date,
+            start: shift.startMinutes,
+            end: shift.endMinutes,
+            breakMinutes: shift.breakMinutes,
+            customPay: shift.customPay,
+            adjustment: shift.adjustmentYen,
+            includeTransport: includeTransport,
+            calendar: calendar
+        )
+    }
+
+    static func payday(for shiftDay: Date, workplace: Workplace, calendar: Calendar = .current) -> Date {
+        let day = calendar.startOfDay(for: shiftDay)
+        let dayNumber = calendar.component(.day, from: day)
+        let closing = workplace.closingDay
+        let periodMonth: Date
+        if closing == 0 || dayNumber <= closing {
+            periodMonth = day
+        } else {
+            periodMonth = calendar.date(byAdding: .month, value: 1, to: day) ?? day
+        }
+        let payMonth = calendar.date(byAdding: .month, value: max(0, min(2, workplace.paydayMonthOffset)), to: periodMonth) ?? periodMonth
+        return clampedDay(payMonth, day: workplace.paydayDay, calendar: calendar)
+    }
+
+    static func payday(in month: Date, workplace: Workplace, calendar: Calendar = .current) -> Date {
+        clampedDay(month, day: workplace.paydayDay, calendar: calendar)
+    }
+
+    private static func clampedDay(_ month: Date, day: Int, calendar: Calendar) -> Date {
+        let comps = calendar.dateComponents([.year, .month], from: month)
+        guard let start = calendar.date(from: comps) else { return calendar.startOfDay(for: month) }
+        let last = calendar.range(of: .day, in: .month, for: start)?.count ?? 28
+        let chosen = day == 0 ? last : min(max(1, day), last)
+        return calendar.date(byAdding: .day, value: chosen - 1, to: start) ?? start
+    }
+
+    private static func rate(at minute: Int, holiday: Bool, workplace: Workplace) -> Int {
+        if holiday && workplace.holidayNightEnabled && contains(minute, workplace.holidayNightStartMinutes, workplace.holidayNightEndMinutes) {
+            return max(0, workplace.holidayNightWage)
+        }
+        if !holiday && workplace.nightPayEnabled && contains(minute, workplace.nightStartMinutes, workplace.nightEndMinutes) {
+            return max(0, workplace.nightWage)
+        }
+        if holiday && workplace.holidayPayEnabled {
+            return max(0, workplace.holidayWage)
+        }
+        return max(0, workplace.hourlyWage)
+    }
+
+    private static func contains(_ minute: Int, _ start: Int, _ end: Int) -> Bool {
+        let start = ((start % (24 * 60)) + 24 * 60) % (24 * 60)
+        let end = ((end % (24 * 60)) + 24 * 60) % (24 * 60)
+        if start == end { return false }
+        if start < end { return minute >= start && minute < end }
+        return minute >= start || minute < end
+    }
+
     static func endDate(day: Date, start: Int, end: Int, calendar: Calendar = .current) -> Date {
         let base = calendar.startOfDay(for: day)
         var endDate = calendar.date(byAdding: .minute, value: end, to: base) ?? day
@@ -35,6 +137,7 @@ struct ShiftSnapshot: Identifiable {
     var workplaceName: String
     var colorHex: String
     var date: Date
+    var payDate: Date
     var endAt: Date
     var minutes: Int
     var yen: Int
@@ -70,7 +173,7 @@ enum IncomeEngine {
         var result = Totals()
         var buckets: [UUID: Row] = [:]
         for shift in shifts {
-            let day = calendar.startOfDay(for: shift.date)
+            let day = calendar.startOfDay(for: shift.payDate)
             guard day >= calendar.startOfDay(for: start), day < end else { continue }
             let worked = shift.endAt <= now
             if worked {
@@ -219,6 +322,7 @@ enum ShiftMapping {
                 workplaceName: workplace.name,
                 colorHex: workplace.colorHex,
                 date: shift.date,
+                payDate: PayMath.payday(for: shift.date, workplace: workplace),
                 endAt: PayMath.endDate(day: shift.date, start: shift.startMinutes, end: shift.endMinutes),
                 minutes: shift.workedMinutes,
                 yen: shift.estimatedYen(includeTransport: includeTransport)

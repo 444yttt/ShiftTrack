@@ -29,7 +29,7 @@ struct WallsScreen: View {
             .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("見込み年収")
+                Text("今年の給料見込")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.muted)
                 Text(Formatters.yen(forecast))

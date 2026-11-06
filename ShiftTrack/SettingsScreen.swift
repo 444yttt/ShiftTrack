@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @State private var showCreator = false
     @State private var confirmReset = false
     @State private var goalText = ""
+    @State private var monthGoalText = ""
     @State private var wageText = ""
     @State private var transportText = ""
     @FocusState private var focused: Bool
@@ -24,18 +25,18 @@ struct SettingsScreen: View {
     private func form(_ settings: AppSettings) -> some View {
         @Bindable var settings = settings
         return ScreenScroll {
-            Text("設定")
+            Text("その他")
                 .font(.system(size: 28, weight: .black))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
             HStack {
-                Text("勤務先")
+                Text("勤務先の設定")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
-                LimeCapsuleButton(title: "+ 追加") { showCreator = true }
+                LimeCapsuleButton(title: "追加する") { showCreator = true }
             }
             .padding(.top, 8)
 
@@ -64,14 +65,16 @@ struct SettingsScreen: View {
                 }
             }
 
-            Text("年収と時給")
+            Text("給料の目標")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
             VStack(spacing: 0) {
-                numberRow("年収目標", text: $goalText)
+                numberRow("月間目標", text: $monthGoalText)
+                line
+                numberRow("年間目標", text: $goalText)
                 line
                 numberRow("新しい勤務先の時給", text: $wageText)
                 line
@@ -82,8 +85,12 @@ struct SettingsScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .onAppear { syncFields(settings) }
             .onChange(of: goalText) { _, new in
-                let value = min(100_000_000, Int(new.filter(\.isNumber)) ?? 0)
+                let value = min(9_999_999, max(0, Int(new.filter(\.isNumber)) ?? 0))
                 if settings.annualIncomeGoal != value { settings.annualIncomeGoal = value }
+            }
+            .onChange(of: monthGoalText) { _, new in
+                let value = min(999_999, max(0, Int(new.filter(\.isNumber)) ?? 0))
+                if settings.monthlyIncomeGoal != value { settings.monthlyIncomeGoal = value }
             }
             .onChange(of: wageText) { _, new in
                 let value = min(100_000, Int(new.filter(\.isNumber)) ?? 0)
@@ -97,7 +104,7 @@ struct SettingsScreen: View {
                 rewrite(new, into: $goalText)
             }
 
-            Text("表示")
+            Text("カレンダーの設定")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,8 +119,16 @@ struct SettingsScreen: View {
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
                 Rectangle().fill(Theme.line).frame(height: 1)
+                Toggle(isOn: $settings.showPaydayOnCalendar) {
+                    Text("給料日の表示")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .tint(Theme.lime)
+                .padding(.vertical, 14)
+                Rectangle().fill(Theme.line).frame(height: 1)
                 Toggle(isOn: $settings.includeTransport) {
-                    Text("交通費を収入に含める")
+                    Text("交通費を給料に含める")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white)
                 }
@@ -216,6 +231,7 @@ struct SettingsScreen: View {
 
     private func syncFields(_ settings: AppSettings) {
         goalText = String(settings.annualIncomeGoal)
+        monthGoalText = String(settings.monthlyIncomeGoal)
         wageText = String(settings.defaultHourlyWage)
         transportText = String(settings.defaultTransportAllowance)
     }

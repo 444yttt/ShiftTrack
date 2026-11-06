@@ -10,6 +10,9 @@ struct CalendarScreen: View {
     @State private var selectedID: UUID?
     @State private var selectedDay: Date?
     @State private var showHelp = false
+    @State private var showAddChoices = false
+    @State private var editor: EditorRoute?
+    @State private var router = ImportRouter.shared
 
     private var settings: AppSettings? { settingsRows.first }
     private var weekStartsOnMonday: Bool { settings?.weekStartsOnMonday ?? false }
@@ -17,9 +20,9 @@ struct CalendarScreen: View {
     var body: some View {
         ScreenScroll {
             HStack {
-                Text("しふとらっく")
-                    .font(.system(size: 22, weight: .black))
-                    .foregroundStyle(Theme.lime)
+                Text("マイシフト")
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(.white)
                 Spacer()
                 HelpButton { showHelp = true }
             }
@@ -57,23 +60,69 @@ struct CalendarScreen: View {
                     if value.translation.width > 40 { moveMonth(-1) }
                 }
             )
+
+            HStack {
+                Text(listTitle)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if selectedDay != nil {
+                    Button("月の一覧") { selectedDay = nil }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.lime)
+                }
+            }
+            .padding(.top, 8)
+
+            if listedShifts.isEmpty {
+                Text(selectedDay == nil ? "この月のシフトはまだありません" : "この日のシフトはありません")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(listedShifts) { shift in
+                        Button {
+                            editor = EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid)
+                        } label: {
+                            ShiftCard(shift: shift, includeTransport: settings?.includeTransport ?? true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
+                showAddChoices = true
+            }
+            .padding(.top, 4)
+
+            Button {
+                router.presentChooser()
+            } label: {
+                Text("シフト表から取り込む")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
         }
         .background(Theme.background)
-        .sheet(isPresented: Binding(
-            get: { selectedDay != nil },
-            set: { if !$0 { selectedDay = nil } }
-        )) {
-            if let selectedDay {
-                DayDetailSheet(day: selectedDay, workplaceID: selectedID)
-            }
+        .sheet(isPresented: $showAddChoices) {
+            ShiftAddChooser(day: addDay, workplaceID: selectedID)
+        }
+        .sheet(item: $editor) { route in
+            ShiftEditorView(route: route)
         }
         .sheet(isPresented: $showHelp) {
             HelpSheet(
-                title: "カレンダーの見方",
+                title: "マイシフトの見方",
                 paragraphs: [
-                    "上の勤務先は、件数に合わせて横幅を等分します。タップすると、その勤務先のシフトだけを表示します。",
-                    "日付の下の点は勤務先の色です。点が多い日は複数の勤務があります。",
-                    "ライム色の日は選択中です。タップすると、その日のシフトを見たり追加したりできます。"
+                    "カレンダーはスワイプで月を切り替えます。日をタップすると、その日のシフトを下に出します。月の一覧で、その月のシフトをまとめて見られます。",
+                    "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
+                    "「給」は給料日です。その他のカレンダーの設定で隠せます。",
+                    "＋シフトを追加から、新しく入力するか、直近10件の履歴を選んで同じ時間を追加できます。"
                 ]
             )
         }
@@ -117,7 +166,7 @@ struct CalendarScreen: View {
                         }
                     }
                 }
-                .frame(height: 5)
+                .frame(height: 8)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 56)
@@ -129,8 +178,52 @@ struct CalendarScreen: View {
                         .stroke(Theme.lime, lineWidth: 1.5)
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                if isPayday(day) {
+                    Text("給")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundStyle(selected ? Theme.ink : Theme.lime)
+                        .padding(3)
+                }
+            }
         }
         .buttonStyle(.plain)
+    }
+
+    private var listedShifts: [WorkShift] {
+        let calendar = Calendar.current
+        return shifts
+            .filter { shift in
+                if let selectedDay {
+                    return calendar.isDate(shift.date, inSameDayAs: selectedDay)
+                }
+                return calendar.isDate(shift.date, equalTo: month, toGranularity: .month)
+            }
+            .filter { selectedID == nil || $0.workplace?.uuid == selectedID }
+            .sorted { lhs, rhs in
+                if lhs.date == rhs.date { return lhs.startMinutes < rhs.startMinutes }
+                return lhs.date < rhs.date
+            }
+    }
+
+    private var listTitle: String {
+        if let selectedDay { return Formatters.longDay(selectedDay) }
+        return "この月のシフト"
+    }
+
+    private var addDay: Date {
+        if let selectedDay { return selectedDay }
+        let calendar = Calendar.current
+        if calendar.isDate(Date(), equalTo: month, toGranularity: .month) { return Date() }
+        return calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? Date()
+    }
+
+    private func isPayday(_ day: Date) -> Bool {
+        guard settings?.showPaydayOnCalendar ?? true else { return false }
+        let calendar = Calendar.current
+        return workplaces.contains { workplace in
+            calendar.isDate(PayMath.payday(in: day, workplace: workplace, calendar: calendar), inSameDayAs: day)
+        }
     }
 
     private func shiftsFor(_ day: Date) -> [WorkShift] {

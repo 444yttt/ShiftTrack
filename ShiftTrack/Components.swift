@@ -1,15 +1,14 @@
 import SwiftUI
 
 enum AppTab: Int, CaseIterable, Identifiable {
-    case calendar, shifts, income, walls, settings
+    case myShift, salary, walls, other
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .calendar: "カレンダー"
-        case .shifts: "シフト"
-        case .income: "収入"
+        case .myShift: "マイシフト"
+        case .salary: "給料"
         case .walls: "年収の壁"
-        case .settings: "設定"
+        case .other: "その他"
         }
     }
 }
