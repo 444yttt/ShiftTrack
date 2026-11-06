@@ -23,7 +23,14 @@ enum ShiftTextParser {
         }
     }
 
-    static func parse(text: String, now: Date = .now, knownNames: [String] = [], calendar: Calendar = .current) -> [Draft] {
+    static func parse(
+        text: String,
+        now: Date = .now,
+        knownNames: [String] = [],
+        calendar: Calendar = .current,
+        fallbackDate: Date? = nil,
+        defaultWorkplace: String = ""
+    ) -> [Draft] {
         let source = TextNormalizer.fold(text)
         let known = knownNames.map { TextNormalizer.fold($0) }.filter { !$0.isEmpty }
         var yearContext = calendar.component(.year, from: now)
@@ -51,14 +58,23 @@ enum ShiftTextParser {
             }
             if times.isEmpty {
                 let name = cleanupName(line, spans: dates.map(\.span))
-                if !name.isEmpty { stickyName = name }
+                if !name.isEmpty, !looksLikeNote(name) { stickyName = name }
                 continue
             }
 
-            let usableDates = dates.isEmpty ? (stickyDate.map { [$0] } ?? []) : dates.map { ($0.year, $0.month, $0.day) }
+            var usableDates = dates.isEmpty ? (stickyDate.map { [$0] } ?? []) : dates.map { ($0.year, $0.month, $0.day) }
+            if usableDates.isEmpty, let fallback = fallbackParts(fallbackDate, calendar: calendar) {
+                usableDates = [fallback]
+            }
             guard !usableDates.isEmpty else { continue }
             let breakMinutes = min(8 * 60, max(0, breakMatch(in: line) ?? 0))
-            let name = pickName(line: line, known: known, dates: dates.map(\.span), times: times.map(\.span), sticky: stickyName)
+            var name = pickName(line: line, known: known, dates: dates.map(\.span), times: times.map(\.span), sticky: stickyName)
+            if looksLikeNote(name) {
+                name = looksLikeNote(stickyName) ? "" : stickyName
+            }
+            if name.isEmpty {
+                name = defaultWorkplace.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
             guard !name.isEmpty else { continue }
 
             for (index, time) in times.enumerated() {
@@ -93,6 +109,13 @@ enum ShiftTextParser {
             }
         }
         return Array(unique.prefix(40))
+    }
+
+    private static func fallbackParts(_ date: Date?, calendar: Calendar) -> (Int, Int, Int)? {
+        guard let date else { return nil }
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else { return nil }
+        return (year, month, day)
     }
 
     private struct DateHit {
@@ -194,6 +217,14 @@ enum ShiftTextParser {
             return true
         }
         return parts.joined(separator: " ")
+    }
+
+    private static func looksLikeNote(_ name: String) -> Bool {
+        let stripped = name
+            .replacingOccurrences(of: "休憩", with: "")
+            .replacingOccurrences(of: "分", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        return !name.isEmpty && (stripped.isEmpty || stripped.allSatisfy(\.isNumber))
     }
 
     private static func clock(_ match: NSTextCheckingResult, base: Int, _ ns: NSString) -> Int? {

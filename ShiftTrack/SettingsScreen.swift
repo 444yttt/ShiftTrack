@@ -2,12 +2,10 @@ import SwiftData
 import SwiftUI
 
 struct SettingsScreen: View {
-    @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query private var settingsRows: [AppSettings]
     @State private var editorID: UUID?
     @State private var showCreator = false
-    @State private var confirmReset = false
     @State private var goalText = ""
     @State private var monthGoalText = ""
     @State private var wageText = ""
@@ -139,30 +137,6 @@ struct SettingsScreen: View {
             .background(Theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            Text("データ")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
-
-            Button {
-                confirmReset = true
-            } label: {
-                Text("サンプルデータをリセット")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.destructive)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Theme.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Theme.destructive, lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("確認してから、勤務先とシフトをサンプルに戻します")
-
             VStack(alignment: .leading, spacing: 6) {
                 Text("Siri / ショートカット")
                     .font(.system(size: 15, weight: .bold))
@@ -190,19 +164,6 @@ struct SettingsScreen: View {
             set: { if !$0 { editorID = nil } }
         )) {
             WorkplaceEditorView(existingID: editorID)
-        }
-        .alert("サンプルデータに戻しますか？", isPresented: $confirmReset) {
-            Button("リセット", role: .destructive) {
-                SampleSeeder.reset(in: context)
-                PendingImportStore.clear()
-                ImportRouter.shared.refreshCount()
-                if let settings = settingsRows.first {
-                    syncFields(settings)
-                }
-            }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("入力したシフトと勤務先は消え、最初のサンプルに戻ります。")
         }
     }
 

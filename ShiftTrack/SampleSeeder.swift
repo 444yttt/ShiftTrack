@@ -9,20 +9,6 @@ enum SampleSeeder {
         seed(in: context)
     }
 
-    static func reset(in context: ModelContext) {
-        for shift in (try? context.fetch(FetchDescriptor<WorkShift>())) ?? [] {
-            context.delete(shift)
-        }
-        for workplace in (try? context.fetch(FetchDescriptor<Workplace>())) ?? [] {
-            context.delete(workplace)
-        }
-        for settings in (try? context.fetch(FetchDescriptor<AppSettings>())) ?? [] {
-            context.delete(settings)
-        }
-        try? context.save()
-        seed(in: context)
-    }
-
     static func seed(in context: ModelContext) {
         let calendar = Calendar.current
         let year = calendar.component(.year, from: .now)

@@ -11,6 +11,15 @@ enum AppTab: Int, CaseIterable, Identifiable {
         case .other: "その他"
         }
     }
+
+    var symbol: String {
+        switch self {
+        case .myShift: "calendar"
+        case .salary: "yensign.circle"
+        case .walls: "chart.bar"
+        case .other: "gearshape"
+        }
+    }
 }
 
 struct CustomTabBar: View {
@@ -23,9 +32,11 @@ struct CustomTabBar: View {
                     selection = tab
                 } label: {
                     VStack(spacing: 4) {
-                        Circle()
-                            .fill(selection == tab ? Theme.lime : Theme.unselectedDot)
-                            .frame(width: 22, height: 22)
+                        Image(systemName: tab.symbol)
+                            .font(.system(size: 20, weight: .semibold))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(selection == tab ? Theme.lime : Theme.muted)
+                            .frame(width: 28, height: 24)
                         Text(tab.title)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(selection == tab ? Theme.lime : Theme.muted)

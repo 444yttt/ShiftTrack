@@ -59,6 +59,11 @@ enum PendingImportStore {
     }
 }
 
+struct ImportFocus: Equatable {
+    var id = UUID()
+    var dates: [Date]
+}
+
 @MainActor
 @Observable
 final class ImportRouter {
@@ -67,12 +72,23 @@ final class ImportRouter {
     var startInReview = false
     var pending: PendingImport?
     var stagedCount = 0
+    var fallbackDate: Date?
+    var defaultWorkplace = ""
+    var focusRequest: ImportFocus?
     private var handledStamp: Date?
 
-    func presentChooser() {
+    func presentChooser(fallbackDate: Date? = nil, defaultWorkplace: String = "") {
+        self.fallbackDate = fallbackDate
+        self.defaultWorkplace = defaultWorkplace
         startInReview = false
         pending = nil
         isPresented = true
+    }
+
+    func showSaved(dates: [Date]) {
+        let days = dates.map { Calendar.current.startOfDay(for: $0) }
+        guard !days.isEmpty else { return }
+        focusRequest = ImportFocus(dates: days)
     }
 
     func presentReview(_ pending: PendingImport) {
@@ -178,7 +194,12 @@ enum ShiftImageReader {
 }
 
 enum ShiftExtractionService {
-    static func extract(imageData: Data, knownNames: [String]) async -> PendingImport {
+    static func extract(
+        imageData: Data,
+        knownNames: [String],
+        fallbackDate: Date? = nil,
+        defaultWorkplace: String = ""
+    ) async -> PendingImport {
         let text: String
         do {
             text = try await ShiftImageReader.recognizeText(in: imageData)
@@ -196,10 +217,22 @@ enum ShiftExtractionService {
                 candidates: []
             )
         }
-        return await extract(text: text, knownNames: knownNames, fromImage: true)
+        return await extract(
+            text: text,
+            knownNames: knownNames,
+            fromImage: true,
+            fallbackDate: fallbackDate,
+            defaultWorkplace: defaultWorkplace
+        )
     }
 
-    static func extract(text: String, knownNames: [String], fromImage: Bool) async -> PendingImport {
+    static func extract(
+        text: String,
+        knownNames: [String],
+        fromImage: Bool,
+        fallbackDate: Date? = nil,
+        defaultWorkplace: String = ""
+    ) async -> PendingImport {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return PendingImport(
@@ -226,7 +259,12 @@ enum ShiftExtractionService {
         }
         #endif
 
-        let drafts = ShiftTextParser.parse(text: trimmed, knownNames: knownNames)
+        let drafts = ShiftTextParser.parse(
+            text: trimmed,
+            knownNames: knownNames,
+            fallbackDate: fallbackDate,
+            defaultWorkplace: defaultWorkplace
+        )
         return makePending(drafts: drafts, fromImage: fromImage, usedModel: false, modelFailed: modelFailed)
     }
 
@@ -245,7 +283,7 @@ enum ShiftExtractionService {
             message += "日付と時刻のパターンから候補を作りました。通信は使っていません。"
         }
         if drafts.isEmpty {
-            message += " シフトを見つけられませんでした。日付と開始・終了時刻が分かる形にしてください。"
+            message += " シフトを見つけられませんでした。勤務先・日付・開始と終了が分かる形にしてください。例: 11/8 カフェA 10:00-15:00"
         } else {
             message += " 保存前に内容を確認してください。"
         }
