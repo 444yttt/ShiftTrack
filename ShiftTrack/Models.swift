@@ -1,0 +1,237 @@
+import Foundation
+import SwiftData
+import SwiftUI
+
+@Model
+final class Workplace {
+    var uuid: UUID
+    var name: String
+    var colorHex: String
+    var hourlyWage: Int
+    var transportAllowance: Int
+    var notes: String
+    var genre: String
+    var place: String
+    var closingDay: Int
+    var paydayMonthOffset: Int
+    var paydayDay: Int
+    var payIsDaily: Bool
+    var dailyWage: Int
+    var holidayPayEnabled: Bool
+    var holidayWage: Int
+    var holidayWeekdaysRaw: String
+    var nightPayEnabled: Bool
+    var nightWage: Int
+    var nightStartMinutes: Int
+    var nightEndMinutes: Int
+    var holidayNightEnabled: Bool
+    var holidayNightWage: Int
+    var holidayNightStartMinutes: Int
+    var holidayNightEndMinutes: Int
+    var overtimeEnabled: Bool
+    var overtimeAfterMinutes: Int
+    var overtimePerHour: Bool
+    var overtimeExtra: Int
+    var createdAt: Date
+    @Relationship(deleteRule: .cascade, inverse: \WorkShift.workplace)
+    var shifts: [WorkShift]
+
+    init(
+        name: String,
+        colorHex: String,
+        hourlyWage: Int,
+        transportAllowance: Int,
+        notes: String = "",
+        createdAt: Date = .now
+    ) {
+        self.uuid = UUID()
+        self.name = name
+        self.colorHex = colorHex
+        self.hourlyWage = hourlyWage
+        self.transportAllowance = transportAllowance
+        self.notes = notes
+        self.genre = ""
+        self.place = ""
+        self.closingDay = 0
+        self.paydayMonthOffset = 0
+        self.paydayDay = 0
+        self.payIsDaily = false
+        self.dailyWage = 0
+        self.holidayPayEnabled = false
+        self.holidayWage = 0
+        self.holidayWeekdaysRaw = ""
+        self.nightPayEnabled = false
+        self.nightWage = 0
+        self.nightStartMinutes = 22 * 60
+        self.nightEndMinutes = 5 * 60
+        self.holidayNightEnabled = false
+        self.holidayNightWage = 0
+        self.holidayNightStartMinutes = 22 * 60
+        self.holidayNightEndMinutes = 5 * 60
+        self.overtimeEnabled = false
+        self.overtimeAfterMinutes = 8 * 60
+        self.overtimePerHour = true
+        self.overtimeExtra = 0
+        self.createdAt = createdAt
+        self.shifts = []
+    }
+
+    var holidayWeekdays: Set<Int> {
+        Set(holidayWeekdaysRaw.split(separator: ",").compactMap { Int($0) })
+    }
+
+    func setHolidayWeekdays(_ days: Set<Int>) {
+        holidayWeekdaysRaw = days.sorted().map(String.init).joined(separator: ",")
+    }
+
+    var color: Color { Color(hexString: colorHex) }
+}
+
+@Model
+final class WorkShift {
+    var uuid: UUID
+    var date: Date
+    var startMinutes: Int
+    var endMinutes: Int
+    var breakMinutes: Int
+    var notes: String
+    var customPay: Int?
+    var adjustmentYen: Int
+    var adjustmentNote: String
+    var workplace: Workplace?
+
+    init(
+        date: Date,
+        startMinutes: Int,
+        endMinutes: Int,
+        breakMinutes: Int,
+        notes: String = "",
+        customPay: Int? = nil,
+        adjustmentYen: Int = 0,
+        adjustmentNote: String = "",
+        workplace: Workplace?
+    ) {
+        self.uuid = UUID()
+        self.date = Calendar.current.startOfDay(for: date)
+        self.startMinutes = startMinutes
+        self.endMinutes = endMinutes
+        self.breakMinutes = breakMinutes
+        self.notes = notes
+        self.customPay = customPay
+        self.adjustmentYen = adjustmentYen
+        self.adjustmentNote = adjustmentNote
+        self.workplace = workplace
+    }
+
+    var workedMinutes: Int {
+        PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: breakMinutes)
+    }
+
+    func estimatedYen(includeTransport: Bool) -> Int {
+        guard let workplace else { return 0 }
+        return PayMath.shiftYen(self, includeTransport: includeTransport)
+    }
+
+    func hasEnded(now: Date = .now, calendar: Calendar = .current) -> Bool {
+        PayMath.endDate(day: date, start: startMinutes, end: endMinutes, calendar: calendar) <= now
+    }
+
+    var scheduleLabel: String {
+        let time = "\(Formatters.clock(startMinutes))–\(Formatters.clock(endMinutes))"
+        var label = "\(Formatters.monthDayWeekday(date))  \(time)"
+        if breakMinutes > 0 {
+            label += "  休憩\(breakMinutes)分"
+        }
+        return label
+    }
+}
+
+@Model
+final class AppSettings {
+    var weekStartsOnMonday: Bool
+    var includeTransport: Bool
+    var defaultHourlyWage: Int
+    var defaultTransportAllowance: Int
+    var annualIncomeGoal: Int
+    var monthlyIncomeGoal: Int
+    var showPaydayOnCalendar: Bool
+    var goalMonthOverrides: String
+    var goalYearOverrides: String
+    var salarySeenKey: String
+    var salarySeenWorked: Int
+
+    init(
+        weekStartsOnMonday: Bool = false,
+        includeTransport: Bool = true,
+        defaultHourlyWage: Int = 1_200,
+        defaultTransportAllowance: Int = 500,
+        annualIncomeGoal: Int = 1_000_000,
+        monthlyIncomeGoal: Int = 100_000
+    ) {
+        self.weekStartsOnMonday = weekStartsOnMonday
+        self.includeTransport = includeTransport
+        self.defaultHourlyWage = defaultHourlyWage
+        self.defaultTransportAllowance = defaultTransportAllowance
+        self.annualIncomeGoal = annualIncomeGoal
+        self.monthlyIncomeGoal = monthlyIncomeGoal
+        self.showPaydayOnCalendar = true
+        self.goalMonthOverrides = ""
+        self.goalYearOverrides = ""
+        self.salarySeenKey = ""
+        self.salarySeenWorked = 0
+    }
+
+    func monthGoal(year: Int, month: Int) -> Int {
+        Self.overrideMap(goalMonthOverrides)[Self.monthKey(year, month)] ?? monthlyIncomeGoal
+    }
+
+    func yearGoal(_ year: Int) -> Int {
+        Self.overrideMap(goalYearOverrides)[String(year)] ?? annualIncomeGoal
+    }
+
+    func setMonthGoal(_ value: Int, year: Int, month: Int, applyForward: Bool) {
+        let key = Self.monthKey(year, month)
+        if applyForward {
+            monthlyIncomeGoal = value
+            goalMonthOverrides = Self.overrideMap(goalMonthOverrides)
+                .filter { $0.key < key }
+                .map { "\($0.key)=\($0.value)" }
+                .sorted()
+                .joined(separator: "|")
+        } else {
+            var map = Self.overrideMap(goalMonthOverrides)
+            map[key] = value
+            goalMonthOverrides = map.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: "|")
+        }
+    }
+
+    func setYearGoal(_ value: Int, year: Int, applyForward: Bool) {
+        let key = String(year)
+        if applyForward {
+            annualIncomeGoal = value
+            goalYearOverrides = Self.overrideMap(goalYearOverrides)
+                .filter { $0.key < key }
+                .map { "\($0.key)=\($0.value)" }
+                .sorted()
+                .joined(separator: "|")
+        } else {
+            var map = Self.overrideMap(goalYearOverrides)
+            map[key] = value
+            goalYearOverrides = map.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: "|")
+        }
+    }
+
+    private static func monthKey(_ year: Int, _ month: Int) -> String {
+        String(format: "%04d-%02d", year, month)
+    }
+
+    private static func overrideMap(_ raw: String) -> [String: Int] {
+        var map: [String: Int] = [:]
+        for part in raw.split(separator: "|") {
+            let pieces = part.split(separator: "=", maxSplits: 1)
+            guard pieces.count == 2, let value = Int(pieces[1]) else { continue }
+            map[String(pieces[0])] = value
+        }
+        return map
+    }
+}
