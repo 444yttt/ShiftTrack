@@ -10,6 +10,7 @@ on:
       - "ShiftTrack/**"
       - "ShiftTrack.xcodeproj/**"
       - ".github/workflows/testflight.yml"
+      - ".github/scripts/**"
 
 jobs:
   upload:
