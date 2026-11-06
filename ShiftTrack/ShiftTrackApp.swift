@@ -67,7 +67,7 @@ struct RootView: View {
                 .presentationBackground(Theme.background)
         }
         .task {
-            SampleSeeder.seedIfNeeded(in: context)
+            AppBootstrap.ensureSettings(in: context)
             ShiftTrackShortcuts.updateAppShortcutParameters()
             router.considerPending()
         }
@@ -79,12 +79,22 @@ struct RootView: View {
     }
 }
 
+enum AppBootstrap {
+    @MainActor
+    static func ensureSettings(in context: ModelContext) {
+        let existing = (try? context.fetch(FetchDescriptor<AppSettings>())) ?? []
+        guard existing.isEmpty else { return }
+        context.insert(AppSettings())
+        try? context.save()
+    }
+}
+
 enum PreviewStore {
     @MainActor static let container: ModelContainer = {
         let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self])
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: [configuration])
-        SampleSeeder.seed(in: container.mainContext)
+        AppBootstrap.ensureSettings(in: container.mainContext)
         return container
     }()
 }

@@ -95,7 +95,7 @@ struct ImportChooserView: View {
                     .frame(minHeight: 160)
                     .padding(10)
                 if text.isEmpty {
-                    Text("11/7 カフェA 10:00-15:00\n11月8日 コンビニB 18:00-23:00")
+                    Text(placeholder)
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
                         .padding(16)
@@ -105,6 +105,14 @@ struct ImportChooserView: View {
             .background(Theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.top, 12)
+
+            if !assumption.isEmpty {
+                Text(assumption)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+            }
 
             Button {
                 if let clip = UIPasteboard.general.string, !clip.isEmpty {
@@ -178,15 +186,47 @@ struct ImportChooserView: View {
         .clipShape(Capsule())
     }
 
+    private var placeholder: String {
+        if ImportRouter.shared.defaultWorkplace.isEmpty {
+            return "11/7 カフェA 10:00-15:00\n11月8日 コンビニB 18:00-23:00"
+        }
+        return "10:00-15:00\n18:00-23:00 休憩60分"
+    }
+
+    private var assumption: String {
+        var lines: [String] = []
+        if let day = ImportRouter.shared.fallbackDate {
+            lines.append("日付の無い行は\(Formatters.longDay(day))として読みます。")
+        }
+        if !ImportRouter.shared.defaultWorkplace.isEmpty {
+            lines.append("勤務先の無い行は「\(ImportRouter.shared.defaultWorkplace)」にします。")
+        }
+        lines.append("読み取ったあと、保存するとマイシフトに出ます。")
+        return lines.joined()
+    }
+
     private func extract() async {
         working = true
         error = ""
         let names = workplaces.map(\.name)
+        let day = ImportRouter.shared.fallbackDate
+        let workplace = ImportRouter.shared.defaultWorkplace
         let pending: PendingImport
         if let imageData {
-            pending = await ShiftExtractionService.extract(imageData: imageData, knownNames: names)
+            pending = await ShiftExtractionService.extract(
+                imageData: imageData,
+                knownNames: names,
+                fallbackDate: day,
+                defaultWorkplace: workplace
+            )
         } else {
-            pending = await ShiftExtractionService.extract(text: text, knownNames: names, fromImage: false)
+            pending = await ShiftExtractionService.extract(
+                text: text,
+                knownNames: names,
+                fromImage: false,
+                fallbackDate: day,
+                defaultWorkplace: workplace
+            )
         }
         PendingImportStore.save(pending)
         working = false
@@ -368,14 +408,23 @@ struct ImportReviewView: View {
             context.insert(shift)
             saved += 1
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            savedNote = "保存できませんでした。もう一度試してください。"
+            return
+        }
         PendingImportStore.clear()
         ImportRouter.shared.refreshCount()
-        savedNote = skipped > 0 ? "\(saved)件保存しました。同じシフト \(skipped)件は飛ばしました。" : "\(saved)件保存しました。"
-        if saved > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        let focused = pending.candidates.filter(\.included).map(\.date)
+        if saved > 0 || skipped > 0 {
+            ImportRouter.shared.showSaved(dates: focused)
+            savedNote = skipped > 0 ? "\(saved)件保存しました。同じシフト \(skipped)件は飛ばしました。" : "\(saved)件保存しました。"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                 dismiss()
             }
+        } else {
+            savedNote = "保存できるシフトがありません。勤務先と開始・終了を確認してください。"
         }
     }
 
@@ -418,6 +467,7 @@ struct CandidateEditor: View {
     @Binding var candidate: ImportCandidate
     var workplaces: [Workplace]
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var typing: Bool
 
     var body: some View {
         NavigationStack {
@@ -429,6 +479,7 @@ struct CandidateEditor: View {
                     TextField("勤務先の名前", text: $candidate.workplaceName)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.white)
+                        .focused($typing)
                     Picker("登録方法", selection: $candidate.createWorkplace) {
                         Text("この名前で追加").tag(true)
                         Text("既存の勤務先").tag(false)
@@ -460,6 +511,15 @@ struct CandidateEditor: View {
                             .foregroundStyle(.white)
                     }
                     .tint(Theme.lime)
+                    if PayMath.workedMinutes(
+                        start: candidate.startMinutes,
+                        end: candidate.endMinutes,
+                        breakMinutes: candidate.breakMinutes
+                    ) == 0 {
+                        Text("開始と終了が同じだと、この行は保存されません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.behind)
+                    }
                 }
                 .padding(14)
                 .background(Theme.card)
@@ -472,6 +532,11 @@ struct CandidateEditor: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完了") { dismiss() }
+                        .foregroundStyle(Theme.lime)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { typing = false }
                         .foregroundStyle(Theme.lime)
                 }
             }

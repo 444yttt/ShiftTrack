@@ -188,10 +188,16 @@ struct DayDetailSheet: View {
 struct ShiftAddChooser: View {
     var day: Date
     var workplaceID: UUID?
+    var onSaved: ([Date]) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query(sort: \WorkShift.date, order: .reverse) private var shifts: [WorkShift]
+    @Query private var settingsRows: [AppSettings]
     @State private var editor: EditorRoute?
+    @State private var tableText = ""
+    @State private var tableError = ""
+    @FocusState private var tableFocused: Bool
 
     private var history: [WorkShift] {
         var seen = Set<String>()
@@ -206,6 +212,43 @@ struct ShiftAddChooser: View {
         return items
     }
 
+    private var assumedWorkplace: Workplace? {
+        if let workplaceID, let match = workplaces.first(where: { $0.uuid == workplaceID }) {
+            return match
+        }
+        return workplaces.count == 1 ? workplaces.first : nil
+    }
+
+    private var drafts: [ShiftTextParser.Draft] {
+        ShiftTextParser.parse(
+            text: tableText,
+            knownNames: workplaces.map(\.name),
+            fallbackDate: day,
+            defaultWorkplace: assumedWorkplace?.name ?? ""
+        )
+    }
+
+    private var tableHint: String {
+        var lines = ["日付を書かない行は\(Formatters.longDay(day))になります。"]
+        if let name = assumedWorkplace?.name {
+            lines.append("勤務先を書かない行は「\(name)」になります。")
+        } else {
+            lines.append("勤務先の名前を行に書いてください。")
+        }
+        lines.append("追加すると、この画面を閉じてマイシフトに出します。")
+        return lines.joined(separator: "")
+    }
+
+    private var tableProblem: String {
+        if !tableError.isEmpty { return tableError }
+        let trimmed = tableText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, drafts.isEmpty else { return "" }
+        if assumedWorkplace == nil {
+            return "勤務先の名前と、開始・終了時刻を書いてください。例: 11/8 カフェA 10:00-15:00"
+        }
+        return "開始・終了時刻が読み取れません。例: 10:00-15:00"
+    }
+
     var body: some View {
         NavigationStack {
             ScreenScroll {
@@ -213,47 +256,9 @@ struct ShiftAddChooser: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                LimeCapsuleButton(title: "新規にシフトを入力する", fillWidth: true) {
-                    editor = EditorRoute(shiftID: nil, date: day, workplaceID: workplaceID)
-                }
-                .padding(.top, 8)
-                Text("履歴から追加")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-                if history.isEmpty {
-                    Text("まだ履歴がありません。新しく入力すると、次から日付を選ぶだけで追加できます。")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.muted)
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(history) { shift in
-                            Button {
-                                add(shift)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Circle()
-                                        .fill(shift.workplace?.color ?? Theme.lime)
-                                        .frame(width: 12, height: 12)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(shift.workplace?.name ?? "勤務先")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(.white)
-                                        Text("\(Formatters.clock(shift.startMinutes))–\(Formatters.clock(shift.endMinutes))  休憩\(shift.breakMinutes)分")
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(Theme.muted)
-                                    }
-                                    Spacer()
-                                }
-                                .padding(14)
-                                .background(Theme.card)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+                tableSection
+                manualSection
+                historySection
             }
             .background(Theme.background)
             .navigationTitle("シフトを追加")
@@ -263,12 +268,187 @@ struct ShiftAddChooser: View {
                     Button("閉じる") { dismiss() }
                         .foregroundStyle(Theme.lime)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { tableFocused = false }
+                        .foregroundStyle(Theme.lime)
+                }
             }
             .darkSheet()
             .sheet(item: $editor) { route in
-                ShiftEditorView(route: route)
+                ShiftEditorView(route: route) { date in
+                    onSaved([date])
+                    dismiss()
+                }
             }
         }
+    }
+
+    private var tableSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("シフト表")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+            Text(tableHint)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $tableText)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 120)
+                    .padding(8)
+                    .focused($tableFocused)
+                if tableText.isEmpty {
+                    Text(tablePlaceholder)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                        .padding(14)
+                        .allowsHitTesting(false)
+                }
+            }
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .onChange(of: tableText) { _, _ in tableError = "" }
+            if !tableProblem.isEmpty {
+                Text(tableProblem)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.behind)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !drafts.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(Array(drafts.prefix(6))) { draft in
+                        draftRow(draft)
+                    }
+                    if drafts.count > 6 {
+                        Text("ほか \(drafts.count - 6) 件")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            LimeCapsuleButton(title: "シフト表に追加", fillWidth: true) {
+                commitTable()
+            }
+            .disabled(drafts.isEmpty)
+            .opacity(drafts.isEmpty ? 0.4 : 1)
+        }
+        .padding(.top, 12)
+    }
+
+    private var tablePlaceholder: String {
+        if let name = assumedWorkplace?.name {
+            return "10:00-15:00\n18:00-23:00 休憩60分\n11/9 \(name) 9:00-13:00"
+        }
+        return "11/8 カフェA 10:00-15:00\n11/9 18:00-23:00 休憩60分"
+    }
+
+    private var manualSection: some View {
+        Button {
+            editor = EditorRoute(shiftID: nil, date: day, workplaceID: workplaceID ?? assumedWorkplace?.uuid)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.lime)
+                    .frame(width: 28, height: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("1件ずつ入力")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("勤務先と時刻を画面で選びます")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(14)
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 8)
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("履歴から追加")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if history.isEmpty {
+                Text("まだ履歴がありません。追加すると、次から同じ時間を選べます。")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.muted)
+            } else {
+                ForEach(history) { shift in
+                    Button {
+                        add(shift)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(shift.workplace?.color ?? Theme.lime)
+                                .frame(width: 12, height: 12)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(shift.workplace?.name ?? "勤務先")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("\(Formatters.clock(shift.startMinutes))–\(Formatters.clock(shift.endMinutes))  休憩\(shift.breakMinutes)分")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            Spacer()
+                        }
+                        .padding(14)
+                        .background(Theme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    private func draftRow(_ draft: ShiftTextParser.Draft) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(color(for: draft.workplaceName))
+                .frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(draft.workplaceName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(draftCaption(draft))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Theme.cardRaised)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func draftCaption(_ draft: ShiftTextParser.Draft) -> String {
+        let when = draft.date().map { Formatters.monthDayWeekday($0) } ?? "\(draft.month)/\(draft.day)"
+        return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  休憩\(draft.breakMinutes)分"
+    }
+
+    private func color(for name: String) -> Color {
+        let key = normalize(name)
+        if let match = workplaces.first(where: { normalize($0.name) == key }) {
+            return match.color
+        }
+        return Theme.lime
     }
 
     private func add(_ source: WorkShift) {
@@ -281,13 +461,103 @@ struct ShiftAddChooser: View {
             workplace: workplace
         )
         context.insert(shift)
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            tableError = "保存できませんでした。もう一度試してください。"
+            return
+        }
+        onSaved([day])
         dismiss()
+    }
+
+    private func commitTable() {
+        let parsed = drafts
+        guard !parsed.isEmpty else { return }
+        tableFocused = false
+        let settings = settingsRows.first
+        let wage = settings?.defaultHourlyWage ?? 1200
+        let transport = settings?.defaultTransportAllowance ?? 500
+        var created: [String: Workplace] = [:]
+        var dates: [Date] = []
+        for draft in parsed {
+            guard let date = draft.date() else { continue }
+            guard PayMath.workedMinutes(
+                start: draft.startMinutes,
+                end: draft.endMinutes,
+                breakMinutes: draft.breakMinutes
+            ) > 0 else { continue }
+            guard let workplace = workplace(
+                named: draft.workplaceName,
+                wage: wage,
+                transport: transport,
+                created: &created
+            ) else { continue }
+            dates.append(date)
+            let duplicate = shifts.contains { shift in
+                shift.workplace?.uuid == workplace.uuid
+                    && Calendar.current.isDate(shift.date, inSameDayAs: date)
+                    && shift.startMinutes == draft.startMinutes
+                    && shift.endMinutes == draft.endMinutes
+            }
+            if duplicate { continue }
+            context.insert(WorkShift(
+                date: date,
+                startMinutes: draft.startMinutes,
+                endMinutes: draft.endMinutes,
+                breakMinutes: draft.breakMinutes,
+                workplace: workplace
+            ))
+        }
+        guard !dates.isEmpty else {
+            tableError = "勤務時間が0分になる行だけです。開始と終了を変えてください。"
+            return
+        }
+        do {
+            try context.save()
+        } catch {
+            tableError = "保存できませんでした。もう一度試してください。"
+            return
+        }
+        onSaved(dates)
+        dismiss()
+    }
+
+    private func workplace(
+        named name: String,
+        wage: Int,
+        transport: Int,
+        created: inout [String: Workplace]
+    ) -> Workplace? {
+        let key = normalize(name)
+        guard !key.isEmpty else { return nil }
+        if let existing = created[key] { return existing }
+        if let found = workplaces.first(where: { normalize($0.name) == key }) {
+            created[key] = found
+            return found
+        }
+        let used = Set(workplaces.map(\.colorHex) + created.values.map(\.colorHex))
+        let color = Theme.palette.first { !used.contains($0) } ?? Theme.palette[(workplaces.count + created.count) % Theme.palette.count]
+        let workplace = Workplace(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            colorHex: color,
+            hourlyWage: wage,
+            transportAllowance: transport,
+            notes: "シフト表から追加"
+        )
+        context.insert(workplace)
+        created[key] = workplace
+        return workplace
+    }
+
+    private func normalize(_ text: String) -> String {
+        TextNormalizer.fold(text).replacingOccurrences(of: " ", with: "").lowercased()
     }
 }
 
 struct ShiftEditorView: View {
     var route: EditorRoute
+    var onSaved: ((Date) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
@@ -306,6 +576,7 @@ struct ShiftEditorView: View {
     @State private var error = ""
     @State private var confirmDelete = false
     @State private var showWorkplaceCreator = false
+    @FocusState private var typing: Bool
 
     private var existing: WorkShift? { shifts.first { $0.uuid == route.shiftID } }
     private var includeTransport: Bool { settingsRows.first?.includeTransport ?? true }
@@ -360,26 +631,27 @@ struct ShiftEditorView: View {
                                     .foregroundStyle(.white)
                             }
                             .tint(Theme.lime)
+                            Text("実働 \(Formatters.hours(draftMinutes))")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Theme.lime)
                         }
                     }
                     formCard {
                         labeled("給料の個別設定") {
-                            TextField("空欄なら自動計算", text: $customText)
-                                .keyboardType(.numberPad)
-                                .font(.system(size: 16, weight: .bold))
+                            yenField("空欄なら自動計算", text: $customText)
                         }
                         divider
                         labeled("天引・手当") {
-                            TextField("天引はマイナス", text: $adjustmentText)
-                                .keyboardType(.numbersAndPunctuation)
-                                .font(.system(size: 16, weight: .bold))
+                            yenField("天引はマイナス", text: $adjustmentText, signed: true)
                         }
                         TextField("天引・手当の詳細", text: $adjustmentNote)
                             .font(.system(size: 14))
+                            .focused($typing)
                         divider
                         TextField("メモ", text: $notes, axis: .vertical)
                             .font(.system(size: 15))
                             .foregroundStyle(.white)
+                            .focused($typing)
                     }
                     if let workplace = selectedWorkplace {
                         let amount = PayMath.quote(
@@ -397,12 +669,14 @@ struct ShiftEditorView: View {
                             .foregroundStyle(Theme.lime)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if !error.isEmpty {
-                        Text(error)
+                    if !shownError.isEmpty {
+                        Text(shownError)
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.behind)
                     }
                     LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true) { save() }
+                        .disabled(!canSave)
+                        .opacity(canSave ? 1 : 0.4)
                         .padding(.top, 8)
                     if existing != nil {
                         Button("削除する") { confirmDelete = true }
@@ -421,9 +695,18 @@ struct ShiftEditorView: View {
                     Button("キャンセル") { dismiss() }
                         .foregroundStyle(Theme.lime)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { typing = false }
+                        .foregroundStyle(Theme.lime)
+                }
             }
             .darkSheet()
             .onAppear(perform: load)
+            .onChange(of: workplaces.map(\.uuid)) { _, ids in
+                if let workplaceID, ids.contains(workplaceID) { return }
+                self.workplaceID = workplaces.last?.uuid
+            }
             .alert("このシフトを削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) { deleteShift() }
                 Button("キャンセル", role: .cancel) {}
@@ -485,8 +768,49 @@ struct ShiftEditorView: View {
             )
             context.insert(shift)
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            self.error = "保存できませんでした。もう一度試してください。"
+            return
+        }
+        onSaved?(Calendar.current.startOfDay(for: date))
         dismiss()
+    }
+
+    private var draftMinutes: Int {
+        PayMath.workedMinutes(
+            start: startMinutes,
+            end: endMinutes,
+            breakMinutes: selectedWorkplace?.payIsDaily == true ? 0 : breakMinutes
+        )
+    }
+
+    private var canSave: Bool {
+        guard selectedWorkplace != nil else { return false }
+        if selectedWorkplace?.payIsDaily == true { return true }
+        return draftMinutes > 0
+    }
+
+    private var shownError: String {
+        if !error.isEmpty { return error }
+        guard selectedWorkplace != nil else { return workplaces.isEmpty ? "" : "勤務先を選んでください" }
+        if selectedWorkplace?.payIsDaily != true, draftMinutes == 0 {
+            return "終了時刻が開始と同じにならないようにしてください"
+        }
+        return ""
+    }
+
+    private func yenField(_ prompt: String, text: Binding<String>, signed: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            Text("¥")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Theme.muted)
+            TextField(prompt, text: text)
+                .keyboardType(signed ? .numbersAndPunctuation : .numberPad)
+                .font(.system(size: 16, weight: .bold))
+                .focused($typing)
+        }
     }
 
     private var parsedCustom: Int? {
@@ -506,7 +830,12 @@ struct ShiftEditorView: View {
 
     private func deleteShift() {
         if let existing { context.delete(existing) }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            self.error = "削除できませんでした。もう一度試してください。"
+            return
+        }
         dismiss()
     }
 
@@ -592,6 +921,7 @@ struct WorkplaceEditorView: View {
     @State private var overtimeText = "0"
     @State private var error = ""
     @State private var confirmDelete = false
+    @FocusState private var typing: Bool
 
     private var existing: Workplace? { workplaces.first { $0.uuid == existingID } }
 
@@ -599,7 +929,8 @@ struct WorkplaceEditorView: View {
         NavigationStack {
             ScreenScroll {
                 formCard {
-                    field("勤務先", text: $name)
+                    sectionTitle("勤務先")
+                    field("名前", text: $name)
                     field("ジャンル", text: $genre)
                     field("場所", text: $place)
                     Text("マイシフトでの表示色")
@@ -620,89 +951,82 @@ struct WorkplaceEditorView: View {
                                     }
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("表示色")
+                            .accessibilityAddTraits(colorHex == hex ? .isSelected : [])
                         }
                     }
-                    Picker("締日", selection: $closingDay) {
-                        Text("月末").tag(0)
-                        ForEach(1...31, id: \.self) { day in
-                            Text("\(day)日").tag(day)
-                        }
-                    }
-                    .tint(Theme.lime)
+                }
+                formCard {
+                    sectionTitle("締めと給料日")
+                    dayPicker("締日", selection: $closingDay)
                     Picker("給料日の月", selection: $paydayOffset) {
                         Text("当月").tag(0)
                         Text("翌月").tag(1)
                         Text("翌々月").tag(2)
                     }
                     .tint(Theme.lime)
-                    Picker("給料日", selection: $paydayDay) {
-                        Text("月末").tag(0)
-                        ForEach(1...31, id: \.self) { day in
-                            Text("\(day)日").tag(day)
-                        }
-                    }
-                    .tint(Theme.lime)
+                    dayPicker("給料日", selection: $paydayDay)
+                    Text("給料は、働いた月ではなく給料日の月に集計されます。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                }
+                formCard {
+                    sectionTitle("給料")
                     Picker("給料", selection: $payIsDaily) {
                         Text("時給").tag(false)
                         Text("日給").tag(true)
                     }
                     .pickerStyle(.segmented)
                     if payIsDaily {
-                        field("日給（円）", text: $dailyText, number: true)
+                        field("日給", text: $dailyText, number: true)
                     } else {
-                        field("時給（円）", text: $wageText, number: true)
+                        field("時給", text: $wageText, number: true)
                     }
-                    field("交通費（円）", text: $transportText, number: true)
+                    field("交通費", text: $transportText, number: true)
+                }
+                formCard {
+                    sectionTitle("休日・深夜・残業")
                     Toggle("休日給料", isOn: $holidayOn).tint(Theme.lime)
                     if holidayOn {
-                        field("休日給料（円）", text: $holidayText, number: true)
-                        weekdayPicker
+                        VStack(alignment: .leading, spacing: 10) {
+                            field("休日給料", text: $holidayText, number: true)
+                            weekdayPicker
+                        }
                     }
                     if !payIsDaily {
-                        Toggle("深夜給料", isOn: $nightOn).tint(Theme.lime)
-                        if nightOn {
-                            field("深夜給料（円）", text: $nightText, number: true)
-                            HStack {
-                                MinutesTimePicker(minutes: $nightStart)
-                                Text("から").foregroundStyle(Theme.muted)
-                                MinutesTimePicker(minutes: $nightEnd)
-                            }
-                        }
-                        if holidayOn {
-                            Toggle("休日深夜給料", isOn: $holidayNightOn).tint(Theme.lime)
-                            if holidayNightOn {
-                                field("休日深夜給料（円）", text: $holidayNightText, number: true)
-                                HStack {
-                                    MinutesTimePicker(minutes: $holidayNightStart)
-                                    Text("から").foregroundStyle(Theme.muted)
-                                    MinutesTimePicker(minutes: $holidayNightEnd)
-                                }
-                            }
-                        }
+                        nightFields
                     }
                     Toggle("残業手当", isOn: $overtimeOn).tint(Theme.lime)
                     if overtimeOn {
-                        Stepper(value: $overtimeHours, in: 1...16) {
-                            Text("適応時間 \(overtimeHours)時間")
-                                .foregroundStyle(.white)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Stepper(value: $overtimeHours, in: 1...16) {
+                                Text("適応時間 \(overtimeHours)時間")
+                                    .foregroundStyle(.white)
+                            }
+                            Picker("金額の単位", selection: $overtimePerHour) {
+                                Text("1時間あたり").tag(true)
+                                Text("1シフトあたり").tag(false)
+                            }
+                            .tint(Theme.lime)
+                            field("追加金額", text: $overtimeText, number: true)
                         }
-                        Picker("金額の単位", selection: $overtimePerHour) {
-                            Text("1時間あたり").tag(true)
-                            Text("1シフトあたり").tag(false)
-                        }
-                        .tint(Theme.lime)
-                        field("追加金額（円）", text: $overtimeText, number: true)
                     }
+                }
+                formCard {
+                    sectionTitle("メモ")
                     field("メモ", text: $notes)
                 }
                 if !error.isEmpty {
-                    Text(error).font(.system(size: 13)).foregroundStyle(Theme.behind)
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.behind)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true) { save() }
                 if existing != nil {
                     Button("この勤務先を削除") { confirmDelete = true }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Theme.behind)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.destructive)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
                 }
@@ -715,13 +1039,23 @@ struct WorkplaceEditorView: View {
                     Button("キャンセル") { dismiss() }
                         .foregroundStyle(Theme.lime)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { typing = false }
+                        .foregroundStyle(Theme.lime)
+                }
             }
             .darkSheet()
             .onAppear(perform: load)
             .alert("この勤務先と、入っているシフトを削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) {
                     if let existing { context.delete(existing) }
-                    try? context.save()
+                    do {
+                        try context.save()
+                    } catch {
+                        self.error = "削除できませんでした。もう一度試してください。"
+                        return
+                    }
                     dismiss()
                 }
                 Button("キャンセル", role: .cancel) {}
@@ -766,6 +1100,47 @@ struct WorkplaceEditorView: View {
         }
     }
 
+    private var nightFields: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("深夜給料", isOn: $nightOn).tint(Theme.lime)
+            if nightOn {
+                field("深夜給料", text: $nightText, number: true)
+                HStack {
+                    MinutesTimePicker(minutes: $nightStart)
+                    Text("から").foregroundStyle(Theme.muted)
+                    MinutesTimePicker(minutes: $nightEnd)
+                }
+            }
+            if holidayOn {
+                Toggle("休日深夜給料", isOn: $holidayNightOn).tint(Theme.lime)
+                if holidayNightOn {
+                    field("休日深夜給料", text: $holidayNightText, number: true)
+                    HStack {
+                        MinutesTimePicker(minutes: $holidayNightStart)
+                        Text("から").foregroundStyle(Theme.muted)
+                        MinutesTimePicker(minutes: $holidayNightEnd)
+                    }
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(.white)
+    }
+
+    private func dayPicker(_ title: String, selection: Binding<Int>) -> some View {
+        Picker(title, selection: selection) {
+            Text("月末").tag(0)
+            ForEach(1...31, id: \.self) { day in
+                Text("\(day)日").tag(day)
+            }
+        }
+        .tint(Theme.lime)
+    }
+
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -773,6 +1148,36 @@ struct WorkplaceEditorView: View {
             return
         }
         let wage = min(100_000, max(0, Int(wageText.filter(\.isNumber)) ?? 0))
+        let daily = min(100_000, max(0, Int(dailyText.filter(\.isNumber)) ?? 0))
+        if payIsDaily, daily == 0 {
+            error = "日給を入力してください"
+            return
+        }
+        if !payIsDaily, wage == 0 {
+            error = "時給を入力してください"
+            return
+        }
+        if holidayOn, holidayDays.isEmpty {
+            error = "休日の曜日を1つ選んでください"
+            return
+        }
+        if holidayOn, yen(holidayText) == 0 {
+            error = "休日給料を入力してください"
+            return
+        }
+        if nightOn, !payIsDaily, yen(nightText) == 0 {
+            error = "深夜給料を入力してください"
+            return
+        }
+        if holidayNightOn, holidayOn, !payIsDaily, yen(holidayNightText) == 0 {
+            error = "休日深夜給料を入力してください"
+            return
+        }
+        if overtimeOn, yen(overtimeText) == 0 {
+            error = "残業手当の金額を入力してください"
+            return
+        }
+        error = ""
         let transport = min(100_000, max(0, Int(transportText.filter(\.isNumber)) ?? 0))
         let workplace: Workplace
         if let existing {
@@ -798,7 +1203,7 @@ struct WorkplaceEditorView: View {
         workplace.paydayMonthOffset = paydayOffset
         workplace.paydayDay = paydayDay
         workplace.payIsDaily = payIsDaily
-        workplace.dailyWage = min(100_000, max(0, Int(dailyText.filter(\.isNumber)) ?? 0))
+        workplace.dailyWage = daily
         workplace.holidayPayEnabled = holidayOn
         workplace.holidayWage = min(100_000, max(0, Int(holidayText.filter(\.isNumber)) ?? 0))
         workplace.setHolidayWeekdays(holidayDays)
@@ -814,8 +1219,17 @@ struct WorkplaceEditorView: View {
         workplace.overtimeAfterMinutes = overtimeHours * 60
         workplace.overtimePerHour = overtimePerHour
         workplace.overtimeExtra = min(100_000, max(0, Int(overtimeText.filter(\.isNumber)) ?? 0))
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            self.error = "保存できませんでした。もう一度試してください。"
+            return
+        }
         dismiss()
+    }
+
+    private func yen(_ text: String) -> Int {
+        min(100_000, max(0, Int(text.filter(\.isNumber)) ?? 0))
     }
 
     private var weekdayPicker: some View {
@@ -844,10 +1258,18 @@ struct WorkplaceEditorView: View {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.muted)
-            TextField(title, text: text)
-                .keyboardType(number ? .numberPad : .default)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
+            HStack(spacing: 6) {
+                if number {
+                    Text("¥")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.muted)
+                }
+                TextField(title, text: text)
+                    .keyboardType(number ? .numberPad : .default)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+                    .focused($typing)
+            }
         }
     }
 

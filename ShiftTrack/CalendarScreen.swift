@@ -11,6 +11,7 @@ struct CalendarScreen: View {
     @State private var selectedDay: Date?
     @State private var showHelp = false
     @State private var showAddChoices = false
+    @State private var showWorkplace = false
     @State private var editor: EditorRoute?
     @State private var router = ImportRouter.shared
 
@@ -28,8 +29,10 @@ struct CalendarScreen: View {
             }
             .padding(.top, 8)
 
-            FilterChipBar(workplaces: workplaces, selectedID: $selectedID)
-                .padding(.top, 12)
+            if !workplaces.isEmpty {
+                FilterChipBar(workplaces: workplaces, selectedID: $selectedID)
+                    .padding(.top, 12)
+            }
 
             HStack(alignment: .center) {
                 Text(Formatters.monthTitle(month))
@@ -74,7 +77,17 @@ struct CalendarScreen: View {
             }
             .padding(.top, 8)
 
-            if listedShifts.isEmpty {
+            if workplaces.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("勤務先を1件追加すると、シフトを入れられます。")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    LimeCapsuleButton(title: "勤務先を追加", fillWidth: true) {
+                        showWorkplace = true
+                    }
+                }
+            } else if listedShifts.isEmpty {
                 Text(selectedDay == nil ? "この月のシフトはまだありません" : "この日のシフトはありません")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
@@ -98,7 +111,7 @@ struct CalendarScreen: View {
             .padding(.top, 4)
 
             Button {
-                router.presentChooser()
+                router.presentChooser(fallbackDate: addDay, defaultWorkplace: assumedWorkplaceName)
             } label: {
                 Text("シフト表から取り込む")
                     .font(.system(size: 14, weight: .bold))
@@ -109,11 +122,18 @@ struct CalendarScreen: View {
             .buttonStyle(.plain)
         }
         .background(Theme.background)
+        .sheet(isPresented: $showWorkplace) {
+            WorkplaceEditorView(existingID: nil)
+        }
         .sheet(isPresented: $showAddChoices) {
-            ShiftAddChooser(day: addDay, workplaceID: selectedID)
+            ShiftAddChooser(day: addDay, workplaceID: selectedID, onSaved: reveal)
         }
         .sheet(item: $editor) { route in
-            ShiftEditorView(route: route)
+            ShiftEditorView(route: route, onSaved: { reveal([$0]) })
+        }
+        .onChange(of: router.focusRequest) { _, request in
+            guard let request else { return }
+            reveal(request.dates)
         }
         .sheet(isPresented: $showHelp) {
             HelpSheet(
@@ -122,7 +142,7 @@ struct CalendarScreen: View {
                     "カレンダーはスワイプで月を切り替えます。日をタップすると、その日のシフトを下に出します。月の一覧で、その月のシフトをまとめて見られます。",
                     "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
                     "「給」は給料日です。その他のカレンダーの設定で隠せます。",
-                    "＋シフトを追加から、新しく入力するか、直近10件の履歴を選んで同じ時間を追加できます。"
+                    "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                 ]
             )
         }
@@ -209,6 +229,21 @@ struct CalendarScreen: View {
     private var listTitle: String {
         if let selectedDay { return Formatters.longDay(selectedDay) }
         return "この月のシフト"
+    }
+
+    private var assumedWorkplaceName: String {
+        if let selectedID, let match = workplaces.first(where: { $0.uuid == selectedID }) {
+            return match.name
+        }
+        return workplaces.count == 1 ? (workplaces.first?.name ?? "") : ""
+    }
+
+    private func reveal(_ dates: [Date]) {
+        let days = Set(dates.map { Calendar.current.startOfDay(for: $0) })
+        guard let first = days.min() else { return }
+        month = first
+        selectedDay = days.count == 1 ? first : nil
+        selectedID = nil
     }
 
     private var addDay: Date {
