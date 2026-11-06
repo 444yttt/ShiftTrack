@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - cursor/shifttrack-ios-app-0c12
     paths:
       - "ShiftTrack/**"
       - "ShiftTrack.xcodeproj/**"

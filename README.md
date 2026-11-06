@@ -64,7 +64,7 @@ App Intents 自体は iOS 17 以降でも登録されます。Apple Intelligence
 
 ## TestFlight
 
-`.github/workflows/testflight.yml` は、手動実行と `main` のアプリ本体・プロジェクトへの push で、Archive、IPA の書き出し、`xcrun altool --upload-app` まで進めます。Bundle ID は `app.shifttrack.ios`、表示名は「しふとらっく」です。Team ID はプロジェクトに書かず、実行時の `DEVELOPMENT_TEAM` で渡します。ビルド番号は Actions の run number です。自動のクラウド署名が権限不足で止まったときは、同じ API キーで配布用証明書と App Store 用プロファイルを作って書き出します。
+`.github/workflows/testflight.yml` は、手動実行と `main` または作業ブランチのアプリ本体・プロジェクトへの push で、Archive、IPA の書き出し、`xcrun altool --upload-app` まで進めます。Bundle ID は `app.shifttrack.ios`、表示名は「しふとらっく」です。Team ID はプロジェクトに書かず、実行時の `DEVELOPMENT_TEAM` で渡します。ビルド番号は Actions の run number です。自動のクラウド署名が権限不足で止まったときは、同じ API キーで配布用証明書と App Store 用プロファイルを作って書き出します。
 
 必要な Actions secrets は `ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_PRIVATE_KEY`、`APPLE_TEAM_ID` です。値はこのリポジトリにありません。未登録のあいだはアップロードを実行しません。
 
