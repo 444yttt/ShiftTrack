@@ -8,6 +8,8 @@
 2. スキーム **ShiftTrack** を選び、iPhone シミュレータ（iOS 17 以降）で実行する。
 3. 署名チームは空のままでシミュレータに入れます。実機に入れるときだけ、Signing & Capabilities で自分のチームを選んでください。
 
+GitHub Actions でもビルドを確認できます。`main` と `cursor/shifttrack-ios-app-0c12` への push と、それら向けの pull request で、iPhone シミュレータ向けの署名なしビルドが走ります（`.github/workflows/ios-build.yml`）。macOS 14 のランナーは 2026年11月に提供が終わったため、`macos-26` を使っています。TestFlight や App Store へのアップロードは含みません。
+
 初回起動でサンプルが入っています。勤務先はカフェA・コンビニB・塾Cの3件で、今年のシフトが数週間分あります。11月はカレンダーとシフト一覧の見た目が揃うよう、日付を個別に入れています。
 
 ## 画面
@@ -63,4 +65,4 @@ App Intents 自体は iOS 17 以降でも登録されます。Apple Intelligence
 
 ## 補足
 
-このリポジトリを作成した環境には Xcode がないため、ここでのコンパイルは行っていません。Xcode で ShiftTrack スキームをビルドして確認してください。Apple Intelligence のパスは、Foundation Models がある SDK（Xcode 26 以降）でだけコンパイルに含まれ、それより前の SDK ではパターン抽出だけが残ります。
+ローカルに Xcode がない環境ではコンパイルできません。その確認は GitHub Actions の iPhone シミュレータ向けビルドで行います。Apple Intelligence のパスは、Foundation Models がある SDK（Xcode 26 以降）でだけコンパイルに含まれ、それより前の SDK ではパターン抽出だけが残ります。
