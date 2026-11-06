@@ -119,26 +119,34 @@ struct SettingsScreen: View {
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
-                Rectangle().fill(Theme.line).frame(height: 1)
-                Button {
-                    confirmReset = true
-                } label: {
-                    HStack {
-                        Text("サンプルデータをリセット")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white)
-                        Spacer()
-                        Text("実行")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Theme.lime)
-                    }
-                    .padding(.vertical, 14)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
             .background(Theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            Text("データ")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+
+            Button {
+                confirmReset = true
+            } label: {
+                Text("サンプルデータをリセット")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.destructive)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Theme.destructive, lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("確認してから、勤務先とシフトをサンプルに戻します")
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Siri / ショートカット")

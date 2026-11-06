@@ -14,6 +14,7 @@ enum Theme {
     static let border = Color(hex: 0x3A3A3A)
     static let track = Color(hex: 0x2A2A2A)
     static let behind = Color(hex: 0xFF6B9A)
+    static let destructive = Color(hex: 0xFF5A5A)
     static let unselectedDot = Color(hex: 0x5A5A5A)
 
     static let palette = ["C8FF00", "5B8CFF", "FF6B9A", "FFB020", "C084FC", "FFFFFF"]
