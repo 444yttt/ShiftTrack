@@ -24,6 +24,7 @@ struct ImportShiftTextIntent: AppIntent {
     }
 }
 
+@available(iOS 18.0, *)
 struct ImportShiftImageIntent: AppIntent {
     static var title: LocalizedStringResource = "シフト表の画像を取り込む"
     static var description = IntentDescription("シフト表の画像から勤務の候補を作ります。画像は端末内で読み、サーバーには送りません。")
