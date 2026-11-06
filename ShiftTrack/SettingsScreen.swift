@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct SettingsScreen: View {
+    @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query private var settingsRows: [AppSettings]
     @State private var editorID: UUID?
@@ -39,6 +40,15 @@ struct SettingsScreen: View {
             .padding(.top, 8)
 
             VStack(spacing: 12) {
+                if workplaces.isEmpty {
+                    Text("勤務先はまだありません。追加すると、シフトと給料を記録できます。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Theme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
                 ForEach(workplaces) { workplace in
                     HStack(spacing: 12) {
                         Circle()
@@ -48,7 +58,7 @@ struct SettingsScreen: View {
                             Text(workplace.name)
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(.white)
-                            Text("時給 \(Formatters.yen(workplace.hourlyWage))")
+                            Text(workplace.payIsDaily ? "日給 \(Formatters.yen(workplace.dailyWage))" : "時給 \(Formatters.yen(workplace.hourlyWage))")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted)
                         }
@@ -77,27 +87,39 @@ struct SettingsScreen: View {
                 numberRow("新しい勤務先の時給", text: $wageText)
                 line
                 numberRow("新しい勤務先の交通費", text: $transportText)
+                Text("月間は5,000円以上100万円未満、年間は1万円以上1,000万円未満です。給料画面で月や年ごとに変えた金額が優先されます。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
             }
             .padding(.horizontal, 14)
             .background(Theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .onAppear { syncFields(settings) }
             .onChange(of: goalText) { _, new in
-                let value = min(9_999_999, max(0, Int(new.filter(\.isNumber)) ?? 0))
-                if settings.annualIncomeGoal != value { settings.annualIncomeGoal = value }
+                commit(new, range: 10_000..<10_000_000) { value in
+                    if settings.annualIncomeGoal != value { settings.annualIncomeGoal = value }
+                }
             }
             .onChange(of: monthGoalText) { _, new in
-                let value = min(999_999, max(0, Int(new.filter(\.isNumber)) ?? 0))
-                if settings.monthlyIncomeGoal != value { settings.monthlyIncomeGoal = value }
+                commit(new, range: 5_000..<1_000_000) { value in
+                    if settings.monthlyIncomeGoal != value { settings.monthlyIncomeGoal = value }
+                }
             }
             .onChange(of: wageText) { _, new in
-                let value = min(100_000, Int(new.filter(\.isNumber)) ?? 0)
-                if settings.defaultHourlyWage != value { settings.defaultHourlyWage = value }
+                commit(new, range: 0...100_000) { value in
+                    if settings.defaultHourlyWage != value { settings.defaultHourlyWage = value }
+                }
             }
             .onChange(of: transportText) { _, new in
-                let value = min(100_000, Int(new.filter(\.isNumber)) ?? 0)
-                if settings.defaultTransportAllowance != value { settings.defaultTransportAllowance = value }
+                commit(new, range: 0...100_000) { value in
+                    if settings.defaultTransportAllowance != value { settings.defaultTransportAllowance = value }
+                }
             }
+            .onChange(of: settings.weekStartsOnMonday) { _, _ in persist() }
+            .onChange(of: settings.showPaydayOnCalendar) { _, _ in persist() }
+            .onChange(of: settings.includeTransport) { _, _ in persist() }
             .onChange(of: settings.annualIncomeGoal) { _, new in
                 rewrite(new, into: $goalText)
             }
@@ -195,6 +217,17 @@ struct SettingsScreen: View {
         monthGoalText = String(settings.monthlyIncomeGoal)
         wageText = String(settings.defaultHourlyWage)
         transportText = String(settings.defaultTransportAllowance)
+    }
+
+    private func commit(_ raw: String, range: some RangeExpression<Int>, apply: (Int) -> Void) {
+        let digits = raw.filter(\.isNumber)
+        guard !digits.isEmpty, let value = Int(digits), range.contains(value) else { return }
+        apply(value)
+        persist()
+    }
+
+    private func persist() {
+        try? context.save()
     }
 
     private func rewrite(_ value: Int, into text: Binding<String>) {

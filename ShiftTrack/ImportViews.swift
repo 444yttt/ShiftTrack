@@ -408,7 +408,12 @@ struct ImportReviewView: View {
             context.insert(shift)
             saved += 1
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            savedNote = "保存できませんでした。もう一度試してください。"
+            return
+        }
         PendingImportStore.clear()
         ImportRouter.shared.refreshCount()
         let focused = pending.candidates.filter(\.included).map(\.date)
@@ -462,6 +467,7 @@ struct CandidateEditor: View {
     @Binding var candidate: ImportCandidate
     var workplaces: [Workplace]
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var typing: Bool
 
     var body: some View {
         NavigationStack {
@@ -473,6 +479,7 @@ struct CandidateEditor: View {
                     TextField("勤務先の名前", text: $candidate.workplaceName)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.white)
+                        .focused($typing)
                     Picker("登録方法", selection: $candidate.createWorkplace) {
                         Text("この名前で追加").tag(true)
                         Text("既存の勤務先").tag(false)
@@ -504,6 +511,15 @@ struct CandidateEditor: View {
                             .foregroundStyle(.white)
                     }
                     .tint(Theme.lime)
+                    if PayMath.workedMinutes(
+                        start: candidate.startMinutes,
+                        end: candidate.endMinutes,
+                        breakMinutes: candidate.breakMinutes
+                    ) == 0 {
+                        Text("開始と終了が同じだと、この行は保存されません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.behind)
+                    }
                 }
                 .padding(14)
                 .background(Theme.card)
@@ -516,6 +532,11 @@ struct CandidateEditor: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完了") { dismiss() }
+                        .foregroundStyle(Theme.lime)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { typing = false }
                         .foregroundStyle(Theme.lime)
                 }
             }

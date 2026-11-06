@@ -11,6 +11,7 @@ struct CalendarScreen: View {
     @State private var selectedDay: Date?
     @State private var showHelp = false
     @State private var showAddChoices = false
+    @State private var showWorkplace = false
     @State private var editor: EditorRoute?
     @State private var router = ImportRouter.shared
 
@@ -28,8 +29,10 @@ struct CalendarScreen: View {
             }
             .padding(.top, 8)
 
-            FilterChipBar(workplaces: workplaces, selectedID: $selectedID)
-                .padding(.top, 12)
+            if !workplaces.isEmpty {
+                FilterChipBar(workplaces: workplaces, selectedID: $selectedID)
+                    .padding(.top, 12)
+            }
 
             HStack(alignment: .center) {
                 Text(Formatters.monthTitle(month))
@@ -74,7 +77,17 @@ struct CalendarScreen: View {
             }
             .padding(.top, 8)
 
-            if listedShifts.isEmpty {
+            if workplaces.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("勤務先を1件追加すると、シフトを入れられます。")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    LimeCapsuleButton(title: "勤務先を追加", fillWidth: true) {
+                        showWorkplace = true
+                    }
+                }
+            } else if listedShifts.isEmpty {
                 Text(selectedDay == nil ? "この月のシフトはまだありません" : "この日のシフトはありません")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
@@ -109,6 +122,9 @@ struct CalendarScreen: View {
             .buttonStyle(.plain)
         }
         .background(Theme.background)
+        .sheet(isPresented: $showWorkplace) {
+            WorkplaceEditorView(existingID: nil)
+        }
         .sheet(isPresented: $showAddChoices) {
             ShiftAddChooser(day: addDay, workplaceID: selectedID, onSaved: reveal)
         }

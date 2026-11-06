@@ -8,6 +8,7 @@ private enum IncomeScope: String, CaseIterable, Identifiable {
 }
 
 struct IncomeScreen: View {
+    @Environment(\.modelContext) private var context
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query private var settingsRows: [AppSettings]
     @State private var scope: IncomeScope = .month
@@ -89,7 +90,7 @@ struct IncomeScreen: View {
                 .padding(.top, 4)
 
             if totals.rows.isEmpty {
-                Text("この期間に入る給料のシフトはまだありません")
+                Text(emptySalaryText(calendar: calendar))
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -237,12 +238,26 @@ struct IncomeScreen: View {
         settings.salarySeenWorked = worked
     }
 
+    private func emptySalaryText(calendar: Calendar) -> String {
+        let workedHere = shifts.contains { shift in
+            if scope == .year {
+                return calendar.component(.year, from: shift.date) == calendar.component(.year, from: anchor)
+            }
+            return calendar.isDate(shift.date, equalTo: anchor, toGranularity: .month)
+        }
+        if workedHere {
+            return "この期間に働いたシフトはあります。給料日が翌月以降の勤務先は、入金される月の給料に出ます。"
+        }
+        return "この期間に入る給料のシフトはまだありません"
+    }
+
     private func store(_ settings: AppSettings, value: Int, year: Int, month: Int, applyForward: Bool) {
         if scope == .year {
             settings.setYearGoal(value, year: year, applyForward: applyForward)
         } else {
             settings.setMonthGoal(value, year: year, month: month, applyForward: applyForward)
         }
+        try? context.save()
     }
 
     private func move(_ delta: Int) {
@@ -328,6 +343,7 @@ struct GoalEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var error = ""
+    @FocusState private var typing: Bool
 
     var body: some View {
         NavigationStack {
@@ -343,6 +359,7 @@ struct GoalEditorSheet: View {
                         .keyboardType(.numberPad)
                         .font(.system(size: 36, weight: .black))
                         .foregroundStyle(.white)
+                        .focused($typing)
                 }
                 Text("\(Formatters.yen(minimum))〜\(Formatters.yen(upper - 1))")
                     .font(.system(size: 12))
@@ -364,9 +381,17 @@ struct GoalEditorSheet: View {
                     Button("キャンセル") { dismiss() }
                         .foregroundStyle(Theme.lime)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { typing = false }
+                        .foregroundStyle(Theme.lime)
+                }
             }
             .darkSheet()
-            .onAppear { text = String(goal) }
+            .onAppear {
+                text = String(goal)
+                typing = true
+            }
         }
         .presentationDetents([.medium])
     }
