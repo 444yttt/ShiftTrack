@@ -62,6 +62,12 @@ App Intents 自体は iOS 17 以降でも登録されます。Apple Intelligence
 
 カメラの使用目的は Info.plist の `NSCameraUsageDescription` に書いてあります。写真はシステムのピッカー経由なので、フォトライブラリ全体への許可は求めていません。追加の entitlements は不要です。追跡もしません（`PrivacyInfo.xcprivacy`）。
 
+## TestFlight
+
+`.github/workflows/testflight.yml` は、手動実行と `main` のアプリ本体・プロジェクトへの push で、Archive、IPA の書き出し、`xcrun altool --upload-app` まで進めます。Bundle ID は `app.shifttrack.ios`、表示名は「しふとらっく」です。Team ID はプロジェクトに書かず、実行時の `DEVELOPMENT_TEAM` で渡します。ビルド番号は Actions の run number です。
+
+必要な Actions secrets は `ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_PRIVATE_KEY`、`APPLE_TEAM_ID` です。値はこのリポジトリにありません。未登録のあいだはアップロードを実行しません。
+
 ## 補足
 
 ローカルに Xcode がない環境ではコンパイルできません。その確認は GitHub Actions の iPhone シミュレータ向けビルドで行います。Apple Intelligence のパスは、Foundation Models がある SDK（Xcode 26 以降）でだけコンパイルに含まれ、それより前の SDK ではパターン抽出だけが残ります。
