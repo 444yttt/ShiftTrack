@@ -102,12 +102,14 @@ def api(method: str, path: str, body=None):
             parsed = json.loads(raw)
         except json.JSONDecodeError:
             parsed = {}
-        codes = [
-            item.get("code", "")
-            for item in parsed.get("errors", [])
-            if isinstance(item, dict)
-        ]
-        print(f"App Store Connect API {method} {path} -> {error.code} {' '.join(codes)}")
+        summaries = []
+        for item in parsed.get("errors", []):
+            if not isinstance(item, dict):
+                continue
+            detail = str(item.get("detail") or item.get("title") or "")
+            detail = detail.replace(os.environ.get("APPLE_TEAM_ID", "___"), "TEAM")
+            summaries.append(f"{item.get('code', '')} {detail[:240]}".strip())
+        print(f"App Store Connect API {method} {path.split('?')[0]} -> {error.code} {' | '.join(summaries)}")
         return error.code, parsed
 
 
@@ -175,6 +177,33 @@ def certificate_name(path: str) -> str:
     raise RuntimeError("証明書の名前を読めません")
 
 
+def revoke_recent_certificate(certificate_type: str) -> bool:
+    status, payload = api(
+        "GET",
+        "/v1/certificates?limit=20&filter[certificateType]=" + certificate_type,
+    )
+    if status != 200:
+        return False
+    newest = None
+    for item in payload.get("data", []):
+        expiration = item.get("attributes", {}).get("expirationDate", "")
+        if newest is None or expiration > newest[0]:
+            newest = (expiration, item["id"])
+    if newest is None:
+        return False
+    try:
+        expires = time.strptime(newest[0][:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return False
+    days_left = (time.mktime(expires) - time.time()) / 86400
+    print(f"{certificate_type} の残日数が最も長い証明書は {days_left:.1f} 日")
+    if days_left < 360:
+        return False
+    deleted, _ = api("DELETE", "/v1/certificates/" + newest[1])
+    print(f"直近の {certificate_type} を取り消しました ({deleted})")
+    return deleted in (200, 204)
+
+
 def create_distribution_identity(work: str) -> tuple[str, str]:
     run(
         [
@@ -208,6 +237,20 @@ def create_distribution_identity(work: str) -> tuple[str, str]:
                 }
             },
         )
+        if status == 409 and revoke_recent_certificate(certificate_type):
+            status, payload = api(
+                "POST",
+                "/v1/certificates",
+                {
+                    "data": {
+                        "type": "certificates",
+                        "attributes": {
+                            "certificateType": certificate_type,
+                            "csrContent": csr,
+                        },
+                    }
+                },
+            )
         if status in (200, 201):
             certificate_id = payload["data"]["id"]
             encoded = payload["data"]["attributes"]["certificateContent"]
