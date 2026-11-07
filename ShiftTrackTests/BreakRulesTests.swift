@@ -448,8 +448,8 @@ final class BreakRulesTests: XCTestCase {
             day: day, start: 9 * 60, end: 18 * 60, breakMinutes: 0,
             workplace: workplace, customPay: nil, calendar: calendar
         )
-        XCTAssertEqual(overtime?.base, 9000)
-        XCTAssertEqual(overtime?.premium, 250)
+        XCTAssertEqual(overtime?.base ?? -1, 9000, accuracy: 0.001)
+        XCTAssertEqual(overtime?.premium ?? -1, 250, accuracy: 0.001)
         let daily = place(daily: true)
         XCTAssertNil(ScheduledPay.hourlyAmount(
             day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 0,
