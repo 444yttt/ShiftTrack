@@ -39,8 +39,8 @@ final class Workplace {
     var overtimeRatePercent: Int = 0
     /// Seven percents, Sunday first, matching `weekday - 1`. Empty is all zero.
     var holidayRatesRaw: String = ""
-    /// Stored `dateInterval|yen` rows. The history lookup is not closed, so
-    /// the scheduled amount still uses `hourlyWage`.
+    /// `effectiveFrom|yen` rows, walked from the end. Empty selects wage 0.
+    /// A row whose calendar day is after the shift does not match.
     var wageHistoryRaw: String = ""
     /// Stored `start|end|yen|night` rows. Band bounds are not closed, so the
     /// scheduled amount does not switch wages from these rows.

@@ -1369,7 +1369,7 @@ struct WorkplaceEditorView: View {
                 }
                 formCard {
                     sectionTitle("時給の履歴と時間帯")
-                    Text("履歴が空のときの戻りは今の時給です。履歴のどれを選ぶか、時間帯の境界は、まだ合計へ入れていません。行を保存しても予定全体の時給分は今の時給のままです。")
+                    Text("予定全体の時給分は、履歴の末尾から適用日がシフトの日以前の行を使います。空なら0です。全部がシフト日より後のときは未確定で、円を出しません。並び順は検査していないので、日付で並べ替えません。時間帯の境界はまだ合計へ入れていません。上の時給欄は、今月の見込みだけが使います。")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)

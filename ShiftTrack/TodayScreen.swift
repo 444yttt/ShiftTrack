@@ -94,7 +94,7 @@ struct TodayScreen: View {
             Text("給与の目安")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Theme.lime)
-            Text("カードの円は、予定の開始から終了までを休憩の分数で割った時給分です。勤務中に今へ切る命令は、この呼び出しにはありません。休憩の分数だけが経過で変わるので、8時間・休憩60分・時給1000円の途中は7500円になり、今までの半分ではありません。")
+            Text("カードの円は、コピーされた開始から終了までを休憩の分数で割った時給分です。今を終了へ書く命令はこの経路にありません。時給は履歴の末尾から、適用日がシフトの日以前の行です。履歴が空のときは0で、勤務先の時給欄は使いません。8時間・休憩60分・時給1000円で休憩だけ30分にした式の結果は7500円です。これは画面で読んだ数字ではなく、今まで稼いだ金額でもありません。1秒の更新は開始以上かつ終了未満のときだけ作られ、その日付の出どころは未確定です。")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -147,7 +147,7 @@ struct TodayScreen: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.muted)
             }
-            Text(LivePay.line(phase, amount: amount(for: shift, now: now)))
+            Text(LivePay.line(phase, evaluation: evaluation(for: shift, now: now)))
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.lime)
             Text(LivePay.breakCaption(phase))
@@ -224,7 +224,7 @@ struct TodayScreen: View {
         )
     }
 
-    private func amount(for shift: WorkShift, now: Date) -> ScheduledPay.Amount? {
+    private func evaluation(for shift: WorkShift, now: Date) -> ScheduledPay.Evaluation? {
         guard let workplace = shift.workplace else { return nil }
         let phase = phase(for: shift, now: now)
         let scaled: Int?
@@ -237,7 +237,7 @@ struct TodayScreen: View {
             scaled = nil
         }
         guard let scaled else { return nil }
-        return ScheduledPay.hourlyAmount(
+        return ScheduledPay.evaluate(
             day: shift.date,
             start: shift.startMinutes,
             end: shift.endMinutes,

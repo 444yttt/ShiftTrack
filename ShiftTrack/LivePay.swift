@@ -1,12 +1,13 @@
 import Foundation
 
-/// Today-screen clock. `0x10026e844` copies the shift start and end, then
-/// replaces break minutes from `TimelineView.Context.date`. The yen from that
-/// record is the scheduled interval, not pay earned so far.
+/// Today-screen clock. `WorkplaceListView` installs a 1-second timeline only
+/// while `start <= gate < end`. The closure copies shift start and end, then
+/// scales break minutes from `Context.date`. The gate date from `0x100260e08`
+/// was not reduced to `Date()` or `Context.date`. The yen is that copied
+/// interval, not pay earned so far.
 ///
-/// The caption 「いま稼いだお給料」 is a different function. Its help text says
-/// the number increases. This scheduled amount does not. Two timeline periods
-/// are 30 seconds and one is 1 second. Which one feeds this context is open.
+/// 「いま稼いだお給料」 is a different function. Its help text says the number
+/// increases. This amount does not, and 7500 yen was not read from a screen.
 enum LivePay {
     enum Phase: Equatable {
         case notAShift
@@ -57,24 +58,28 @@ enum LivePay {
         )
     }
 
-    static func line(_ phase: Phase, amount: ScheduledPay.Amount?) -> String {
+    static func line(_ phase: Phase, evaluation: ScheduledPay.Evaluation?) -> String {
         switch phase {
         case .notAShift:
             return "開始と終了が同じです"
         case .beforeStart(let minutes):
             return "はじまりまで あと \(Formatters.hours(minutes))"
         case .during(_, _, let minutes):
-            return scheduledLine(amount, suffix: "終わりまで あと \(Formatters.hours(minutes))")
+            return scheduledLine(evaluation, suffix: "終わりまで あと \(Formatters.hours(minutes))")
         case .afterEnd:
-            return scheduledLine(amount, suffix: "終了しました")
+            return scheduledLine(evaluation, suffix: "終了しました")
         }
     }
 
-    private static func scheduledLine(_ amount: ScheduledPay.Amount?, suffix: String) -> String {
-        guard let amount else {
+    private static func scheduledLine(_ evaluation: ScheduledPay.Evaluation?, suffix: String) -> String {
+        switch evaluation {
+        case .amount(let amount):
+            return "予定全体の時給分 \(ScheduledPay.amountText(amount.total))（交通費の前）。今まで稼いだ金額ではありません。\(suffix)"
+        case .historyOpen:
+            return "給与の目安：時給の履歴がすべてシフト日より後で、そのときの時給は未確定です。\(suffix)"
+        case .notThisFormula, nil:
             return "給与の目安：日給の未確定な条件、または入力した金額のため、予定全体の時給分は出していません。\(suffix)"
         }
-        return "予定全体の時給分 \(ScheduledPay.amountText(amount.total))（交通費の前）。今まで稼いだ金額ではありません。\(suffix)"
     }
 
     static func breakCaption(_ phase: Phase) -> String {

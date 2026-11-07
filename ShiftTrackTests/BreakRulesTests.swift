@@ -258,7 +258,7 @@ final class BreakRulesTests: XCTestCase {
             LivePay.phase(now: before, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
             .beforeStart(remainingMinutes: 240)
         )
-        XCTAssertFalse(LivePay.line(.beforeStart(remainingMinutes: 240), amount: nil).contains("円"))
+        XCTAssertFalse(LivePay.line(.beforeStart(remainingMinutes: 240), evaluation: nil).contains("円"))
         XCTAssertFalse(LivePay.breakCaption(.beforeStart(remainingMinutes: 240)).contains("-30"))
         XCTAssertEqual(
             LivePay.phase(now: start, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
@@ -272,6 +272,7 @@ final class BreakRulesTests: XCTestCase {
             LivePay.phase(now: after, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
             .afterEnd(scaledBreak: 60, scheduledBreak: 60)
         )
+        workplace.wageHistory = [.init(at: shiftDay, hourlyWage: 1200)]
         let midwayAmount = ScheduledPay.hourlyAmount(
             day: shiftDay,
             start: 9 * 60,
@@ -282,7 +283,10 @@ final class BreakRulesTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(midwayAmount?.total, 9000)
-        let during = LivePay.line(.during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 240), amount: midwayAmount)
+        let during = LivePay.line(
+            .during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 240),
+            evaluation: midwayAmount.map { .amount($0) }
+        )
         XCTAssertTrue(during.contains("予定全体の時給分"))
         XCTAssertTrue(during.contains("今まで稼いだ金額ではありません"))
         XCTAssertFalse(during.contains("いま稼いだ"))
@@ -354,20 +358,72 @@ final class BreakRulesTests: XCTestCase {
         let calendar = calendar()
         let workplace = place(wage: 1000)
         let day = day(2026, 11, 8)
+        let empty = ScheduledPay.hourlyAmount(
+            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
+            workplace: workplace, customPay: nil, calendar: calendar
+        )
+        XCTAssertEqual(empty?.total, 0)
+        let january = self.day(2026, 1, 1, 15, 0)
+        let june = self.day(2026, 6, 1, 8, 0)
+        XCTAssertEqual(
+            InOutRecovered.selectedHourlyWage(
+                shiftDate: self.day(2026, 5, 20, 9, 0),
+                history: [(effectiveFrom: january, hourlyWage: 1000), (effectiveFrom: june, hourlyWage: 1500)],
+                calendar: calendar
+            ),
+            1000
+        )
+        XCTAssertEqual(
+            InOutRecovered.selectedHourlyWage(
+                shiftDate: june,
+                history: [(effectiveFrom: january, hourlyWage: 1000), (effectiveFrom: june, hourlyWage: 1500)],
+                calendar: calendar
+            ),
+            1500
+        )
+        XCTAssertEqual(
+            InOutRecovered.selectedHourlyWage(
+                shiftDate: june,
+                history: [(effectiveFrom: june, hourlyWage: 1500), (effectiveFrom: january, hourlyWage: 1000)],
+                calendar: calendar
+            ),
+            1000
+        )
+        XCTAssertNil(
+            InOutRecovered.selectedHourlyWage(
+                shiftDate: self.day(2025, 1, 1),
+                history: [(effectiveFrom: january, hourlyWage: 1000)],
+                calendar: calendar
+            )
+        )
+        let start = self.day(2026, 11, 8, 9, 0)
+        let end = self.day(2026, 11, 8, 17, 0)
+        XCTAssertTrue(InOutRecovered.showsOneSecondPayTimeline(start: start, end: end, gate: start))
+        XCTAssertFalse(InOutRecovered.showsOneSecondPayTimeline(start: start, end: end, gate: end))
+        XCTAssertEqual(
+            InOutRecovered.transportAfterPayItem(transport: 100, kind: 0, unit: 1, amount: 500, condition: 0, nightMinutes: 0),
+            600
+        )
+        XCTAssertEqual(
+            InOutRecovered.transportAfterPayItem(transport: 0, kind: 0, unit: 2, amount: 500, condition: 0, nightMinutes: 0),
+            0
+        )
+        workplace.wageHistory = [.init(at: day, hourlyWage: 1000)]
+        workplace.wageBands = [.init(startMinutes: 18 * 60, endMinutes: 22 * 60, hourlyWage: 3000, includesNightPremium: true)]
         let plain = ScheduledPay.hourlyAmount(
             day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
             workplace: workplace, customPay: nil, calendar: calendar
         )
-        XCTAssertEqual(plain?.base, 7000)
-        XCTAssertEqual(plain?.premium, 0)
         XCTAssertEqual(plain?.total, 7000)
-        workplace.wageHistory = [.init(at: day, hourlyWage: 2000)]
-        workplace.wageBands = [.init(startMinutes: 18 * 60, endMinutes: 22 * 60, hourlyWage: 3000, includesNightPremium: true)]
-        let unchanged = ScheduledPay.hourlyAmount(
-            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
-            workplace: workplace, customPay: nil, calendar: calendar
+        workplace.wageHistory = [.init(at: self.day(2026, 12, 1), hourlyWage: 2000)]
+        XCTAssertEqual(
+            ScheduledPay.evaluate(
+                day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
+                workplace: workplace, customPay: nil, calendar: calendar
+            ),
+            .historyOpen
         )
-        XCTAssertEqual(unchanged?.total, 7000)
+        workplace.wageHistory = [.init(at: day, hourlyWage: 1000)]
         let quote = PayMath.quote(
             workplace: workplace, day: day, start: 9 * 60, end: 17 * 60,
             breakMinutes: 60, customPay: nil, adjustment: 0, includeTransport: false, calendar: calendar

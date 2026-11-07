@@ -305,8 +305,9 @@ enum InOutRecovered {
         sliceYen * Double(ratePercent) / 100
     }
 
-    /// 0x10011a3f4. Daily wage is added only when the method is daily and an
-    /// unnamed low bit is also 1. The caller passes that bit. It is not guessed.
+    /// 0x10011a36c. Daily wage is added only when `PayMethod` is daily and
+    /// `UUID.==` is true. The two UUID fields were not identified, so the
+    /// caller passes the comparison result. A false result does not add yen.
     static func baseAfterDailyWage(base: Double, dailyWage: Int, methodIsDaily: Bool, flagBit: Bool) -> Double {
         guard methodIsDaily, flagBit else { return base }
         return base + Double(dailyWage)
@@ -321,5 +322,62 @@ enum InOutRecovered {
     /// 0x10026ecf0 adds base and premium for `numericText`. Transport is absent.
     static func liveNumericTotal(base: Double, premium: Double) -> Double {
         base + premium
+    }
+
+    /// 0x100262af8 and 0x100262b14. `WorkplaceListView` builds the 1-second
+    /// timeline only when `start <= gate < end`. The compares do not write
+    /// the dates. `gate` comes from 0x100260e08 and was not reduced to `Date()`
+    /// or `TimelineView.Context.date`.
+    static func showsOneSecondPayTimeline(start: Date, end: Date, gate: Date) -> Bool {
+        start <= gate && gate < end
+    }
+
+    /// 0x1000de424. Walks history from the last element. `effectiveFrom` is
+    /// reduced to a calendar day and compared with the shift's start of day.
+    /// The first day that is <= the shift day supplies its hourly wage.
+    /// Empty history returns 0. If every day is after the shift, the return
+    /// was not reduced, so this returns nil instead of inventing a wage.
+    /// The loop does not sort the array.
+    static func selectedHourlyWage(
+        shiftDate: Date,
+        history: [(effectiveFrom: Date, hourlyWage: Int)],
+        calendar: Calendar = .current
+    ) -> Int? {
+        if history.isEmpty {
+            return 0
+        }
+        let shiftDay = calendar.startOfDay(for: shiftDate)
+        for rate in history.reversed() {
+            let parts = calendar.dateComponents([.year, .month, .day], from: rate.effectiveFrom)
+            guard let rateDay = calendar.date(from: parts) else { continue }
+            if rateDay <= shiftDay {
+                return rate.hourlyWage
+            }
+        }
+        return nil
+    }
+
+    /// 0x100119384. perPeriod (2) is skipped. Only transport kind 0 is added,
+    /// once, when amount is at least 1. perDay reaches that same add only
+    /// after a UUID and count check that was not reduced, so this is not
+    /// "multiplied by the number of days". Allowance and deduction are not added.
+    static func transportAfterPayItem(
+        transport: Double,
+        kind: Int,
+        unit: Int,
+        amount: Int,
+        condition: Int,
+        nightMinutes: Double
+    ) -> Double {
+        if unit == 2 || kind != 0 {
+            return transport
+        }
+        if condition == 1 && !(nightMinutes > 0) {
+            return transport
+        }
+        if amount < 1 {
+            return transport
+        }
+        return transport + Double(amount)
     }
 }

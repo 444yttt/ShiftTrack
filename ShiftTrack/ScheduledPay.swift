@@ -1,20 +1,28 @@
 import Foundation
 
 /// Hourly amount from the recovered walk in `0x10011b1d0`.
-/// The live caller copies the shift's own start and end, then replaces
-/// `breakMinutes` only. This amount is that scheduled interval. It is not
-/// pay earned up to now.
+/// `0x10026e844` copies `ShiftInstance` start and end unchanged, then
+/// replaces break minutes. No `min(now, end)` was found on that path.
+/// The amount is that copied interval. It is not pay earned up to now.
+/// 7500 yen for an 8-hour shift, 30 scaled break minutes, and a 1000 wage
+/// is this formula's result. It was not read off the reference screen.
 ///
-/// Each 60-second slice is scaled by the no-span fraction, so the base sum
-/// matches `scheduledHourlyYen`. Night and holiday use that slice's base.
-/// Overtime counts the same paid slice, with prior minutes of 0: minutes
-/// from earlier shifts were not identified. Wage bands and a non-empty wage
-/// history are not applied; those selection rules were not closed.
+/// The wage integer is `selectedHourlyWage`. An empty history is 0.
+/// If every history day is after the shift, the wage is left unset.
+/// Wage-band bounds are still not applied. Each 60-second slice is scaled
+/// by the no-span fraction. Overtime uses prior minutes of 0 because minutes
+/// from earlier shifts were not identified.
 enum ScheduledPay {
     struct Amount: Equatable {
         var base: Double
         var premium: Double
         var total: Double
+    }
+
+    enum Evaluation: Equatable {
+        case amount(Amount)
+        case notThisFormula
+        case historyOpen
     }
 
     static func hourlyAmount(
@@ -26,8 +34,39 @@ enum ScheduledPay {
         customPay: Int?,
         calendar: Calendar = .current
     ) -> Amount? {
+        if case .amount(let amount) = evaluate(
+            day: day,
+            start: start,
+            end: end,
+            breakMinutes: breakMinutes,
+            workplace: workplace,
+            customPay: customPay,
+            calendar: calendar
+        ) {
+            return amount
+        }
+        return nil
+    }
+
+    static func evaluate(
+        day: Date,
+        start: Int,
+        end: Int,
+        breakMinutes: Int,
+        workplace: Workplace,
+        customPay: Int?,
+        calendar: Calendar = .current
+    ) -> Evaluation {
         if customPay != nil || workplace.payIsDaily || breakMinutes < 0 {
-            return nil
+            return .notThisFormula
+        }
+        let history = workplace.wageHistory.map { (effectiveFrom: $0.at, hourlyWage: $0.hourlyWage) }
+        guard let wage = InOutRecovered.selectedHourlyWage(
+            shiftDate: day,
+            history: history,
+            calendar: calendar
+        ) else {
+            return .historyOpen
         }
         let startDate = calendar.date(
             byAdding: .minute,
@@ -54,7 +93,7 @@ enum ScheduledPay {
         let base = InOutRecovered.scheduledHourlyYen(
             totalSeconds: duration,
             breakMinutes: breakMinutes,
-            hourlyWage: workplace.hourlyWage
+            hourlyWage: wage
         )
         let fraction = InOutRecovered.paidMinuteFraction(
             totalSeconds: duration,
@@ -69,7 +108,7 @@ enum ScheduledPay {
             let next = min(endDate, cursor.addingTimeInterval(60))
             let sliceMinutes = next.timeIntervalSince(cursor) / 60
             let paidSlice = sliceMinutes * fraction
-            let sliceYen = InOutRecovered.hourlyYen(paidMinutes: paidSlice, hourlyWage: workplace.hourlyWage)
+            let sliceYen = InOutRecovered.hourlyYen(paidMinutes: paidSlice, hourlyWage: wage)
             let midpoint = cursor.addingTimeInterval(next.timeIntervalSince(cursor) / 2)
             let minute = calendar.component(.hour, from: midpoint) * 60 + calendar.component(.minute, from: midpoint)
             premium += InOutRecovered.nightPremiumYen(
@@ -97,18 +136,18 @@ enum ScheduledPay {
             if workplace.overtimeEnabled {
                 premium += InOutRecovered.overtimePremiumYen(
                     overtimeMinutes: overtime,
-                    hourlyWage: workplace.hourlyWage,
+                    hourlyWage: wage,
                     ratePercent: workplace.overtimeRatePercent
                 )
             }
             prior += paidSlice
             cursor = next
         }
-        return Amount(
+        return .amount(Amount(
             base: base,
             premium: premium,
             total: InOutRecovered.liveNumericTotal(base: base, premium: premium)
-        )
+        ))
     }
 
     static func amountText(_ value: Double) -> String {
