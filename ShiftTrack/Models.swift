@@ -32,6 +32,10 @@ final class Workplace {
     var overtimeAfterMinutes: Int
     var overtimePerHour: Bool
     var overtimeExtra: Int
+    /// Off uses the legal 6h/8h table. On uses `breakRulesRaw`.
+    var customBreaks: Bool = false
+    /// `overMinutes:breakMinutes` pairs, earlier first. Empty is not the legal table.
+    var breakRulesRaw: String = ""
     var createdAt: Date
     @Relationship(deleteRule: .cascade, inverse: \WorkShift.workplace)
     var shifts: [WorkShift]
@@ -72,6 +76,8 @@ final class Workplace {
         self.overtimeAfterMinutes = InOutRecovered.defaultOvertimeThresholdMinutes
         self.overtimePerHour = true
         self.overtimeExtra = 0
+        self.customBreaks = false
+        self.breakRulesRaw = ""
         self.createdAt = createdAt
         self.shifts = []
     }
@@ -85,6 +91,11 @@ final class Workplace {
     }
 
     var color: Color { Color(hexString: colorHex) }
+
+    var breakRules: [InOutRecovered.BreakRule] {
+        get { BreakRules.decode(breakRulesRaw) }
+        set { breakRulesRaw = BreakRules.encode(newValue) }
+    }
 }
 
 @Model
@@ -98,6 +109,9 @@ final class WorkShift {
     var customPay: Int?
     var adjustmentYen: Int
     var adjustmentNote: String
+    /// True only after the user saves a shift with rule-based breaks.
+    /// Existing rows stay false, so their stored break is left alone.
+    var breakFollowsRules: Bool = false
     var workplace: Workplace?
 
     init(
@@ -109,6 +123,7 @@ final class WorkShift {
         customPay: Int? = nil,
         adjustmentYen: Int = 0,
         adjustmentNote: String = "",
+        breakFollowsRules: Bool = false,
         workplace: Workplace?
     ) {
         self.uuid = UUID()
@@ -120,6 +135,7 @@ final class WorkShift {
         self.customPay = customPay
         self.adjustmentYen = adjustmentYen
         self.adjustmentNote = adjustmentNote
+        self.breakFollowsRules = breakFollowsRules
         self.workplace = workplace
     }
 

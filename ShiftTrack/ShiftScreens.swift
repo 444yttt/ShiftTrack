@@ -235,7 +235,7 @@ struct ShiftAddChooser: View {
         } else {
             lines.append("勤務先の名前を行に書いてください。")
         }
-        lines.append("追加すると、この画面を閉じてマイシフトに出します。")
+        lines.append("追加すると、この画面を閉じてカレンダーに出します。")
         return lines.joined(separator: "")
     }
 
@@ -440,7 +440,21 @@ struct ShiftAddChooser: View {
 
     private func draftCaption(_ draft: ShiftTextParser.Draft) -> String {
         let when = draft.date().map { Formatters.monthDayWeekday($0) } ?? "\(draft.month)/\(draft.day)"
-        return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  休憩\(draft.breakMinutes)分"
+        let match = workplaces.first { normalize($0.name) == normalize(draft.workplaceName) }
+        if match?.payIsDaily == true {
+            return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  日給"
+        }
+        let decision = BreakRules.textDecision(
+            breakIsExplicit: draft.breakIsExplicit,
+            explicitMinutes: draft.breakMinutes,
+            payIsDaily: false,
+            customBreaks: match?.customBreaks ?? false,
+            rules: match?.breakRules ?? [],
+            start: draft.startMinutes,
+            end: draft.endMinutes
+        )
+        let mark = decision.followsRules ? "（規則）" : "（入力）"
+        return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  休憩\(decision.minutes)分\(mark)"
     }
 
     private func color(for name: String) -> Color {
@@ -486,17 +500,26 @@ struct ShiftAddChooser: View {
         var dates: [Date] = []
         for draft in parsed {
             guard let date = draft.date() else { continue }
-            guard PayMath.workedMinutes(
-                start: draft.startMinutes,
-                end: draft.endMinutes,
-                breakMinutes: draft.breakMinutes
-            ) > 0 else { continue }
             guard let workplace = workplace(
                 named: draft.workplaceName,
                 wage: wage,
                 transport: transport,
                 created: &created
             ) else { continue }
+            let decision = BreakRules.textDecision(
+                breakIsExplicit: draft.breakIsExplicit,
+                explicitMinutes: draft.breakMinutes,
+                payIsDaily: workplace.payIsDaily,
+                customBreaks: workplace.customBreaks,
+                rules: workplace.breakRules,
+                start: draft.startMinutes,
+                end: draft.endMinutes
+            )
+            guard PayMath.workedMinutes(
+                start: draft.startMinutes,
+                end: draft.endMinutes,
+                breakMinutes: decision.minutes
+            ) > 0 else { continue }
             dates.append(date)
             let duplicate = shifts.contains { shift in
                 shift.workplace?.uuid == workplace.uuid
@@ -509,7 +532,8 @@ struct ShiftAddChooser: View {
                 date: date,
                 startMinutes: draft.startMinutes,
                 endMinutes: draft.endMinutes,
-                breakMinutes: draft.breakMinutes,
+                breakMinutes: decision.minutes,
+                breakFollowsRules: decision.followsRules,
                 workplace: workplace
             ))
         }
@@ -573,6 +597,7 @@ struct ShiftEditorView: View {
     @State private var startMinutes = 10 * 60
     @State private var endMinutes = 15 * 60
     @State private var breakMinutes = 0
+    @State private var breakFollowsRules = false
     @State private var notes = ""
     @State private var customText = ""
     @State private var adjustmentText = ""
@@ -648,7 +673,18 @@ struct ShiftEditorView: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted)
                         } else {
-                            BreakMinutesControl(minutes: $breakMinutes, range: 0...600)
+                            Toggle("休憩を規則から入れる", isOn: breakFollowsBinding)
+                                .tint(Theme.lime)
+                            Text(breakFollowsRules
+                                 ? BreakRules.summary(
+                                    customBreaks: selectedWorkplace?.customBreaks ?? false,
+                                    rules: selectedWorkplace?.breakRules ?? []
+                                 ) + "時刻を変えるとこの休憩も変わります。"
+                                 : "手入力です。時刻を変えても、この休憩は残します。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            BreakMinutesControl(minutes: breakEntryBinding, range: 0...600)
                             Text("実働 \(Formatters.hours(draftMinutes))")
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Theme.lime)
@@ -677,7 +713,7 @@ struct ShiftEditorView: View {
                             day: date,
                             start: startMinutes,
                             end: endMinutes,
-                            breakMinutes: selectedWorkplace?.payIsDaily == true ? 0 : breakMinutes,
+                            breakMinutes: shownBreak,
                             customPay: parsedCustom,
                             adjustment: parsedAdjustment,
                             includeTransport: includeTransport
@@ -773,6 +809,7 @@ struct ShiftEditorView: View {
             date = existing.date
             startMinutes = existing.startMinutes
             endMinutes = existing.endMinutes
+            breakFollowsRules = existing.breakFollowsRules
             breakMinutes = existing.breakMinutes
             notes = existing.notes
             customText = existing.customPay.map(String.init) ?? ""
@@ -781,6 +818,7 @@ struct ShiftEditorView: View {
         } else {
             workplaceID = route.workplaceID ?? workplaces.first?.uuid
             date = route.date
+            breakFollowsRules = true
         }
     }
 
@@ -789,7 +827,8 @@ struct ShiftEditorView: View {
             error = "勤務先を選んでください"
             return
         }
-        let storedBreak = ShiftDatePolicy.breakToStore(payIsDaily: workplace.payIsDaily, minutes: breakMinutes)
+        let follows = breakFollowsRules && !workplace.payIsDaily
+        let storedBreak = shownBreak
         let minutes = PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: storedBreak)
         guard workplace.payIsDaily || minutes > 0 else {
             error = "終了時刻が開始と同じにならないようにしてください"
@@ -805,6 +844,7 @@ struct ShiftEditorView: View {
             existing.startMinutes = startMinutes
             existing.endMinutes = endMinutes
             existing.breakMinutes = storedBreak
+            existing.breakFollowsRules = follows
             existing.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
             existing.customPay = parsedCustom
             existing.adjustmentYen = parsedAdjustment
@@ -816,6 +856,7 @@ struct ShiftEditorView: View {
                 endMinutes: endMinutes,
                 breakMinutes: storedBreak,
                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+                breakFollowsRules: follows,
                 customPay: parsedCustom,
                 adjustmentYen: parsedAdjustment,
                 adjustmentNote: adjustmentNote.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -833,11 +874,48 @@ struct ShiftEditorView: View {
         dismiss()
     }
 
+    private var shownBreak: Int {
+        guard let workplace = selectedWorkplace else { return breakMinutes }
+        return BreakRules.minutesForEditor(
+            payIsDaily: workplace.payIsDaily,
+            followsRules: breakFollowsRules,
+            start: startMinutes,
+            end: endMinutes,
+            manualMinutes: breakMinutes,
+            customBreaks: workplace.customBreaks,
+            rules: workplace.breakRules
+        )
+    }
+
+    private var breakFollowsBinding: Binding<Bool> {
+        Binding(
+            get: { breakFollowsRules },
+            set: { on in
+                if on {
+                    breakFollowsRules = true
+                } else {
+                    breakMinutes = shownBreak
+                    breakFollowsRules = false
+                }
+            }
+        )
+    }
+
+    private var breakEntryBinding: Binding<Int> {
+        Binding(
+            get: { shownBreak },
+            set: { newValue in
+                breakFollowsRules = false
+                breakMinutes = newValue
+            }
+        )
+    }
+
     private var draftMinutes: Int {
         PayMath.workedMinutes(
             start: startMinutes,
             end: endMinutes,
-            breakMinutes: selectedWorkplace?.payIsDaily == true ? 0 : breakMinutes
+            breakMinutes: shownBreak
         )
     }
 
@@ -1133,6 +1211,8 @@ struct WorkplaceEditorView: View {
     @State private var overtimeHours = 8
     @State private var overtimePerHour = true
     @State private var overtimeText = "0"
+    @State private var customBreaks = false
+    @State private var breakRules: [InOutRecovered.BreakRule] = []
     @State private var error = ""
     @State private var confirmDelete = false
     @FocusState private var typing: Bool
@@ -1147,7 +1227,7 @@ struct WorkplaceEditorView: View {
                     field("名前", text: $name)
                     field("ジャンル", text: $genre)
                     field("場所", text: $place)
-                    Text("マイシフトでの表示色")
+                    Text("カレンダーでの表示色")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.muted)
                     HStack(spacing: 10) {
@@ -1227,6 +1307,28 @@ struct WorkplaceEditorView: View {
                     }
                 }
                 formCard {
+                    sectionTitle("休憩")
+                    Toggle("この勤務先の規則を使う", isOn: $customBreaks)
+                        .tint(Theme.lime)
+                    if customBreaks {
+                        Text("勤務時間が閾値を超えたとき、超えた中でいちばん長い閾値の休憩を入れます。保存済みのシフトは、ここでは書き換わりません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if breakRules.isEmpty {
+                            Text("規則がないので、自動の休憩は0分です。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                        }
+                        BreakRuleEditor(rules: $breakRules)
+                    } else {
+                        Text("法律で決まった休憩で計算します（6時間を超えたら45分、8時間を超えたら60分）。保存済みのシフトは変わりません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                formCard {
                     sectionTitle("メモ")
                     field("メモ", text: $notes)
                 }
@@ -1261,6 +1363,11 @@ struct WorkplaceEditorView: View {
             }
             .darkSheet()
             .onAppear(perform: load)
+            .onChange(of: customBreaks) { _, on in
+                if on, breakRules.isEmpty {
+                    breakRules = InOutRecovered.legalBreakRules
+                }
+            }
             .alert("この勤務先と、入っているシフトを削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) {
                     if let existing { context.delete(existing) }
@@ -1306,6 +1413,8 @@ struct WorkplaceEditorView: View {
             overtimeHours = max(1, existing.overtimeAfterMinutes / 60)
             overtimePerHour = existing.overtimePerHour
             overtimeText = String(existing.overtimeExtra)
+            customBreaks = existing.customBreaks
+            breakRules = existing.breakRules
         } else if let settings = settingsRows.first {
             wageText = String(settings.defaultHourlyWage)
             transportText = String(settings.defaultTransportAllowance)
@@ -1431,6 +1540,8 @@ struct WorkplaceEditorView: View {
         workplace.overtimeAfterMinutes = overtimeHours * 60
         workplace.overtimePerHour = overtimePerHour
         workplace.overtimeExtra = min(100_000, max(0, Int(overtimeText.filter(\.isNumber)) ?? 0))
+        workplace.customBreaks = customBreaks
+        workplace.breakRules = breakRules
         do {
             try context.save()
         } catch {

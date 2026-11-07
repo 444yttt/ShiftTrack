@@ -18,6 +18,64 @@ struct ImportCandidate: Identifiable, Codable, Hashable {
     var endMinutes: Int
     var breakMinutes: Int
     var included: Bool
+    var breakFollowsRules: Bool
+
+    init(
+        id: UUID,
+        workplaceName: String,
+        workplaceID: UUID?,
+        createWorkplace: Bool,
+        date: Date,
+        startMinutes: Int,
+        endMinutes: Int,
+        breakMinutes: Int,
+        included: Bool,
+        breakFollowsRules: Bool = false
+    ) {
+        self.id = id
+        self.workplaceName = workplaceName
+        self.workplaceID = workplaceID
+        self.createWorkplace = createWorkplace
+        self.date = date
+        self.startMinutes = startMinutes
+        self.endMinutes = endMinutes
+        self.breakMinutes = breakMinutes
+        self.included = included
+        self.breakFollowsRules = breakFollowsRules
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        workplaceName = try container.decode(String.self, forKey: .workplaceName)
+        workplaceID = try container.decodeIfPresent(UUID.self, forKey: .workplaceID)
+        createWorkplace = try container.decode(Bool.self, forKey: .createWorkplace)
+        date = try container.decode(Date.self, forKey: .date)
+        startMinutes = try container.decode(Int.self, forKey: .startMinutes)
+        endMinutes = try container.decode(Int.self, forKey: .endMinutes)
+        breakMinutes = try container.decode(Int.self, forKey: .breakMinutes)
+        included = try container.decode(Bool.self, forKey: .included)
+        breakFollowsRules = try container.decodeIfPresent(Bool.self, forKey: .breakFollowsRules) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(workplaceName, forKey: .workplaceName)
+        try container.encodeIfPresent(workplaceID, forKey: .workplaceID)
+        try container.encode(createWorkplace, forKey: .createWorkplace)
+        try container.encode(date, forKey: .date)
+        try container.encode(startMinutes, forKey: .startMinutes)
+        try container.encode(endMinutes, forKey: .endMinutes)
+        try container.encode(breakMinutes, forKey: .breakMinutes)
+        try container.encode(included, forKey: .included)
+        try container.encode(breakFollowsRules, forKey: .breakFollowsRules)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, workplaceName, workplaceID, createWorkplace, date
+        case startMinutes, endMinutes, breakMinutes, included, breakFollowsRules
+    }
 }
 
 struct PendingImport: Codable, Hashable {
@@ -289,6 +347,15 @@ enum ShiftExtractionService {
         }
         let candidates = drafts.compactMap { draft -> ImportCandidate? in
             guard let date = draft.date() else { return nil }
+            let decision = BreakRules.textDecision(
+                breakIsExplicit: draft.breakIsExplicit,
+                explicitMinutes: draft.breakMinutes,
+                payIsDaily: false,
+                customBreaks: false,
+                rules: [],
+                start: draft.startMinutes,
+                end: draft.endMinutes
+            )
             return ImportCandidate(
                 id: draft.id,
                 workplaceName: draft.workplaceName,
@@ -297,8 +364,9 @@ enum ShiftExtractionService {
                 date: date,
                 startMinutes: draft.startMinutes,
                 endMinutes: draft.endMinutes,
-                breakMinutes: draft.breakMinutes,
-                included: true
+                breakMinutes: decision.minutes,
+                included: true,
+                breakFollowsRules: decision.followsRules
             )
         }
         return PendingImport(message: message, usedAppleIntelligence: usedModel, candidates: candidates)

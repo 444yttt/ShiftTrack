@@ -1,21 +1,19 @@
 import Foundation
 
-/// Reconstruction from the authorized IN/OUT binary. Not original Swift,
-/// not Ghidra output, and not a guess at payroll, rounding, break selection,
-/// or week paging.
+/// Reconstruction from the authorized IN/OUT binary. Not original Swift
+/// and not Ghidra output. Payroll arithmetic and PayRounding are not here.
 ///
-/// Addresses are in `com.graff.inout` 1.0 (3). Pseudocode for the same
-/// addresses is in the public analysis repo `notes/ghidra/`, commit
-/// `ba221abdcf7d483b50a28aaf0fb4bcbe7fd40459`.
+/// Addresses are in `com.graff.inout` 1.0 (3). Pseudocode is in the public
+/// analysis repo. Minute and day calls match commit `ba221ab`. Break
+/// selection, the editor minute count, and week-times-7 match `06aefb3`.
 enum InOutRecovered {
     struct BreakRule {
         var overMinutes: Int
         var breakMinutes: Int
     }
 
-    /// `0x1000da43c` writes these two BreakRule values. The comparison that
-    /// would choose one of them from worked minutes was not recovered, so
-    /// nothing in the editor or pay path reads this table.
+    /// `0x1000da43c` writes these two BreakRule values. `BreakRules` reads
+    /// them when a workplace's `customBreaks` is off.
     static let legalBreakRules: [BreakRule] = [
         .init(overMinutes: 360, breakMinutes: 45),
         .init(overMinutes: 480, breakMinutes: 60),
@@ -92,5 +90,35 @@ enum InOutRecovered {
             addingDays(14, to: day, calendar: calendar),
             addingDays(-1, to: day, calendar: calendar)
         )
+    }
+
+    /// `0x10020499c`. Week count times 7, then `Calendar.Component.day`,
+    /// wrappingComponents false. The ±1 that produces the week count was not
+    /// in this function. `weekSlideTag` is not used.
+    static func addingWeeks(_ weeks: Int, to day: Date, calendar: Calendar = .current) -> Date? {
+        calendar.date(byAdding: .day, value: weeks * 7, to: day, wrappingComponents: false)
+    }
+
+    /// `0x1000e967c`. Rules with `overMinutes < minutes`, then the greatest
+    /// threshold. An equal threshold keeps the earlier rule. No match is 0.
+    static func selectedBreakMinutes(_ minutes: Int, rules: [BreakRule]) -> Int {
+        var best: BreakRule?
+        for rule in rules where rule.overMinutes < minutes {
+            if let current = best, current.overMinutes >= rule.overMinutes {
+                continue
+            }
+            best = rule
+        }
+        return best?.breakMinutes ?? 0
+    }
+
+    /// `0x1001b8770`. End minus start, positive remainder of 1440.
+    /// A zero remainder, including equal minutes, is 1440.
+    /// `BreakRules` does not pass that 1440 into a shift the product rejects.
+    static func editorMinuteCount(startMinute: Int, endMinute: Int) -> Int {
+        let difference = endMinute - startMinute
+        let remainder = difference % 1440
+        let positive = remainder < 0 ? remainder + 1440 : remainder
+        return positive == 0 ? 1440 : positive
     }
 }
