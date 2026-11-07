@@ -337,7 +337,7 @@ enum ShiftMapping {
                 workplaceName: workplace.name,
                 colorHex: workplace.colorHex,
                 date: shift.date,
-                payDate: PayMath.payday(for: shift.date, workplace: workplace),
+                payDate: PaySchedule.payday(for: shift.date, workplace: workplace),
                 endAt: PayMath.endDate(day: shift.date, start: shift.startMinutes, end: shift.endMinutes),
                 minutes: shift.workedMinutes,
                 yen: shift.estimatedYen(includeTransport: includeTransport)

@@ -55,6 +55,11 @@ final class Workplace {
     var roundingUnitMinutes: Int = 1
     var roundingStartRaw: Int = 0
     var roundingEndRaw: Int = 0
+    /// Independent deposit cycle. `month` keeps the existing payday.
+    /// `week` and `day` apply only after the user chooses them.
+    var payCycleRaw: String = "month"
+    /// Calendar weekday 1...7. Read only when the cycle is `week`.
+    var payWeekday: Int = 0
     var createdAt: Date
     @Relationship(deleteRule: .cascade, inverse: \WorkShift.workplace)
     var shifts: [WorkShift]
@@ -105,6 +110,8 @@ final class Workplace {
         self.roundingUnitMinutes = 1
         self.roundingStartRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
         self.roundingEndRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
+        self.payCycleRaw = PayCycle.month.rawValue
+        self.payWeekday = 0
         self.createdAt = createdAt
         self.shifts = []
     }
