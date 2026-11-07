@@ -235,7 +235,7 @@ struct ShiftAddChooser: View {
         } else {
             lines.append("勤務先の名前を行に書いてください。")
         }
-        lines.append("追加すると、この画面を閉じてマイシフトに出します。")
+        lines.append("追加すると、この画面を閉じてカレンダーに出します。")
         return lines.joined(separator: "")
     }
 
@@ -440,7 +440,21 @@ struct ShiftAddChooser: View {
 
     private func draftCaption(_ draft: ShiftTextParser.Draft) -> String {
         let when = draft.date().map { Formatters.monthDayWeekday($0) } ?? "\(draft.month)/\(draft.day)"
-        return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  休憩\(draft.breakMinutes)分"
+        let match = workplaces.first { normalize($0.name) == normalize(draft.workplaceName) }
+        if match?.payIsDaily == true {
+            return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  日給"
+        }
+        let decision = BreakRules.textDecision(
+            breakIsExplicit: draft.breakIsExplicit,
+            explicitMinutes: draft.breakMinutes,
+            payIsDaily: false,
+            customBreaks: match?.customBreaks ?? false,
+            rules: match?.breakRules ?? [],
+            start: draft.startMinutes,
+            end: draft.endMinutes
+        )
+        let mark = decision.followsRules ? "（規則）" : "（入力）"
+        return "\(when)  \(Formatters.clock(draft.startMinutes))–\(Formatters.clock(draft.endMinutes))  休憩\(decision.minutes)分\(mark)"
     }
 
     private func color(for name: String) -> Color {
@@ -486,17 +500,26 @@ struct ShiftAddChooser: View {
         var dates: [Date] = []
         for draft in parsed {
             guard let date = draft.date() else { continue }
-            guard PayMath.workedMinutes(
-                start: draft.startMinutes,
-                end: draft.endMinutes,
-                breakMinutes: draft.breakMinutes
-            ) > 0 else { continue }
             guard let workplace = workplace(
                 named: draft.workplaceName,
                 wage: wage,
                 transport: transport,
                 created: &created
             ) else { continue }
+            let decision = BreakRules.textDecision(
+                breakIsExplicit: draft.breakIsExplicit,
+                explicitMinutes: draft.breakMinutes,
+                payIsDaily: workplace.payIsDaily,
+                customBreaks: workplace.customBreaks,
+                rules: workplace.breakRules,
+                start: draft.startMinutes,
+                end: draft.endMinutes
+            )
+            guard PayMath.workedMinutes(
+                start: draft.startMinutes,
+                end: draft.endMinutes,
+                breakMinutes: decision.minutes
+            ) > 0 else { continue }
             dates.append(date)
             let duplicate = shifts.contains { shift in
                 shift.workplace?.uuid == workplace.uuid
@@ -509,7 +532,8 @@ struct ShiftAddChooser: View {
                 date: date,
                 startMinutes: draft.startMinutes,
                 endMinutes: draft.endMinutes,
-                breakMinutes: draft.breakMinutes,
+                breakMinutes: decision.minutes,
+                breakFollowsRules: decision.followsRules,
                 workplace: workplace
             ))
         }
@@ -573,6 +597,7 @@ struct ShiftEditorView: View {
     @State private var startMinutes = 10 * 60
     @State private var endMinutes = 15 * 60
     @State private var breakMinutes = 0
+    @State private var breakFollowsRules = false
     @State private var notes = ""
     @State private var customText = ""
     @State private var adjustmentText = ""
@@ -648,7 +673,18 @@ struct ShiftEditorView: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted)
                         } else {
-                            BreakMinutesControl(minutes: $breakMinutes, range: 0...600)
+                            Toggle("休憩を規則から入れる", isOn: breakFollowsBinding)
+                                .tint(Theme.lime)
+                            Text(breakFollowsRules
+                                 ? BreakRules.summary(
+                                    customBreaks: selectedWorkplace?.customBreaks ?? false,
+                                    rules: selectedWorkplace?.breakRules ?? []
+                                 ) + "時刻を変えるとこの休憩も変わります。"
+                                 : "手入力です。時刻を変えても、この休憩は残します。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            BreakMinutesControl(minutes: breakEntryBinding, range: 0...600)
                             Text("実働 \(Formatters.hours(draftMinutes))")
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Theme.lime)
@@ -677,7 +713,7 @@ struct ShiftEditorView: View {
                             day: date,
                             start: startMinutes,
                             end: endMinutes,
-                            breakMinutes: selectedWorkplace?.payIsDaily == true ? 0 : breakMinutes,
+                            breakMinutes: shownBreak,
                             customPay: parsedCustom,
                             adjustment: parsedAdjustment,
                             includeTransport: includeTransport
@@ -773,6 +809,7 @@ struct ShiftEditorView: View {
             date = existing.date
             startMinutes = existing.startMinutes
             endMinutes = existing.endMinutes
+            breakFollowsRules = existing.breakFollowsRules
             breakMinutes = existing.breakMinutes
             notes = existing.notes
             customText = existing.customPay.map(String.init) ?? ""
@@ -781,6 +818,7 @@ struct ShiftEditorView: View {
         } else {
             workplaceID = route.workplaceID ?? workplaces.first?.uuid
             date = route.date
+            breakFollowsRules = true
         }
     }
 
@@ -789,7 +827,8 @@ struct ShiftEditorView: View {
             error = "勤務先を選んでください"
             return
         }
-        let storedBreak = ShiftDatePolicy.breakToStore(payIsDaily: workplace.payIsDaily, minutes: breakMinutes)
+        let follows = breakFollowsRules && !workplace.payIsDaily
+        let storedBreak = shownBreak
         let minutes = PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: storedBreak)
         guard workplace.payIsDaily || minutes > 0 else {
             error = "終了時刻が開始と同じにならないようにしてください"
@@ -805,6 +844,7 @@ struct ShiftEditorView: View {
             existing.startMinutes = startMinutes
             existing.endMinutes = endMinutes
             existing.breakMinutes = storedBreak
+            existing.breakFollowsRules = follows
             existing.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
             existing.customPay = parsedCustom
             existing.adjustmentYen = parsedAdjustment
@@ -819,6 +859,7 @@ struct ShiftEditorView: View {
                 customPay: parsedCustom,
                 adjustmentYen: parsedAdjustment,
                 adjustmentNote: adjustmentNote.trimmingCharacters(in: .whitespacesAndNewlines),
+                breakFollowsRules: follows,
                 workplace: workplace
             )
             context.insert(shift)
@@ -833,11 +874,48 @@ struct ShiftEditorView: View {
         dismiss()
     }
 
+    private var shownBreak: Int {
+        guard let workplace = selectedWorkplace else { return breakMinutes }
+        return BreakRules.minutesForEditor(
+            payIsDaily: workplace.payIsDaily,
+            followsRules: breakFollowsRules,
+            manualMinutes: breakMinutes,
+            start: startMinutes,
+            end: endMinutes,
+            customBreaks: workplace.customBreaks,
+            rules: workplace.breakRules
+        )
+    }
+
+    private var breakFollowsBinding: Binding<Bool> {
+        Binding(
+            get: { breakFollowsRules },
+            set: { on in
+                if on {
+                    breakFollowsRules = true
+                } else {
+                    breakMinutes = shownBreak
+                    breakFollowsRules = false
+                }
+            }
+        )
+    }
+
+    private var breakEntryBinding: Binding<Int> {
+        Binding(
+            get: { shownBreak },
+            set: { newValue in
+                breakFollowsRules = false
+                breakMinutes = newValue
+            }
+        )
+    }
+
     private var draftMinutes: Int {
         PayMath.workedMinutes(
             start: startMinutes,
             end: endMinutes,
-            breakMinutes: selectedWorkplace?.payIsDaily == true ? 0 : breakMinutes
+            breakMinutes: shownBreak
         )
     }
 
@@ -1133,6 +1211,20 @@ struct WorkplaceEditorView: View {
     @State private var overtimeHours = 8
     @State private var overtimePerHour = true
     @State private var overtimeText = "0"
+    @State private var customBreaks = false
+    @State private var roundingUnit = 1
+    @State private var roundingStart = 0
+    @State private var roundingEnd = 0
+    @State private var nightRate = 0
+    @State private var overtimeRate = 0
+    @State private var holidayRates = Array(repeating: 0, count: 7)
+    @State private var wageHistory: [Workplace.WageHistoryEntry] = []
+    @State private var wageBands: [Workplace.WageBandEntry] = []
+    @State private var bandStart = 22 * 60
+    @State private var bandEnd = 5 * 60
+    @State private var bandWage = "1000"
+    @State private var bandIncludesNight = false
+    @State private var breakRules: [InOutRecovered.BreakRule] = []
     @State private var error = ""
     @State private var confirmDelete = false
     @FocusState private var typing: Bool
@@ -1147,7 +1239,7 @@ struct WorkplaceEditorView: View {
                     field("名前", text: $name)
                     field("ジャンル", text: $genre)
                     field("場所", text: $place)
-                    Text("マイシフトでの表示色")
+                    Text("カレンダーでの表示色")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.muted)
                     HStack(spacing: 10) {
@@ -1223,8 +1315,118 @@ struct WorkplaceEditorView: View {
                             }
                             .tint(Theme.lime)
                             field("追加金額", text: $overtimeText, number: true)
+                            Stepper(value: $overtimeRate, in: 0...100) {
+                                Text("割増 \(overtimeRate)%")
+                                    .foregroundStyle(.white)
+                            }
+                            Text("予定全体の時給分では、しきい値を超えた分にこの割合を足します。このシフトより前の分数は未確定なので足しません。今の見込の追加金額とは別です。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                }
+                formCard {
+                    sectionTitle("休憩")
+                    Toggle("この勤務先の規則を使う", isOn: $customBreaks)
+                        .tint(Theme.lime)
+                    if customBreaks {
+                        Text("勤務時間が閾値を超えたとき、超えた中でいちばん長い閾値の休憩を入れます。保存済みのシフトは、ここでは書き換わりません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if breakRules.isEmpty {
+                            Text("規則がないので、自動の休憩は0分です。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                        }
+                        BreakRuleEditor(rules: $breakRules)
+                    } else {
+                        Text("法律で決まった休憩で計算します（6時間を超えたら45分、8時間を超えたら60分）。保存済みのシフトは変わりません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                formCard {
+                    sectionTitle("開始と終了の丸め")
+                    Text("保存したシフトの時刻も、入っている給料の見込も、この設定だけでは変わりません。単位が2分未満か、向きがそのままのときは、その時刻を動かしません。参考アプリの丸めの再構成で、金額の式ではありません。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Picker("単位", selection: $roundingUnit) {
+                        ForEach(roundingUnits, id: \.self) { unit in
+                            Text(unit < 2 ? "\(unit)分（動かさない）" : "\(unit)分").tag(unit)
+                        }
+                    }
+                    .tint(Theme.lime)
+                    roundingDirectionPicker("開始", selection: $roundingStart)
+                    roundingDirectionPicker("終了", selection: $roundingEnd)
+                    Text(roundingPreview)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                formCard {
+                    sectionTitle("時給の履歴と時間帯")
+                    Text("予定全体の時給分は、履歴の末尾から適用日がシフトの日以前の行を使います。空なら0です。全部がシフト日より後のときは未確定で、円を出しません。並び順は検査していないので、日付で並べ替えません。時間帯の境界はまだ合計へ入れていません。上の時給欄は、今月の見込みだけが使います。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(Array(wageHistory.enumerated()), id: \.offset) { index, entry in
+                        HStack {
+                            Text("\(Formatters.longDay(entry.at))  \(Formatters.yen(entry.hourlyWage))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Button("削除") { wageHistory.remove(at: index) }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.destructive)
+                        }
+                    }
+                    Button("今の時給を履歴に足す") {
+                        wageHistory.append(.init(at: .now, hourlyWage: yen(wageText)))
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    ForEach(Array(wageBands.enumerated()), id: \.offset) { index, band in
+                        HStack {
+                            Text("\(Formatters.clock(band.startMinutes))–\(Formatters.clock(band.endMinutes)) \(Formatters.yen(band.hourlyWage))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Button("削除") { wageBands.remove(at: index) }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.destructive)
+                        }
+                    }
+                    HStack(alignment: .top, spacing: 10) {
+                        MinutesTimePicker(title: "帯の開始", minutes: $bandStart)
+                        MinutesTimePicker(title: "帯の終了", minutes: $bandEnd)
+                    }
+                    field("帯の時給", text: $bandWage, number: true)
+                    Toggle("この帯は深夜割増を含む", isOn: $bandIncludesNight).tint(Theme.lime)
+                    Button("時間帯を足す") {
+                        wageBands.append(.init(
+                            startMinutes: bandStart,
+                            endMinutes: bandEnd,
+                            hourlyWage: yen(bandWage),
+                            includesNightPremium: bandIncludesNight
+                        ))
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    let names = ["日", "月", "火", "水", "木", "金", "土"]
+                    ForEach(0..<7, id: \.self) { index in
+                        Stepper(value: $holidayRates[index], in: 0...100) {
+                            Text("\(names[index])の休日割増 \(holidayRates[index])%")
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    Text("休日の割合は曜日番号から1を引いた位置です。0%はその曜日に足しません。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 formCard {
                     sectionTitle("メモ")
@@ -1261,6 +1463,11 @@ struct WorkplaceEditorView: View {
             }
             .darkSheet()
             .onAppear(perform: load)
+            .onChange(of: customBreaks) { _, on in
+                if on, breakRules.isEmpty {
+                    breakRules = InOutRecovered.legalBreakRules
+                }
+            }
             .alert("この勤務先と、入っているシフトを削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) {
                     if let existing { context.delete(existing) }
@@ -1306,6 +1513,16 @@ struct WorkplaceEditorView: View {
             overtimeHours = max(1, existing.overtimeAfterMinutes / 60)
             overtimePerHour = existing.overtimePerHour
             overtimeText = String(existing.overtimeExtra)
+            customBreaks = existing.customBreaks
+            breakRules = existing.breakRules
+            roundingUnit = existing.roundingUnitMinutes
+            roundingStart = existing.roundingStartRaw
+            roundingEnd = existing.roundingEndRaw
+            nightRate = existing.nightRatePercent
+            overtimeRate = existing.overtimeRatePercent
+            holidayRates = existing.holidayRatePercents
+            wageHistory = existing.wageHistory
+            wageBands = existing.wageBands
         } else if let settings = settingsRows.first {
             wageText = String(settings.defaultHourlyWage)
             transportText = String(settings.defaultTransportAllowance)
@@ -1319,6 +1536,14 @@ struct WorkplaceEditorView: View {
             Toggle("深夜給料", isOn: $nightOn).tint(Theme.lime)
             if nightOn {
                 field("深夜給料", text: $nightText, number: true)
+                Stepper(value: $nightRate, in: 0...100) {
+                    Text("深夜の割増 \(nightRate)%")
+                        .foregroundStyle(.white)
+                }
+                Text("予定全体の時給分では、深夜の時間の基本給にこの割合を足します。0%なら足しません。上の深夜給料は、今の見込が時給を置き換える金額です。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .top, spacing: 10) {
                     MinutesTimePicker(title: "深夜の開始", minutes: $nightStart)
                     MinutesTimePicker(title: "深夜の終了", minutes: $nightEnd)
@@ -1335,6 +1560,45 @@ struct WorkplaceEditorView: View {
                 }
             }
         }
+    }
+
+    private var roundingUnits: [Int] {
+        var units = [1, 5, 10, 15, 30, 60]
+        if !units.contains(roundingUnit) {
+            units.append(roundingUnit)
+            units.sort()
+        }
+        return units
+    }
+
+    private func roundingDirectionPicker(_ title: String, selection: Binding<Int>) -> some View {
+        Picker(title, selection: selection) {
+            Text("そのまま").tag(0)
+            Text("切り上げ").tag(1)
+            Text("切り捨て").tag(2)
+            Text("近い方").tag(3)
+        }
+        .tint(Theme.lime)
+    }
+
+    private var roundingPreview: String {
+        let start = InOutRecovered.roundedSecondsFromStartOfDay(
+            450,
+            unitMinutes: roundingUnit,
+            direction: InOutRecovered.RoundingDirection.resolved(roundingStart)
+        )
+        let end = InOutRecovered.roundedSecondsFromStartOfDay(
+            450,
+            unitMinutes: roundingUnit,
+            direction: InOutRecovered.RoundingDirection.resolved(roundingEnd)
+        )
+        return "例: 0時7分30秒は、開始が\(roundingClock(start))、終了が\(roundingClock(end))です。1440分では巻きません。"
+    }
+
+    private func roundingClock(_ seconds: Double) -> String {
+        let sign = seconds < 0 ? "−" : ""
+        let whole = Int(abs(seconds).rounded(.towardZero))
+        return "\(sign)\(whole / 3600)時\((whole / 60) % 60)分\(whole % 60)秒"
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -1431,6 +1695,16 @@ struct WorkplaceEditorView: View {
         workplace.overtimeAfterMinutes = overtimeHours * 60
         workplace.overtimePerHour = overtimePerHour
         workplace.overtimeExtra = min(100_000, max(0, Int(overtimeText.filter(\.isNumber)) ?? 0))
+        workplace.customBreaks = customBreaks
+        workplace.breakRules = breakRules
+        workplace.roundingUnitMinutes = roundingUnit
+        workplace.roundingStartRaw = roundingStart
+        workplace.roundingEndRaw = roundingEnd
+        workplace.nightRatePercent = nightRate
+        workplace.overtimeRatePercent = overtimeRate
+        workplace.setHolidayRatePercents(holidayRates)
+        workplace.wageHistory = wageHistory
+        workplace.wageBands = wageBands
         do {
             try context.save()
         } catch {

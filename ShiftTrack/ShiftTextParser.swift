@@ -10,6 +10,7 @@ enum ShiftTextParser {
         var startMinutes: Int
         var endMinutes: Int
         var breakMinutes: Int
+        var breakIsExplicit: Bool = false
 
         func date(calendar: Calendar = .current) -> Date? {
             var comps = DateComponents()
@@ -67,7 +68,8 @@ enum ShiftTextParser {
                 usableDates = [fallback]
             }
             guard !usableDates.isEmpty else { continue }
-            let breakMinutes = min(8 * 60, max(0, breakMatch(in: line) ?? 0))
+            let matchedBreak = breakMatch(in: line)
+            let breakMinutes = min(8 * 60, max(0, matchedBreak ?? 0))
             var name = pickName(line: line, known: known, dates: dates.map(\.span), times: times.map(\.span), sticky: stickyName)
             if looksLikeNote(name) {
                 name = looksLikeNote(stickyName) ? "" : stickyName
@@ -95,7 +97,8 @@ enum ShiftTextParser {
                     day: date.2,
                     startMinutes: time.start,
                     endMinutes: time.end,
-                    breakMinutes: breakMinutes
+                    breakMinutes: breakMinutes,
+                    breakIsExplicit: matchedBreak != nil
                 ))
             }
         }

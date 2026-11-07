@@ -39,23 +39,7 @@ enum PayMath {
         }
         let paid = workedMinutes(start: start, end: end, breakMinutes: breakMinutes)
         guard paid > 0 else { return max(0, adjustment + transport) }
-        let holiday = workplace.holidayPayEnabled && workplace.holidayWeekdays.contains(calendar.component(.weekday, from: calendar.startOfDay(for: day)))
-        var weighted = 0
-        for offset in 0..<paid {
-            let minute = ((start + offset) % (24 * 60) + (24 * 60)) % (24 * 60)
-            weighted += rate(at: minute, holiday: holiday, workplace: workplace)
-        }
-        var amount = (weighted + 30) / 60
-        if workplace.overtimeEnabled {
-            let extraMinutes = max(0, paid - max(0, workplace.overtimeAfterMinutes))
-            if extraMinutes > 0 {
-                if workplace.overtimePerHour {
-                    amount += (max(0, workplace.overtimeExtra) * extraMinutes + 30) / 60
-                } else {
-                    amount += max(0, workplace.overtimeExtra)
-                }
-            }
-        }
+        let amount = timedAmount(workplace: workplace, day: day, start: start, paidMinutes: paid, calendar: calendar)
         return max(0, amount + adjustment + transport)
     }
 
@@ -98,6 +82,36 @@ enum PayMath {
         let last = calendar.range(of: .day, in: .month, for: start)?.count ?? 28
         let chosen = day == 0 ? last : min(max(1, day), last)
         return calendar.date(byAdding: .day, value: chosen - 1, to: start) ?? start
+    }
+
+    /// ShiftTrack's per-minute wage. Not a recovered IN/OUT pay function.
+    /// `quote` uses the whole paid span. The today screen uses a prefix.
+    static func timedAmount(
+        workplace: Workplace,
+        day: Date,
+        start: Int,
+        paidMinutes: Int,
+        calendar: Calendar = .current
+    ) -> Int {
+        guard paidMinutes > 0 else { return 0 }
+        let holiday = workplace.holidayPayEnabled && workplace.holidayWeekdays.contains(calendar.component(.weekday, from: calendar.startOfDay(for: day)))
+        var weighted = 0
+        for offset in 0..<paidMinutes {
+            let minute = ((start + offset) % (24 * 60) + (24 * 60)) % (24 * 60)
+            weighted += rate(at: minute, holiday: holiday, workplace: workplace)
+        }
+        var amount = (weighted + 30) / 60
+        if workplace.overtimeEnabled {
+            let extraMinutes = max(0, paidMinutes - max(0, workplace.overtimeAfterMinutes))
+            if extraMinutes > 0 {
+                if workplace.overtimePerHour {
+                    amount += (max(0, workplace.overtimeExtra) * extraMinutes + 30) / 60
+                } else {
+                    amount += max(0, workplace.overtimeExtra)
+                }
+            }
+        }
+        return max(0, amount)
     }
 
     private static func rate(at minute: Int, holiday: Bool, workplace: Workplace) -> Int {

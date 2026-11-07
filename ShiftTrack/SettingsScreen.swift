@@ -24,7 +24,7 @@ struct SettingsScreen: View {
     private func form(_ settings: AppSettings) -> some View {
         @Bindable var settings = settings
         return ScreenScroll {
-            Text("その他")
+            Text("設定")
                 .font(.system(size: 28, weight: .black))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -201,7 +201,7 @@ struct ImportChooserView: View {
         if !ImportRouter.shared.defaultWorkplace.isEmpty {
             lines.append("勤務先の無い行は「\(ImportRouter.shared.defaultWorkplace)」にします。")
         }
-        lines.append("読み取ったあと、保存するとマイシフトに出ます。")
+        lines.append("読み取ったあと、保存するとカレンダーに出ます。")
         return lines.joined()
     }
 
@@ -336,7 +336,7 @@ struct ImportReviewView: View {
                 Text(candidate.wrappedValue.workplaceName.isEmpty ? "勤務先未設定" : candidate.wrappedValue.workplaceName)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
-                Text("\(Formatters.monthDayWeekday(candidate.wrappedValue.date))  \(Formatters.clock(candidate.wrappedValue.startMinutes))–\(Formatters.clock(candidate.wrappedValue.endMinutes))")
+                Text("\(Formatters.monthDayWeekday(candidate.wrappedValue.date))  \(Formatters.clock(candidate.wrappedValue.startMinutes))–\(Formatters.clock(candidate.wrappedValue.endMinutes))  休憩\(candidate.wrappedValue.breakMinutes)分\(candidate.wrappedValue.breakFollowsRules ? "（規則）" : "（入力）")")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
                 Text(candidate.wrappedValue.createWorkplace ? "新規の勤務先として追加" : "既存の勤務先")
@@ -369,6 +369,10 @@ struct ImportReviewView: View {
             } else {
                 pending.candidates[index].createWorkplace = !pending.candidates[index].workplaceName.isEmpty
             }
+            let rulePlace = pending.candidates[index].createWorkplace
+                ? nil
+                : workplaces.first { $0.uuid == pending.candidates[index].workplaceID }
+            pending.candidates[index] = BreakRules.refreshed(pending.candidates[index], workplace: rulePlace)
         }
         matched = true
     }
@@ -381,13 +385,14 @@ struct ImportReviewView: View {
         var saved = 0
         var skipped = 0
         for candidate in pending.candidates where candidate.included {
-            guard PayMath.workedMinutes(
-                start: candidate.startMinutes,
-                end: candidate.endMinutes,
-                breakMinutes: candidate.breakMinutes
-            ) > 0 else { continue }
             let workplace = resolve(candidate, wage: wage, transport: transport, created: &created)
             guard let workplace else { continue }
+            let refreshed = BreakRules.refreshed(candidate, workplace: workplace)
+            guard PayMath.workedMinutes(
+                start: refreshed.startMinutes,
+                end: refreshed.endMinutes,
+                breakMinutes: refreshed.breakMinutes
+            ) > 0 else { continue }
             let duplicate = shifts.contains { shift in
                 shift.workplace?.uuid == workplace.uuid
                     && Calendar.current.isDate(shift.date, inSameDayAs: candidate.date)
@@ -399,10 +404,11 @@ struct ImportReviewView: View {
                 continue
             }
             let shift = WorkShift(
-                date: candidate.date,
-                startMinutes: candidate.startMinutes,
-                endMinutes: candidate.endMinutes,
-                breakMinutes: candidate.breakMinutes,
+                date: refreshed.date,
+                startMinutes: refreshed.startMinutes,
+                endMinutes: refreshed.endMinutes,
+                breakMinutes: refreshed.breakMinutes,
+                breakFollowsRules: refreshed.breakFollowsRules,
                 workplace: workplace
             )
             context.insert(shift)
@@ -500,7 +506,17 @@ struct CandidateEditor: View {
                         MinutesTimePicker(title: "開始", minutes: $candidate.startMinutes)
                         MinutesTimePicker(title: "終了", minutes: $candidate.endMinutes)
                     }
-                    BreakMinutesControl(minutes: $candidate.breakMinutes, range: 0...480)
+                    .onChange(of: candidate.startMinutes) { _, _ in refreshCandidateBreak() }
+                    .onChange(of: candidate.endMinutes) { _, _ in refreshCandidateBreak() }
+                    if ruleWorkplace?.payIsDaily == true {
+                        Text("日給の勤務先では、休憩時間は給料から引きません。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                    } else {
+                        Toggle("休憩を規則から入れる", isOn: candidateBreakFollows)
+                            .tint(Theme.lime)
+                        BreakMinutesControl(minutes: candidateBreakEntry, range: 0...600)
+                    }
                     if PayMath.workedMinutes(
                         start: candidate.startMinutes,
                         end: candidate.endMinutes,
@@ -531,7 +547,42 @@ struct CandidateEditor: View {
                 }
             }
             .darkSheet()
+            .onChange(of: candidate.workplaceID) { _, _ in refreshCandidateBreak() }
+            .onChange(of: candidate.createWorkplace) { _, _ in refreshCandidateBreak() }
         }
+    }
+
+    private var ruleWorkplace: Workplace? {
+        guard !candidate.createWorkplace else { return nil }
+        return workplaces.first { $0.uuid == candidate.workplaceID }
+    }
+
+    private var candidateBreakFollows: Binding<Bool> {
+        Binding(
+            get: { candidate.breakFollowsRules },
+            set: { on in
+                if on {
+                    candidate.breakFollowsRules = true
+                    refreshCandidateBreak()
+                } else {
+                    candidate.breakFollowsRules = false
+                }
+            }
+        )
+    }
+
+    private var candidateBreakEntry: Binding<Int> {
+        Binding(
+            get: { candidate.breakMinutes },
+            set: { newValue in
+                candidate.breakFollowsRules = false
+                candidate.breakMinutes = newValue
+            }
+        )
+    }
+
+    private func refreshCandidateBreak() {
+        candidate = BreakRules.refreshed(candidate, workplace: ruleWorkplace)
     }
 
     private var workplaceBinding: Binding<UUID?> {

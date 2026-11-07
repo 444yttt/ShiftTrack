@@ -32,6 +32,29 @@ final class Workplace {
     var overtimeAfterMinutes: Int
     var overtimePerHour: Bool
     var overtimeExtra: Int
+    /// Percent added by the recovered night premium. 0 adds nothing.
+    /// Existing rows stay 0, so this does not change stored shifts.
+    var nightRatePercent: Int = 0
+    /// Percent added on minutes past the overtime threshold. 0 adds nothing.
+    var overtimeRatePercent: Int = 0
+    /// Seven percents, Sunday first, matching `weekday - 1`. Empty is all zero.
+    var holidayRatesRaw: String = ""
+    /// `effectiveFrom|yen` rows, walked from the end. Empty selects wage 0.
+    /// A row whose calendar day is after the shift does not match.
+    var wageHistoryRaw: String = ""
+    /// Stored `start|end|yen|night` rows. Band bounds are not closed, so the
+    /// scheduled amount does not switch wages from these rows.
+    var wageBandsRaw: String = ""
+    /// Off uses the legal 6h/8h table. On uses `breakRulesRaw`.
+    var customBreaks: Bool = false
+    /// `overMinutes:breakMinutes` pairs, earlier first. Empty is not the legal table.
+    var breakRulesRaw: String = ""
+    /// Clock rounding from `PayTerms.rounding`. Unit below 2, or either
+    /// direction `exact` (0), leaves that instant unchanged. Existing rows
+    /// get 1 and exact, which is a no-op. Saving this does not rewrite shifts.
+    var roundingUnitMinutes: Int = 1
+    var roundingStartRaw: Int = 0
+    var roundingEndRaw: Int = 0
     var createdAt: Date
     @Relationship(deleteRule: .cascade, inverse: \WorkShift.workplace)
     var shifts: [WorkShift]
@@ -72,6 +95,16 @@ final class Workplace {
         self.overtimeAfterMinutes = InOutRecovered.defaultOvertimeThresholdMinutes
         self.overtimePerHour = true
         self.overtimeExtra = 0
+        self.nightRatePercent = 0
+        self.overtimeRatePercent = 0
+        self.holidayRatesRaw = ""
+        self.wageHistoryRaw = ""
+        self.wageBandsRaw = ""
+        self.customBreaks = false
+        self.breakRulesRaw = ""
+        self.roundingUnitMinutes = 1
+        self.roundingStartRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
+        self.roundingEndRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
         self.createdAt = createdAt
         self.shifts = []
     }
@@ -85,6 +118,75 @@ final class Workplace {
     }
 
     var color: Color { Color(hexString: colorHex) }
+
+    var breakRules: [InOutRecovered.BreakRule] {
+        get { BreakRules.decode(breakRulesRaw) }
+        set { breakRulesRaw = BreakRules.encode(newValue) }
+    }
+
+    var roundingChangesClock: Bool {
+        if roundingUnitMinutes < 2 { return false }
+        let start = InOutRecovered.RoundingDirection.resolved(roundingStartRaw)
+        let end = InOutRecovered.RoundingDirection.resolved(roundingEndRaw)
+        return start != .exact || end != .exact
+    }
+
+    var holidayRatePercents: [Int] {
+        let parsed = holidayRatesRaw.split(separator: ",").map { Int($0) ?? 0 }
+        if parsed.count == 7 { return parsed }
+        return Array(repeating: 0, count: 7)
+    }
+
+    func setHolidayRatePercents(_ rates: [Int]) {
+        let seven = (0..<7).map { index in
+            rates.indices.contains(index) ? min(100, max(0, rates[index])) : 0
+        }
+        holidayRatesRaw = seven.map(String.init).joined(separator: ",")
+    }
+
+    struct WageHistoryEntry: Equatable {
+        var at: Date
+        var hourlyWage: Int
+    }
+
+    var wageHistory: [WageHistoryEntry] {
+        get {
+            wageHistoryRaw.split(separator: ";").compactMap { row in
+                let parts = row.split(separator: "|")
+                guard parts.count == 2, let seconds = TimeInterval(parts[0]), let wage = Int(parts[1]) else { return nil }
+                return WageHistoryEntry(at: Date(timeIntervalSince1970: seconds), hourlyWage: wage)
+            }
+        }
+        set {
+            wageHistoryRaw = newValue.map { "\($0.at.timeIntervalSince1970)|\($0.hourlyWage)" }.joined(separator: ";")
+        }
+    }
+
+    struct WageBandEntry: Equatable {
+        var startMinutes: Int
+        var endMinutes: Int
+        var hourlyWage: Int
+        var includesNightPremium: Bool
+    }
+
+    var wageBands: [WageBandEntry] {
+        get {
+            wageBandsRaw.split(separator: ";").compactMap { row in
+                let parts = row.split(separator: "|")
+                guard parts.count == 4,
+                      let start = Int(parts[0]),
+                      let end = Int(parts[1]),
+                      let wage = Int(parts[2]),
+                      let night = Int(parts[3]) else { return nil }
+                return WageBandEntry(startMinutes: start, endMinutes: end, hourlyWage: wage, includesNightPremium: night == 1)
+            }
+        }
+        set {
+            wageBandsRaw = newValue.map {
+                "\($0.startMinutes)|\($0.endMinutes)|\($0.hourlyWage)|\($0.includesNightPremium ? 1 : 0)"
+            }.joined(separator: ";")
+        }
+    }
 }
 
 @Model
@@ -98,6 +200,9 @@ final class WorkShift {
     var customPay: Int?
     var adjustmentYen: Int
     var adjustmentNote: String
+    /// True only after the user saves a shift with rule-based breaks.
+    /// Existing rows stay false, so their stored break is left alone.
+    var breakFollowsRules: Bool = false
     var workplace: Workplace?
 
     init(
@@ -109,6 +214,7 @@ final class WorkShift {
         customPay: Int? = nil,
         adjustmentYen: Int = 0,
         adjustmentNote: String = "",
+        breakFollowsRules: Bool = false,
         workplace: Workplace?
     ) {
         self.uuid = UUID()
@@ -120,6 +226,7 @@ final class WorkShift {
         self.customPay = customPay
         self.adjustmentYen = adjustmentYen
         self.adjustmentNote = adjustmentNote
+        self.breakFollowsRules = breakFollowsRules
         self.workplace = workplace
     }
 

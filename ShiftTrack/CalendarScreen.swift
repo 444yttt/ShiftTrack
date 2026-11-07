@@ -23,7 +23,7 @@ struct CalendarScreen: View {
     var body: some View {
         ScreenScroll {
             HStack {
-                Text("マイシフト")
+                Text("カレンダー")
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(.white)
                 Spacer()
@@ -149,11 +149,11 @@ struct CalendarScreen: View {
         }
         .sheet(isPresented: $showHelp) {
             HelpSheet(
-                title: "マイシフトの見方",
+                title: "カレンダーの見方",
                 paragraphs: [
                     "カレンダーを横にスワイプすると、見ている月だけが変わります。入っているシフトの日付は変わりません。日をタップすると、その日のシフトを下に出します。",
                     "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
-                    "「給」は給料日です。その他のカレンダーの設定で隠せます。",
+                    "「給」は給料日です。設定のカレンダーで隠せます。",
                     "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                 ]
             )
