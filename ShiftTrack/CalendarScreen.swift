@@ -4,6 +4,7 @@ import SwiftData
 struct CalendarScreen: View {
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
+    @Query(sort: \ShiftRequest.date) private var requests: [ShiftRequest]
     @Query private var settingsRows: [AppSettings]
 
     @State private var month = Date()
@@ -15,6 +16,8 @@ struct CalendarScreen: View {
     @State private var calendarDragging = false
     @State private var showWorkplace = false
     @State private var editor: EditorRoute?
+    @State private var showPatterns = false
+    @State private var requestRoute: RequestRoute?
     @State private var router = ImportRouter.shared
 
     private var settings: AppSettings? { settingsRows.first }
@@ -116,11 +119,43 @@ struct CalendarScreen: View {
                 }
             }
 
+            if !listedRequests.isEmpty {
+                Text("希望")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+                Text("希望はシフトではありません。給料の見込にも、今日の予定全体の時給分にも入りません。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(spacing: 10) {
+                    ForEach(listedRequests) { request in
+                        Button {
+                            requestRoute = RequestRoute(requestID: request.uuid, date: request.date)
+                        } label: {
+                            requestCard(request)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
                 addAnchor = addDay
                 showAddChoices = true
             }
             .padding(.top, 4)
+
+            HStack(spacing: 12) {
+                Button("パターン") { showPatterns = true }
+                Button("希望を追加") {
+                    requestRoute = RequestRoute(requestID: nil, date: addDay)
+                }
+            }
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(Theme.lime)
+            .frame(maxWidth: .infinity)
 
             Button {
                 router.presentChooser(fallbackDate: addDay, defaultWorkplace: assumedWorkplaceName)
@@ -143,6 +178,14 @@ struct CalendarScreen: View {
         .sheet(item: $editor) { route in
             ShiftEditorView(route: route, onSaved: { reveal([$0]) })
         }
+        .sheet(isPresented: $showPatterns) {
+            PatternListView()
+                .presentationBackground(Theme.background)
+        }
+        .sheet(item: $requestRoute) { route in
+            RequestEditorView(route: route)
+                .presentationBackground(Theme.background)
+        }
         .onChange(of: router.focusRequest) { _, request in
             guard let request else { return }
             reveal(request.dates)
@@ -153,7 +196,9 @@ struct CalendarScreen: View {
                 paragraphs: [
                     "カレンダーを横にスワイプすると、見ている月だけが変わります。入っているシフトの日付は変わりません。日をタップすると、その日のシフトを下に出します。",
                     "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
-                    "「給」は給料日です。設定のカレンダーで隠せます。",
+                    "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
+                    "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
+                    "パターンは曜日のひな形です。入れるとき、同じ勤務先のシフトが既にある日は作りません。",
                     "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                 ]
             )
@@ -233,6 +278,14 @@ struct CalendarScreen: View {
                         .padding(3)
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if hasOpenRequest(day) {
+                    Text("希")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundStyle(selected ? Theme.ink : Theme.lime)
+                        .padding(3)
+                }
+            }
         }
         .buttonStyle(.plain)
     }
@@ -281,8 +334,60 @@ struct CalendarScreen: View {
         guard settings?.showPaydayOnCalendar ?? true else { return false }
         let calendar = Calendar.current
         return workplaces.contains { workplace in
-            calendar.isDate(PayMath.payday(in: day, workplace: workplace, calendar: calendar), inSameDayAs: day)
+            let hasShift = shifts.contains { shift in
+                shift.workplace?.uuid == workplace.uuid && calendar.isDate(shift.date, inSameDayAs: day)
+            }
+            return PaySchedule.showsMark(on: day, workplace: workplace, hasShiftThatDay: hasShift, calendar: calendar)
         }
+    }
+
+    private func hasOpenRequest(_ day: Date) -> Bool {
+        openRequests.contains { Calendar.current.isDate($0.date, inSameDayAs: day) }
+    }
+
+    private var openRequests: [ShiftRequest] {
+        requests.filter { request in
+            request.isOpen && (selectedID == nil || request.workplaceUUID == selectedID)
+        }
+    }
+
+    private var listedRequests: [ShiftRequest] {
+        let calendar = Calendar.current
+        return openRequests
+            .filter { request in
+                if let selectedDay {
+                    return calendar.isDate(request.date, inSameDayAs: selectedDay)
+                }
+                return calendar.isDate(request.date, equalTo: month, toGranularity: .month)
+            }
+            .sorted { lhs, rhs in
+                if lhs.date == rhs.date { return lhs.startMinutes < rhs.startMinutes }
+                return lhs.date < rhs.date
+            }
+    }
+
+    private func requestCard(_ request: ShiftRequest) -> some View {
+        let workplace = workplaces.first { $0.uuid == request.workplaceUUID }
+        return HStack(spacing: 10) {
+            Text("希")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 22, height: 22)
+                .background(Theme.lime)
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(workplace?.name ?? "勤務先未定")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("\(Formatters.monthDayWeekday(request.date))  \(Formatters.clock(request.startMinutes))–\(Formatters.clock(request.endMinutes))")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func shiftsFor(_ day: Date) -> [WorkShift] {

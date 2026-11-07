@@ -1195,6 +1195,8 @@ struct WorkplaceEditorView: View {
     @State private var closingDay = 0
     @State private var paydayOffset = 0
     @State private var paydayDay = 0
+    @State private var payCycle: PayCycle = .month
+    @State private var payWeekday = 0
     @State private var payIsDaily = false
     @State private var holidayOn = false
     @State private var holidayText = "0"
@@ -1272,9 +1274,29 @@ struct WorkplaceEditorView: View {
                     }
                     .tint(Theme.lime)
                     dayPicker("給料日", selection: $paydayDay)
-                    Text("給料は、働いた月ではなく給料日の月に集計されます。")
+                    Picker("支払周期", selection: $payCycle) {
+                        ForEach(PayCycle.allCases) { cycle in
+                            Text(cycle.title).tag(cycle)
+                        }
+                    }
+                    .tint(Theme.lime)
+                    if payCycle == .week {
+                        Picker("支払う曜日", selection: $payWeekday) {
+                            Text("未選択").tag(0)
+                            Text("日曜").tag(1)
+                            Text("月曜").tag(2)
+                            Text("火曜").tag(3)
+                            Text("水曜").tag(4)
+                            Text("木曜").tag(5)
+                            Text("金曜").tag(6)
+                            Text("土曜").tag(7)
+                        }
+                        .tint(Theme.lime)
+                    }
+                    Text("月払いは、今までと同じ締め日と給料日です。週払いと日払いは、ここで選んだときだけ入金日が変わります。時給・日給の金額計算は変わりません。")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 formCard {
                     sectionTitle("給料")
@@ -1497,6 +1519,8 @@ struct WorkplaceEditorView: View {
             closingDay = existing.closingDay
             paydayOffset = existing.paydayMonthOffset
             paydayDay = existing.paydayDay
+            payCycle = existing.payCycle
+            payWeekday = existing.payWeekday
             payIsDaily = existing.payIsDaily
             holidayOn = existing.holidayPayEnabled
             holidayText = String(existing.holidayWage)
@@ -1625,6 +1649,10 @@ struct WorkplaceEditorView: View {
         }
         let wage = min(100_000, max(0, Int(wageText.filter(\.isNumber)) ?? 0))
         let daily = min(100_000, max(0, Int(dailyText.filter(\.isNumber)) ?? 0))
+        if payCycle == .week, !(1...7).contains(payWeekday) {
+            error = "週払いの曜日を選んでください"
+            return
+        }
         if payIsDaily, daily == 0 {
             error = "日給を入力してください"
             return
@@ -1678,6 +1706,8 @@ struct WorkplaceEditorView: View {
         workplace.closingDay = closingDay
         workplace.paydayMonthOffset = paydayOffset
         workplace.paydayDay = paydayDay
+        workplace.payCycle = payCycle
+        workplace.payWeekday = payWeekday
         workplace.payIsDaily = payIsDaily
         workplace.dailyWage = daily
         workplace.holidayPayEnabled = holidayOn
