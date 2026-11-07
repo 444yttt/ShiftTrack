@@ -17,20 +17,19 @@ enum ShiftDatePolicy {
     /// Minutes from midnight, wrapped inside a single day.
     /// An end earlier than the start stays an overnight shift in PayMath.
     static func clockMinutes(_ minutes: Int) -> Int {
-        let day = 24 * 60
-        let wrapped = minutes % day
-        return wrapped >= 0 ? wrapped : wrapped + day
+        let parts = InOutRecovered.minuteOfDay(minutes)
+        return parts.hour * 60 + parts.minute
     }
 
+    /// Wheel date for a minute-of-day. The day is always 2001-01-01 so the
+    /// recovered `bySettingHour` call cannot move a stored shift date.
     static func clockDate(minutes: Int, calendar: Calendar = .current) -> Date {
-        let minute = clockMinutes(minutes)
         var parts = DateComponents()
         parts.year = 2001
         parts.month = 1
         parts.day = 1
-        parts.hour = minute / 60
-        parts.minute = minute % 60
-        return calendar.date(from: parts) ?? Date(timeIntervalSinceReferenceDate: 0)
+        let anchor = calendar.date(from: parts) ?? Date(timeIntervalSinceReferenceDate: 0)
+        return InOutRecovered.date(fromMinuteBinding: minutes, on: anchor, calendar: calendar) ?? anchor
     }
 
     static func clockMinutes(from date: Date, calendar: Calendar = .current) -> Int {

@@ -127,4 +127,92 @@ final class ShiftDatePolicyTests: XCTestCase {
         XCTAssertEqual(explicit[0].startMinutes, 10 * 60)
         XCTAssertEqual(explicit[0].endMinutes, 15 * 60)
     }
+
+    func testRecoveredMinuteNormalizationStaysInsideOneDay() {
+        let calendar = calendar()
+        XCTAssertEqual(ShiftDatePolicy.clockMinutes(-15), 23 * 60 + 45)
+        XCTAssertEqual(Formatters.clock(-15), "23:45")
+        XCTAssertEqual(ShiftDatePolicy.clockMinutes(25 * 60), 60)
+        for minutes in [0, 23 * 60 + 59, -1440, 1440] {
+            let clock = ShiftDatePolicy.clockDate(minutes: minutes, calendar: calendar)
+            let parts = calendar.dateComponents([.year, .month, .day], from: clock)
+            XCTAssertEqual(parts.year, 2001)
+            XCTAssertEqual(parts.month, 1)
+            XCTAssertEqual(parts.day, 1)
+        }
+        let stored = day(2026, 11, 8)
+        let clock = ShiftDatePolicy.clockDate(minutes: 22 * 60, calendar: calendar)
+        XCTAssertNotEqual(calendar.component(.day, from: clock), calendar.component(.day, from: stored))
+        XCTAssertEqual(
+            ShiftDatePolicy.dateToStore(existing: stored, draft: clock, userEditedDate: false, calendar: calendar),
+            calendar.startOfDay(for: stored)
+        )
+    }
+
+    func testNewWorkplaceKeepsRecoveredTimesWithoutTurningPremiumsOn() {
+        let place = Workplace(name: "店", colorHex: "C8FF00", hourlyWage: 1200, transportAllowance: 0)
+        XCTAssertEqual(place.nightStartMinutes, InOutRecovered.defaultNightStartMinute)
+        XCTAssertEqual(place.nightEndMinutes, InOutRecovered.defaultNightEndMinute)
+        XCTAssertEqual(place.overtimeAfterMinutes, InOutRecovered.defaultOvertimeThresholdMinutes)
+        XCTAssertFalse(place.nightPayEnabled)
+        XCTAssertFalse(place.overtimeEnabled)
+        XCTAssertFalse(place.holidayPayEnabled)
+        XCTAssertEqual(place.nightWage, 0)
+        XCTAssertNotEqual(place.nightWage, InOutRecovered.defaultNightRatePercent)
+        XCTAssertEqual(place.overtimeExtra, 0)
+        let shift = WorkShift(
+            date: day(2026, 11, 8),
+            startMinutes: 9 * 60,
+            endMinutes: 18 * 60,
+            breakMinutes: 0,
+            workplace: place
+        )
+        XCTAssertEqual(shift.breakMinutes, 0)
+        XCTAssertFalse(InOutRecovered.legalBreakRules.map(\.breakMinutes).contains(shift.breakMinutes))
+        let calendar = calendar()
+        let yen = PayMath.quote(
+            workplace: place,
+            day: shift.date,
+            start: 23 * 60,
+            end: 60,
+            breakMinutes: 0,
+            customPay: nil,
+            adjustment: 0,
+            includeTransport: false,
+            calendar: calendar
+        )
+        XCTAssertEqual(yen, (1200 * 120 + 30) / 60)
+    }
+
+    func testDayAdditionsDoNotMoveTheVisibleMonthOrStoredDate() {
+        let calendar = calendar()
+        let stored = calendar.startOfDay(for: day(2026, 11, 8))
+        let window = InOutRecovered.dayWindow(around: stored, calendar: calendar)
+        XCTAssertEqual(window.previous, calendar.date(byAdding: .day, value: -1, to: stored))
+        XCTAssertEqual(window.twoAhead, calendar.date(byAdding: .day, value: 2, to: stored))
+        let offsets = InOutRecovered.dayOffsets(from: stored, calendar: calendar)
+        XCTAssertEqual(offsets.ahead, calendar.date(byAdding: .day, value: 14, to: stored))
+        XCTAssertEqual(
+            ShiftDatePolicy.dateToStore(existing: stored, draft: window.twoAhead!, userEditedDate: false, calendar: calendar),
+            stored
+        )
+        XCTAssertNil(
+            ShiftDatePolicy.selectedDayAfterMonthChange(
+                selected: stored,
+                visibleMonth: offsets.ahead!,
+                calendar: calendar
+            )
+        )
+        let month = calendar.date(from: DateComponents(year: 2026, month: 11, day: 18))!
+        let cells = CalendarGrid.days(in: month, weekStartsOnMonday: false, calendar: calendar)
+        let days = cells.compactMap { $0 }
+        XCTAssertEqual(days.count, 30)
+        XCTAssertEqual(calendar.component(.day, from: days[0]), 1)
+        XCTAssertEqual(calendar.component(.day, from: days[29]), 30)
+        XCTAssertTrue(days.allSatisfy { calendar.component(.month, from: $0) == 11 })
+        let january = calendar.date(from: DateComponents(year: 2026, month: 1, day: 31))!
+        let february = InOutRecovered.addingDays(1, to: calendar.startOfDay(for: january), calendar: calendar)
+        XCTAssertEqual(calendar.component(.month, from: february!), 2)
+        XCTAssertEqual(calendar.component(.day, from: february!), 1)
+    }
 }
