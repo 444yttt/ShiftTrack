@@ -23,6 +23,7 @@ struct WallsScreen: View {
                 Text("年収の壁")
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(.white)
+                    .accessibilityIdentifier("walls.title")
                 Spacer()
                 HelpButton { showHelp = true }
             }
@@ -67,6 +68,7 @@ struct WallsScreen: View {
                 .padding(.top, 4)
         }
         .background(Theme.background)
+        .accessibilityIdentifier("walls.screen")
         .sheet(isPresented: $showHelp) {
             HelpSheet(
                 title: "年収の壁",

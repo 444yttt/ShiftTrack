@@ -1782,6 +1782,7 @@ struct WorkplaceEditorView: View {
                 }
                 TextField(title, text: text)
                     .keyboardType(number ? .numberPad : .default)
+                    .accessibilityIdentifier("field.\(title)")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
                     .focused($typing)

@@ -47,15 +47,15 @@ struct RootView: View {
     var body: some View {
         Group {
             switch tab {
-            case .today:
+            case .list:
                 TodayScreen()
-            case .myShift:
+            case .calendar:
                 CalendarScreen()
-            case .salary:
+            case .workplaces:
+                WorkplaceDirectoryScreen()
+            case .income:
                 IncomeScreen()
-            case .walls:
-                WallsScreen()
-            case .other:
+            case .settings:
                 SettingsScreen()
             }
         }

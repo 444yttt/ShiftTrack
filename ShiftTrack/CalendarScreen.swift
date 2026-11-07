@@ -44,10 +44,20 @@ struct CalendarScreen: View {
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(.white)
                 Spacer()
-                monthButton("chevron.left") { moveMonth(-1) }
-                monthButton("chevron.right") { moveMonth(1) }
+                monthButton("chevron.left", label: "前の月", identifier: "calendar.previousMonth") { moveMonth(-1) }
+                monthButton("chevron.right", label: "次の月", identifier: "calendar.nextMonth") { moveMonth(1) }
             }
             .padding(.top, 16)
+            if !Calendar.current.isDate(month, equalTo: .now, toGranularity: .month) {
+                Button("今月に戻ります") {
+                    month = Date()
+                    selectedDay = ShiftDatePolicy.selectedDayAfterMonthChange(selected: selectedDay, visibleMonth: Date())
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.lime)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("calendar.thisMonth")
+            }
 
             weekdayHeader
                 .padding(.top, 16)
@@ -413,7 +423,7 @@ struct CalendarScreen: View {
         selectedDay = ShiftDatePolicy.selectedDayAfterMonthChange(selected: selectedDay, visibleMonth: next)
     }
 
-    private func monthButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+    private func monthButton(_ systemName: String, label: String, identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .bold))
@@ -423,5 +433,7 @@ struct CalendarScreen: View {
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
     }
 }
