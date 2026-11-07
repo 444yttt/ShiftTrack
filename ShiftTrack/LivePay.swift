@@ -1,12 +1,12 @@
 import Foundation
 
-/// Today-screen clock. The recovered path scales break minutes from
-/// `TimelineView.Context.date` (`0x10026e844`). It does not produce yen, and
-/// it does not show that worked time is cut at now. Planned start and end
-/// stay on the shift. Yen stays off this screen.
+/// Today-screen clock. `0x10026e844` copies the shift start and end, then
+/// replaces break minutes from `TimelineView.Context.date`. The yen from that
+/// record is the scheduled interval, not pay earned so far.
 ///
-/// Two recovered timeline periods are 30 seconds and one is 1 second. Which
-/// of them feeds this context was not tied by a pointer.
+/// The caption 「いま稼いだお給料」 is a different function. Its help text says
+/// the number increases. This scheduled amount does not. Two timeline periods
+/// are 30 seconds and one is 1 second. Which one feeds this context is open.
 enum LivePay {
     enum Phase: Equatable {
         case notAShift
@@ -57,17 +57,24 @@ enum LivePay {
         )
     }
 
-    static func line(_ phase: Phase) -> String {
+    static func line(_ phase: Phase, amount: ScheduledPay.Amount?) -> String {
         switch phase {
         case .notAShift:
             return "開始と終了が同じです"
         case .beforeStart(let minutes):
             return "はじまりまで あと \(Formatters.hours(minutes))"
         case .during(_, _, let minutes):
-            return "給与の目安：円は出していません。終わりまで あと \(Formatters.hours(minutes))"
+            return scheduledLine(amount, suffix: "終わりまで あと \(Formatters.hours(minutes))")
         case .afterEnd:
-            return "終了しました。給与の目安：円は出していません"
+            return scheduledLine(amount, suffix: "終了しました")
         }
+    }
+
+    private static func scheduledLine(_ amount: ScheduledPay.Amount?, suffix: String) -> String {
+        guard let amount else {
+            return "給与の目安：日給の未確定な条件、または入力した金額のため、予定全体の時給分は出していません。\(suffix)"
+        }
+        return "予定全体の時給分 \(ScheduledPay.amountText(amount.total))（交通費の前）。今まで稼いだ金額ではありません。\(suffix)"
     }
 
     static func breakCaption(_ phase: Phase) -> String {

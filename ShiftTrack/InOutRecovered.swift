@@ -216,4 +216,110 @@ enum InOutRecovered {
         let scaled = (elapsed * Double(breakMinutes) / duration).rounded(.toNearestOrAwayFromZero)
         return Int(scaled)
     }
+
+    /// 0x10011b848. With any BreakSpan the fraction stays 1 and those minutes
+    /// are dropped one by one. Without spans the fraction is
+    /// `max(0, minutes - breakMinutes) / minutes`.
+    static func paidMinuteFraction(totalSeconds: Double, breakMinutes: Int, hasBreakSpans: Bool) -> Double {
+        if hasBreakSpans {
+            return 1
+        }
+        let minutes = totalSeconds / 60
+        if minutes <= 0 {
+            return 0
+        }
+        let paid = minutes - Double(breakMinutes)
+        return (paid >= 0 ? paid : 0) / minutes
+    }
+
+    /// 0x10011bf14. Paid minutes times the hourly integer, divided by 60.
+    /// The integer is a band wage or the wage-history return. This is base.
+    static func hourlyYen(paidMinutes: Double, hourlyWage: Int) -> Double {
+        paidMinutes * Double(hourlyWage) / 60
+    }
+
+    /// No BreakSpans. `totalSeconds` is the record's own start-to-end interval.
+    static func scheduledHourlyYen(totalSeconds: Double, breakMinutes: Int, hourlyWage: Int) -> Double {
+        let fraction = paidMinuteFraction(
+            totalSeconds: totalSeconds,
+            breakMinutes: breakMinutes,
+            hasBreakSpans: false
+        )
+        return hourlyYen(paidMinutes: (totalSeconds / 60) * fraction, hourlyWage: hourlyWage)
+    }
+
+    /// 0x10011bd08. Equal bounds are empty. Same-day end is exclusive.
+    /// Otherwise the window wraps midnight.
+    static func minuteIsInPremiumWindow(minuteOfDay: Int, start: Int, end: Int) -> Bool {
+        if start == end {
+            return false
+        }
+        if start < end {
+            return minuteOfDay >= start && minuteOfDay < end
+        }
+        return minuteOfDay >= start || minuteOfDay < end
+    }
+
+    /// 0x10011c168. Night premium is the slice's own base times rate / 100.
+    static func nightPremiumYen(
+        sliceYen: Double,
+        ratePercent: Int,
+        enabled: Bool,
+        inWindow: Bool,
+        bandIncludesNight: Bool
+    ) -> Double {
+        if enabled && inWindow && !bandIncludesNight && ratePercent != 0 {
+            return sliceYen * Double(ratePercent) / 100
+        }
+        return 0
+    }
+
+    /// 0x10011c454. The minute that lands on the threshold adds nothing.
+    static func overtimeMinutes(sliceMinutes: Double, priorMinutes: Double, threshold: Double) -> Double {
+        let under = threshold - priorMinutes
+        let capped = under < sliceMinutes ? under : sliceMinutes
+        if capped < 0 {
+            return sliceMinutes
+        }
+        let extra = sliceMinutes - capped
+        return extra > 0 ? extra : 0
+    }
+
+    /// 0x10011c684.
+    static func overtimePremiumYen(overtimeMinutes: Double, hourlyWage: Int, ratePercent: Int) -> Double {
+        if ratePercent == 0 || overtimeMinutes == 0 {
+            return 0
+        }
+        return overtimeMinutes * Double(hourlyWage) / 60 * Double(ratePercent) / 100
+    }
+
+    /// Weekday is `DateComponents.weekday`. The index is that value minus 1.
+    static func holidayRatePercent(weekday: Int?, rates: [Int]) -> Int? {
+        guard let weekday else { return nil }
+        let index = weekday - 1
+        guard index >= 0, index < rates.count else { return nil }
+        return rates[index]
+    }
+
+    static func holidayPremiumYen(sliceYen: Double, ratePercent: Int) -> Double {
+        sliceYen * Double(ratePercent) / 100
+    }
+
+    /// 0x10011a3f4. Daily wage is added only when the method is daily and an
+    /// unnamed low bit is also 1. The caller passes that bit. It is not guessed.
+    static func baseAfterDailyWage(base: Double, dailyWage: Int, methodIsDaily: Bool, flagBit: Bool) -> Double {
+        guard methodIsDaily, flagBit else { return base }
+        return base + Double(dailyWage)
+    }
+
+    /// 0x10011acd0. Transport kind and amount of at least 1. Not an allowance.
+    static func transportAfterExtra(transport: Double, amount: Int, kindIsTransport: Bool) -> Double {
+        guard kindIsTransport, amount >= 1 else { return transport }
+        return transport + Double(amount)
+    }
+
+    /// 0x10026ecf0 adds base and premium for `numericText`. Transport is absent.
+    static func liveNumericTotal(base: Double, premium: Double) -> Double {
+        base + premium
+    }
 }

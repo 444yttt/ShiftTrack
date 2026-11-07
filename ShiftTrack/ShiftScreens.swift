@@ -1215,6 +1215,15 @@ struct WorkplaceEditorView: View {
     @State private var roundingUnit = 1
     @State private var roundingStart = 0
     @State private var roundingEnd = 0
+    @State private var nightRate = 0
+    @State private var overtimeRate = 0
+    @State private var holidayRates = Array(repeating: 0, count: 7)
+    @State private var wageHistory: [Workplace.WageHistoryEntry] = []
+    @State private var wageBands: [Workplace.WageBandEntry] = []
+    @State private var bandStart = 22 * 60
+    @State private var bandEnd = 5 * 60
+    @State private var bandWage = "1000"
+    @State private var bandIncludesNight = false
     @State private var breakRules: [InOutRecovered.BreakRule] = []
     @State private var error = ""
     @State private var confirmDelete = false
@@ -1306,6 +1315,14 @@ struct WorkplaceEditorView: View {
                             }
                             .tint(Theme.lime)
                             field("追加金額", text: $overtimeText, number: true)
+                            Stepper(value: $overtimeRate, in: 0...100) {
+                                Text("割増 \(overtimeRate)%")
+                                    .foregroundStyle(.white)
+                            }
+                            Text("予定全体の時給分では、しきい値を超えた分にこの割合を足します。このシフトより前の分数は未確定なので足しません。今の見込の追加金額とは別です。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -1346,6 +1363,67 @@ struct WorkplaceEditorView: View {
                     roundingDirectionPicker("開始", selection: $roundingStart)
                     roundingDirectionPicker("終了", selection: $roundingEnd)
                     Text(roundingPreview)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                formCard {
+                    sectionTitle("時給の履歴と時間帯")
+                    Text("履歴が空のときの戻りは今の時給です。履歴のどれを選ぶか、時間帯の境界は、まだ合計へ入れていません。行を保存しても予定全体の時給分は今の時給のままです。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(Array(wageHistory.enumerated()), id: \.offset) { index, entry in
+                        HStack {
+                            Text("\(Formatters.longDay(entry.at))  \(Formatters.yen(entry.hourlyWage))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Button("削除") { wageHistory.remove(at: index) }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.destructive)
+                        }
+                    }
+                    Button("今の時給を履歴に足す") {
+                        wageHistory.append(.init(at: .now, hourlyWage: yen(wageText)))
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    ForEach(Array(wageBands.enumerated()), id: \.offset) { index, band in
+                        HStack {
+                            Text("\(Formatters.clock(band.startMinutes))–\(Formatters.clock(band.endMinutes)) \(Formatters.yen(band.hourlyWage))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Button("削除") { wageBands.remove(at: index) }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.destructive)
+                        }
+                    }
+                    HStack(alignment: .top, spacing: 10) {
+                        MinutesTimePicker(title: "帯の開始", minutes: $bandStart)
+                        MinutesTimePicker(title: "帯の終了", minutes: $bandEnd)
+                    }
+                    field("帯の時給", text: $bandWage, number: true)
+                    Toggle("この帯は深夜割増を含む", isOn: $bandIncludesNight).tint(Theme.lime)
+                    Button("時間帯を足す") {
+                        wageBands.append(.init(
+                            startMinutes: bandStart,
+                            endMinutes: bandEnd,
+                            hourlyWage: yen(bandWage),
+                            includesNightPremium: bandIncludesNight
+                        ))
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    let names = ["日", "月", "火", "水", "木", "金", "土"]
+                    ForEach(0..<7, id: \.self) { index in
+                        Stepper(value: $holidayRates[index], in: 0...100) {
+                            Text("\(names[index])の休日割増 \(holidayRates[index])%")
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    Text("休日の割合は曜日番号から1を引いた位置です。0%はその曜日に足しません。")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1440,6 +1518,11 @@ struct WorkplaceEditorView: View {
             roundingUnit = existing.roundingUnitMinutes
             roundingStart = existing.roundingStartRaw
             roundingEnd = existing.roundingEndRaw
+            nightRate = existing.nightRatePercent
+            overtimeRate = existing.overtimeRatePercent
+            holidayRates = existing.holidayRatePercents
+            wageHistory = existing.wageHistory
+            wageBands = existing.wageBands
         } else if let settings = settingsRows.first {
             wageText = String(settings.defaultHourlyWage)
             transportText = String(settings.defaultTransportAllowance)
@@ -1453,6 +1536,14 @@ struct WorkplaceEditorView: View {
             Toggle("深夜給料", isOn: $nightOn).tint(Theme.lime)
             if nightOn {
                 field("深夜給料", text: $nightText, number: true)
+                Stepper(value: $nightRate, in: 0...100) {
+                    Text("深夜の割増 \(nightRate)%")
+                        .foregroundStyle(.white)
+                }
+                Text("予定全体の時給分では、深夜の時間の基本給にこの割合を足します。0%なら足しません。上の深夜給料は、今の見込が時給を置き換える金額です。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .top, spacing: 10) {
                     MinutesTimePicker(title: "深夜の開始", minutes: $nightStart)
                     MinutesTimePicker(title: "深夜の終了", minutes: $nightEnd)
@@ -1609,6 +1700,11 @@ struct WorkplaceEditorView: View {
         workplace.roundingUnitMinutes = roundingUnit
         workplace.roundingStartRaw = roundingStart
         workplace.roundingEndRaw = roundingEnd
+        workplace.nightRatePercent = nightRate
+        workplace.overtimeRatePercent = overtimeRate
+        workplace.setHolidayRatePercents(holidayRates)
+        workplace.wageHistory = wageHistory
+        workplace.wageBands = wageBands
         do {
             try context.save()
         } catch {

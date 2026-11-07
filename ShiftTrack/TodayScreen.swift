@@ -94,7 +94,7 @@ struct TodayScreen: View {
             Text("給与の目安")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Theme.lime)
-            Text("勤務中の円は出していません。休憩だけを、経過した秒の割合で按分しています。金額の式ではなく、勤務時間を今で切った数字でもありません。")
+            Text("カードの円は、予定の開始から終了までを休憩の分数で割った時給分です。勤務中に今へ切る命令は、この呼び出しにはありません。休憩の分数だけが経過で変わるので、8時間・休憩60分・時給1000円の途中は7500円になり、今までの半分ではありません。")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -147,7 +147,7 @@ struct TodayScreen: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.muted)
             }
-            Text(LivePay.line(phase))
+            Text(LivePay.line(phase, amount: amount(for: shift, now: now)))
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.lime)
             Text(LivePay.breakCaption(phase))
@@ -219,6 +219,29 @@ struct TodayScreen: View {
             start: shift.startMinutes,
             end: shift.endMinutes,
             breakMinutes: shift.breakMinutes,
+            workplace: workplace,
+            customPay: shift.customPay
+        )
+    }
+
+    private func amount(for shift: WorkShift, now: Date) -> ScheduledPay.Amount? {
+        guard let workplace = shift.workplace else { return nil }
+        let phase = phase(for: shift, now: now)
+        let scaled: Int?
+        switch phase {
+        case .during(let value, _, _):
+            scaled = value
+        case .afterEnd(let value, _):
+            scaled = value
+        case .beforeStart, .notAShift:
+            scaled = nil
+        }
+        guard let scaled else { return nil }
+        return ScheduledPay.hourlyAmount(
+            day: shift.date,
+            start: shift.startMinutes,
+            end: shift.endMinutes,
+            breakMinutes: scaled,
             workplace: workplace,
             customPay: shift.customPay
         )

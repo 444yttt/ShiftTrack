@@ -117,6 +117,11 @@ final class BreakRulesTests: XCTestCase {
         XCTAssertEqual(workplace.roundingUnitMinutes, 1)
         XCTAssertEqual(workplace.roundingStartRaw, 0)
         XCTAssertEqual(workplace.roundingEndRaw, 0)
+        XCTAssertEqual(workplace.nightRatePercent, 0)
+        XCTAssertEqual(workplace.overtimeRatePercent, 0)
+        XCTAssertEqual(workplace.holidayRatePercents, Array(repeating: 0, count: 7))
+        XCTAssertTrue(workplace.wageHistory.isEmpty)
+        XCTAssertTrue(workplace.wageBands.isEmpty)
         workplace.breakRules = [.init(overMinutes: 360, breakMinutes: 45), .init(overMinutes: 100, breakMinutes: 10)]
         XCTAssertEqual(BreakRules.decode(workplace.breakRulesRaw).map(\.breakMinutes), [45, 10])
         XCTAssertEqual(existing.breakMinutes, 15)
@@ -253,7 +258,7 @@ final class BreakRulesTests: XCTestCase {
             LivePay.phase(now: before, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
             .beforeStart(remainingMinutes: 240)
         )
-        XCTAssertFalse(LivePay.line(.beforeStart(remainingMinutes: 240)).contains("円"))
+        XCTAssertFalse(LivePay.line(.beforeStart(remainingMinutes: 240), amount: nil).contains("円"))
         XCTAssertFalse(LivePay.breakCaption(.beforeStart(remainingMinutes: 240)).contains("-30"))
         XCTAssertEqual(
             LivePay.phase(now: start, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
@@ -267,9 +272,20 @@ final class BreakRulesTests: XCTestCase {
             LivePay.phase(now: after, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
             .afterEnd(scaledBreak: 60, scheduledBreak: 60)
         )
-        let during = LivePay.line(.during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 240))
-        XCTAssertTrue(during.contains("給与の目安"))
-        XCTAssertTrue(during.contains("円は出していません"))
+        let midwayAmount = ScheduledPay.hourlyAmount(
+            day: shiftDay,
+            start: 9 * 60,
+            end: 17 * 60,
+            breakMinutes: 30,
+            workplace: workplace,
+            customPay: nil,
+            calendar: calendar
+        )
+        XCTAssertEqual(midwayAmount?.total, 9000)
+        let during = LivePay.line(.during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 240), amount: midwayAmount)
+        XCTAssertTrue(during.contains("予定全体の時給分"))
+        XCTAssertTrue(during.contains("今まで稼いだ金額ではありません"))
+        XCTAssertFalse(during.contains("いま稼いだ"))
         let quote = PayMath.quote(
             workplace: workplace,
             day: shiftDay,
@@ -328,6 +344,66 @@ final class BreakRulesTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(other, .afterEnd(scaledBreak: 0, scheduledBreak: 0))
+    }
+
+    func testScheduledHourlyYenUsesTheRecoveredInterval() {
+        XCTAssertEqual(InOutRecovered.scheduledHourlyYen(totalSeconds: 8 * 3600, breakMinutes: 60, hourlyWage: 1000), 7000)
+        XCTAssertEqual(InOutRecovered.scheduledHourlyYen(totalSeconds: 8 * 3600, breakMinutes: 30, hourlyWage: 1000), 7500)
+        XCTAssertEqual(InOutRecovered.liveNumericTotal(base: 7000, premium: 250), 7250)
+        XCTAssertEqual(InOutRecovered.baseAfterDailyWage(base: 100, dailyWage: 8000, methodIsDaily: true, flagBit: false), 100)
+        let calendar = calendar()
+        let workplace = place(wage: 1000)
+        let day = day(2026, 11, 8)
+        let plain = ScheduledPay.hourlyAmount(
+            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
+            workplace: workplace, customPay: nil, calendar: calendar
+        )
+        XCTAssertEqual(plain?.base, 7000)
+        XCTAssertEqual(plain?.premium, 0)
+        XCTAssertEqual(plain?.total, 7000)
+        workplace.wageHistory = [.init(at: day, hourlyWage: 2000)]
+        workplace.wageBands = [.init(startMinutes: 18 * 60, endMinutes: 22 * 60, hourlyWage: 3000, includesNightPremium: true)]
+        let unchanged = ScheduledPay.hourlyAmount(
+            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
+            workplace: workplace, customPay: nil, calendar: calendar
+        )
+        XCTAssertEqual(unchanged?.total, 7000)
+        let quote = PayMath.quote(
+            workplace: workplace, day: day, start: 9 * 60, end: 17 * 60,
+            breakMinutes: 60, customPay: nil, adjustment: 0, includeTransport: false, calendar: calendar
+        )
+        XCTAssertEqual(quote, (1000 * 420 + 30) / 60)
+        workplace.nightPayEnabled = true
+        workplace.nightStartMinutes = 22 * 60
+        workplace.nightEndMinutes = 5 * 60
+        workplace.nightRatePercent = 25
+        let night = ScheduledPay.hourlyAmount(
+            day: day, start: 22 * 60, end: 6 * 60, breakMinutes: 0,
+            workplace: workplace, customPay: nil, calendar: calendar
+        )
+        XCTAssertEqual(night?.base ?? -1, 8000, accuracy: 0.001)
+        XCTAssertEqual(night?.premium ?? -1, 1750, accuracy: 0.001)
+        XCTAssertEqual(night?.total ?? -1, 9750, accuracy: 0.001)
+        workplace.nightPayEnabled = false
+        workplace.overtimeEnabled = true
+        workplace.overtimeAfterMinutes = 480
+        workplace.overtimeRatePercent = 25
+        let overtime = ScheduledPay.hourlyAmount(
+            day: day, start: 9 * 60, end: 18 * 60, breakMinutes: 0,
+            workplace: workplace, customPay: nil, calendar: calendar
+        )
+        XCTAssertEqual(overtime?.base, 9000)
+        XCTAssertEqual(overtime?.premium, 250)
+        let daily = place(daily: true)
+        XCTAssertNil(ScheduledPay.hourlyAmount(
+            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 0,
+            workplace: daily, customPay: nil, calendar: calendar
+        ))
+        let old = PayMath.quote(
+            workplace: daily, day: day, start: 9 * 60, end: 17 * 60,
+            breakMinutes: 0, customPay: nil, adjustment: 0, includeTransport: false, calendar: calendar
+        )
+        XCTAssertEqual(old, 8000)
     }
 
     @MainActor
