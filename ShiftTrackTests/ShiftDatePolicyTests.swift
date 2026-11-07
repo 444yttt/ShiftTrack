@@ -196,10 +196,19 @@ final class ShiftDatePolicyTests: XCTestCase {
             ShiftDatePolicy.dateToStore(existing: stored, draft: window.twoAhead!, userEditedDate: false, calendar: calendar),
             stored
         )
-        XCTAssertNil(
+        XCTAssertEqual(
             ShiftDatePolicy.selectedDayAfterMonthChange(
                 selected: stored,
                 visibleMonth: offsets.ahead!,
+                calendar: calendar
+            ),
+            stored
+        )
+        let nextMonth = calendar.date(byAdding: .month, value: 1, to: stored)!
+        XCTAssertNil(
+            ShiftDatePolicy.selectedDayAfterMonthChange(
+                selected: stored,
+                visibleMonth: nextMonth,
                 calendar: calendar
             )
         )
