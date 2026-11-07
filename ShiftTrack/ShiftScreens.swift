@@ -453,6 +453,7 @@ struct ShiftAddChooser: View {
 
     private func add(_ source: WorkShift) {
         guard let workplace = source.workplace else { return }
+        let preservedDate = source.date
         let shift = WorkShift(
             date: day,
             startMinutes: source.startMinutes,
@@ -461,6 +462,9 @@ struct ShiftAddChooser: View {
             workplace: workplace
         )
         context.insert(shift)
+        if !Calendar.current.isDate(source.date, inSameDayAs: preservedDate) {
+            source.date = preservedDate
+        }
         do {
             try context.save()
         } catch {
@@ -576,6 +580,10 @@ struct ShiftEditorView: View {
     @State private var error = ""
     @State private var confirmDelete = false
     @State private var showWorkplaceCreator = false
+    @State private var showDateEditor = false
+    @State private var draftDate = Date()
+    @State private var userEditedDate = false
+    @State private var loaded = false
     @FocusState private var typing: Bool
 
     private var existing: WorkShift? { shifts.first { $0.uuid == route.shiftID } }
@@ -609,30 +617,40 @@ struct ShiftEditorView: View {
                             }
                         }
                         divider
-                        labeled("日付") {
-                            DatePicker("", selection: $date, displayedComponents: .date)
-                                .labelsHidden()
-                                .environment(\.locale, Locale(identifier: "ja_JP"))
+                        Button {
+                            draftDate = date
+                            showDateEditor = true
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("日付")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Theme.muted)
+                                Text(Formatters.longDay(date))
+                                    .font(.title3.weight(.bold))
+                                    .foregroundStyle(.white)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Theme.cardRaised)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
-                        divider
-                        HStack {
-                            labeled("開始") { MinutesTimePicker(minutes: $startMinutes) }
-                            labeled("終了") { MinutesTimePicker(minutes: $endMinutes) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("日付")
+                        .accessibilityValue(Formatters.longDay(date))
+                        .accessibilityHint("日付を変えるときだけ開きます")
+                        HStack(alignment: .top, spacing: 10) {
+                            MinutesTimePicker(title: "開始", minutes: $startMinutes)
+                            MinutesTimePicker(title: "終了", minutes: $endMinutes)
                         }
                         if selectedWorkplace?.payIsDaily == true {
                             Text("日給の勤務先では、休憩時間は給料から引きません。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted)
                         } else {
-                            divider
-                            Stepper(value: $breakMinutes, in: 0...600, step: 1) {
-                                Text("休憩 \(breakMinutes)分")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.white)
-                            }
-                            .tint(Theme.lime)
+                            BreakMinutesControl(minutes: $breakMinutes, range: 0...600)
                             Text("実働 \(Formatters.hours(draftMinutes))")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Theme.lime)
                         }
                     }
@@ -714,10 +732,42 @@ struct ShiftEditorView: View {
             .sheet(isPresented: $showWorkplaceCreator) {
                 WorkplaceEditorView(existingID: nil)
             }
+            .sheet(isPresented: $showDateEditor) {
+                NavigationStack {
+                    DatePicker("日付", selection: $draftDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        .environment(\.locale, Locale(identifier: "ja_JP"))
+                        .tint(Theme.lime)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .background(Theme.background)
+                        .navigationTitle("日付を変更")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("キャンセル") { showDateEditor = false }
+                                    .foregroundStyle(Theme.lime)
+                            }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("決定") {
+                                    date = Calendar.current.startOfDay(for: draftDate)
+                                    userEditedDate = true
+                                    showDateEditor = false
+                                }
+                                .foregroundStyle(Theme.lime)
+                            }
+                        }
+                        .darkSheet()
+                }
+                .presentationDetents([.medium])
+            }
         }
     }
 
     private func load() {
+        guard !loaded else { return }
+        loaded = true
         if let existing {
             workplaceID = existing.workplace?.uuid
             date = existing.date
@@ -739,14 +789,19 @@ struct ShiftEditorView: View {
             error = "勤務先を選んでください"
             return
         }
-        let storedBreak = workplace.payIsDaily ? 0 : breakMinutes
+        let storedBreak = ShiftDatePolicy.breakToStore(payIsDaily: workplace.payIsDaily, minutes: breakMinutes)
         let minutes = PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: storedBreak)
         guard workplace.payIsDaily || minutes > 0 else {
             error = "終了時刻が開始と同じにならないようにしてください"
             return
         }
+        let storedDate = ShiftDatePolicy.dateToStore(
+            existing: existing?.date,
+            draft: date,
+            userEditedDate: userEditedDate
+        )
         if let existing {
-            existing.date = Calendar.current.startOfDay(for: date)
+            existing.date = storedDate
             existing.startMinutes = startMinutes
             existing.endMinutes = endMinutes
             existing.breakMinutes = storedBreak
@@ -756,7 +811,7 @@ struct ShiftEditorView: View {
             existing.adjustmentNote = adjustmentNote.trimmingCharacters(in: .whitespacesAndNewlines)
         } else {
             let shift = WorkShift(
-                date: date,
+                date: storedDate,
                 startMinutes: startMinutes,
                 endMinutes: endMinutes,
                 breakMinutes: storedBreak,
@@ -774,7 +829,7 @@ struct ShiftEditorView: View {
             self.error = "保存できませんでした。もう一度試してください。"
             return
         }
-        onSaved?(Calendar.current.startOfDay(for: date))
+        onSaved?(storedDate)
         dismiss()
     }
 
@@ -867,21 +922,180 @@ struct ShiftEditorView: View {
 }
 
 struct MinutesTimePicker: View {
+    var title: String
     @Binding var minutes: Int
+    @State private var draft = 0
+    @State private var showSheet = false
 
     var body: some View {
-        DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
-            .labelsHidden()
-            .environment(\.locale, Locale(identifier: "ja_JP"))
+        Button {
+            draft = ShiftDatePolicy.clockMinutes(minutes)
+            showSheet = true
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Theme.muted)
+                Text(Formatters.clock(minutes))
+                    .font(.title.weight(.black))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Theme.cardRaised)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Theme.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(Formatters.clock(minutes))
+        .accessibilityHint("時刻を変更します。日付は変わりません。")
+        .accessibilityAddTraits(.isButton)
+        .sheet(isPresented: $showSheet) {
+            TimeAdjustSheet(
+                title: title,
+                minutes: $draft,
+                onCommit: {
+                    minutes = ShiftDatePolicy.minutesAfterDismiss(original: minutes, draft: draft, committed: true)
+                    showSheet = false
+                },
+                onCancel: { showSheet = false }
+            )
+        }
+    }
+}
+
+struct TimeAdjustSheet: View {
+    var title: String
+    @Binding var minutes: Int
+    var onCommit: () -> Void
+    var onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(Formatters.clock(minutes))
+                    .font(.largeTitle.weight(.black))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .accessibilityLabel(title)
+                    .accessibilityValue(Formatters.clock(minutes))
+
+                VStack(spacing: 10) {
+                    stepRow(amount: 60, unit: "1時間")
+                    stepRow(amount: 15, unit: "15分")
+                }
+
+                DatePicker(title, selection: wheelBinding, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .environment(\.locale, Locale(identifier: "ja_JP"))
+                    .frame(maxWidth: .infinity, minHeight: 160)
+                    .accessibilityLabel(title)
+
+                Text("変えるのは時刻だけです。終了が開始より前のときは、日付を動かさず翌日にまたぐ勤務として計算します。")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Theme.background)
+            .navigationTitle("\(title)の時刻")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル", action: onCancel)
+                        .foregroundStyle(Theme.lime)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("決定", action: onCommit)
+                        .foregroundStyle(Theme.lime)
+                }
+            }
+            .darkSheet()
+        }
+        .presentationDetents([.large])
     }
 
-    private var dateBinding: Binding<Date> {
+    private var wheelBinding: Binding<Date> {
         Binding {
-            Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()) ?? Date()
+            ShiftDatePolicy.clockDate(minutes: minutes)
         } set: { newValue in
-            let calendar = Calendar.current
-            minutes = calendar.component(.hour, from: newValue) * 60 + calendar.component(.minute, from: newValue)
+            minutes = ShiftDatePolicy.clockMinutes(from: newValue)
         }
+    }
+
+    private func stepRow(amount: Int, unit: String) -> some View {
+        HStack(spacing: 10) {
+            stepButton("\(unit)前", delta: -amount)
+            stepButton("\(unit)後", delta: amount)
+        }
+    }
+
+    private func stepButton(_ label: String, delta: Int) -> some View {
+        Button {
+            minutes = ShiftDatePolicy.clockMinutes(minutes + delta)
+        } label: {
+            Text(label)
+                .font(.body.weight(.bold))
+                .foregroundStyle(Theme.ink)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .padding(.vertical, 8)
+                .background(Theme.lime)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct BreakMinutesControl: View {
+    @Binding var minutes: Int
+    var range: ClosedRange<Int> = 0...600
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("休憩")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.muted)
+            Text(Formatters.hours(minutes))
+                .font(.title3.weight(.black))
+                .foregroundStyle(.white)
+                .accessibilityLabel("休憩")
+                .accessibilityValue(Formatters.hours(minutes))
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    nudge("15分減らす", delta: -15, title: "−15分")
+                    nudge("15分増やす", delta: 15, title: "+15分")
+                }
+                HStack(spacing: 8) {
+                    nudge("1分減らす", delta: -1, title: "−1分")
+                    nudge("1分増やす", delta: 1, title: "+1分")
+                }
+            }
+        }
+    }
+
+    private func nudge(_ label: String, delta: Int, title: String) -> some View {
+        Button {
+            minutes = ShiftDatePolicy.clampedBreak(minutes + delta, range: range)
+        } label: {
+            Text(title)
+                .font(.body.weight(.bold))
+                .foregroundStyle(Theme.ink)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(Theme.lime)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 
@@ -1105,20 +1319,18 @@ struct WorkplaceEditorView: View {
             Toggle("深夜給料", isOn: $nightOn).tint(Theme.lime)
             if nightOn {
                 field("深夜給料", text: $nightText, number: true)
-                HStack {
-                    MinutesTimePicker(minutes: $nightStart)
-                    Text("から").foregroundStyle(Theme.muted)
-                    MinutesTimePicker(minutes: $nightEnd)
+                HStack(alignment: .top, spacing: 10) {
+                    MinutesTimePicker(title: "深夜の開始", minutes: $nightStart)
+                    MinutesTimePicker(title: "深夜の終了", minutes: $nightEnd)
                 }
             }
             if holidayOn {
                 Toggle("休日深夜給料", isOn: $holidayNightOn).tint(Theme.lime)
                 if holidayNightOn {
                     field("休日深夜給料", text: $holidayNightText, number: true)
-                    HStack {
-                        MinutesTimePicker(minutes: $holidayNightStart)
-                        Text("から").foregroundStyle(Theme.muted)
-                        MinutesTimePicker(minutes: $holidayNightEnd)
+                    HStack(alignment: .top, spacing: 10) {
+                        MinutesTimePicker(title: "休日深夜の開始", minutes: $holidayNightStart)
+                        MinutesTimePicker(title: "休日深夜の終了", minutes: $holidayNightEnd)
                     }
                 }
             }
