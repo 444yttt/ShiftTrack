@@ -496,21 +496,11 @@ struct CandidateEditor: View {
                     }
                     DatePicker("日付", selection: $candidate.date, displayedComponents: .date)
                         .environment(\.locale, Locale(identifier: "ja_JP"))
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("開始").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                            MinutesTimePicker(minutes: $candidate.startMinutes)
-                        }
-                        VStack(alignment: .leading) {
-                            Text("終了").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                            MinutesTimePicker(minutes: $candidate.endMinutes)
-                        }
+                    HStack(alignment: .top, spacing: 10) {
+                        MinutesTimePicker(title: "開始", minutes: $candidate.startMinutes)
+                        MinutesTimePicker(title: "終了", minutes: $candidate.endMinutes)
                     }
-                    Stepper(value: $candidate.breakMinutes, in: 0...480, step: 15) {
-                        Text("休憩 \(candidate.breakMinutes)分")
-                            .foregroundStyle(.white)
-                    }
-                    .tint(Theme.lime)
+                    BreakMinutesControl(minutes: $candidate.breakMinutes, range: 0...480)
                     if PayMath.workedMinutes(
                         start: candidate.startMinutes,
                         end: candidate.endMinutes,

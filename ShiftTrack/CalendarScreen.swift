@@ -11,6 +11,8 @@ struct CalendarScreen: View {
     @State private var selectedDay: Date?
     @State private var showHelp = false
     @State private var showAddChoices = false
+    @State private var addAnchor = Date()
+    @State private var calendarDragging = false
     @State private var showWorkplace = false
     @State private var editor: EditorRoute?
     @State private var router = ImportRouter.shared
@@ -48,8 +50,8 @@ struct CalendarScreen: View {
                 .padding(.top, 16)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
-                    if let day {
+                ForEach(calendarCells) { cell in
+                    if let day = cell.day {
                         dayCell(day)
                     } else {
                         Color.clear.frame(height: 56)
@@ -57,11 +59,20 @@ struct CalendarScreen: View {
                 }
             }
             .padding(.top, 8)
-            .gesture(
-                DragGesture(minimumDistance: 30).onEnded { value in
-                    if value.translation.width < -40 { moveMonth(1) }
-                    if value.translation.width > 40 { moveMonth(-1) }
-                }
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 28)
+                    .onChanged { value in
+                        if abs(value.translation.width) > abs(value.translation.height) {
+                            calendarDragging = true
+                        }
+                    }
+                    .onEnded { value in
+                        let horizontal = value.translation.width
+                        let vertical = value.translation.height
+                        defer { calendarDragging = false }
+                        guard abs(horizontal) > abs(vertical), abs(horizontal) > 48 else { return }
+                        moveMonth(horizontal < 0 ? 1 : -1)
+                    }
             )
 
             HStack {
@@ -106,6 +117,7 @@ struct CalendarScreen: View {
             }
 
             LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
+                addAnchor = addDay
                 showAddChoices = true
             }
             .padding(.top, 4)
@@ -126,7 +138,7 @@ struct CalendarScreen: View {
             WorkplaceEditorView(existingID: nil)
         }
         .sheet(isPresented: $showAddChoices) {
-            ShiftAddChooser(day: addDay, workplaceID: selectedID, onSaved: reveal)
+            ShiftAddChooser(day: addAnchor, workplaceID: selectedID, onSaved: reveal)
         }
         .sheet(item: $editor) { route in
             ShiftEditorView(route: route, onSaved: { reveal([$0]) })
@@ -139,12 +151,26 @@ struct CalendarScreen: View {
             HelpSheet(
                 title: "マイシフトの見方",
                 paragraphs: [
-                    "カレンダーはスワイプで月を切り替えます。日をタップすると、その日のシフトを下に出します。月の一覧で、その月のシフトをまとめて見られます。",
+                    "カレンダーを横にスワイプすると、見ている月だけが変わります。入っているシフトの日付は変わりません。日をタップすると、その日のシフトを下に出します。",
                     "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
                     "「給」は給料日です。その他のカレンダーの設定で隠せます。",
                     "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                 ]
             )
+        }
+    }
+
+    private struct CalendarCell: Identifiable {
+        var id: String
+        var day: Date?
+    }
+
+    private var calendarCells: [CalendarCell] {
+        cells.enumerated().map { index, day in
+            if let day {
+                return CalendarCell(id: String(day.timeIntervalSinceReferenceDate), day: day)
+            }
+            return CalendarCell(id: "empty-\(index)", day: nil)
         }
     }
 
@@ -169,6 +195,7 @@ struct CalendarScreen: View {
         let isToday = Calendar.current.isDateInToday(day)
         let colors = uniqueColors(dayShifts)
         return Button {
+            guard !calendarDragging else { return }
             selectedDay = Calendar.current.startOfDay(for: day)
         } label: {
             VStack(spacing: 4) {
@@ -281,6 +308,7 @@ struct CalendarScreen: View {
     private func moveMonth(_ delta: Int) {
         guard let next = Calendar.current.date(byAdding: .month, value: delta, to: month) else { return }
         month = next
+        selectedDay = ShiftDatePolicy.selectedDayAfterMonthChange(selected: selectedDay, visibleMonth: next)
     }
 
     private func monthButton(_ systemName: String, action: @escaping () -> Void) -> some View {
