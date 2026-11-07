@@ -856,10 +856,10 @@ struct ShiftEditorView: View {
                 endMinutes: endMinutes,
                 breakMinutes: storedBreak,
                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
-                breakFollowsRules: follows,
                 customPay: parsedCustom,
                 adjustmentYen: parsedAdjustment,
                 adjustmentNote: adjustmentNote.trimmingCharacters(in: .whitespacesAndNewlines),
+                breakFollowsRules: follows,
                 workplace: workplace
             )
             context.insert(shift)
@@ -879,9 +879,9 @@ struct ShiftEditorView: View {
         return BreakRules.minutesForEditor(
             payIsDaily: workplace.payIsDaily,
             followsRules: breakFollowsRules,
+            manualMinutes: breakMinutes,
             start: startMinutes,
             end: endMinutes,
-            manualMinutes: breakMinutes,
             customBreaks: workplace.customBreaks,
             rules: workplace.breakRules
         )
@@ -1212,6 +1212,9 @@ struct WorkplaceEditorView: View {
     @State private var overtimePerHour = true
     @State private var overtimeText = "0"
     @State private var customBreaks = false
+    @State private var roundingUnit = 1
+    @State private var roundingStart = 0
+    @State private var roundingEnd = 0
     @State private var breakRules: [InOutRecovered.BreakRule] = []
     @State private var error = ""
     @State private var confirmDelete = false
@@ -1329,6 +1332,25 @@ struct WorkplaceEditorView: View {
                     }
                 }
                 formCard {
+                    sectionTitle("開始と終了の丸め")
+                    Text("保存したシフトの時刻も、入っている給料の見込も、この設定だけでは変わりません。単位が2分未満か、向きがそのままのときは、その時刻を動かしません。参考アプリの丸めの再構成で、金額の式ではありません。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Picker("単位", selection: $roundingUnit) {
+                        ForEach(roundingUnits, id: \.self) { unit in
+                            Text(unit < 2 ? "\(unit)分（動かさない）" : "\(unit)分").tag(unit)
+                        }
+                    }
+                    .tint(Theme.lime)
+                    roundingDirectionPicker("開始", selection: $roundingStart)
+                    roundingDirectionPicker("終了", selection: $roundingEnd)
+                    Text(roundingPreview)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                formCard {
                     sectionTitle("メモ")
                     field("メモ", text: $notes)
                 }
@@ -1415,6 +1437,9 @@ struct WorkplaceEditorView: View {
             overtimeText = String(existing.overtimeExtra)
             customBreaks = existing.customBreaks
             breakRules = existing.breakRules
+            roundingUnit = existing.roundingUnitMinutes
+            roundingStart = existing.roundingStartRaw
+            roundingEnd = existing.roundingEndRaw
         } else if let settings = settingsRows.first {
             wageText = String(settings.defaultHourlyWage)
             transportText = String(settings.defaultTransportAllowance)
@@ -1444,6 +1469,45 @@ struct WorkplaceEditorView: View {
                 }
             }
         }
+    }
+
+    private var roundingUnits: [Int] {
+        var units = [1, 5, 10, 15, 30, 60]
+        if !units.contains(roundingUnit) {
+            units.append(roundingUnit)
+            units.sort()
+        }
+        return units
+    }
+
+    private func roundingDirectionPicker(_ title: String, selection: Binding<Int>) -> some View {
+        Picker(title, selection: selection) {
+            Text("そのまま").tag(0)
+            Text("切り上げ").tag(1)
+            Text("切り捨て").tag(2)
+            Text("近い方").tag(3)
+        }
+        .tint(Theme.lime)
+    }
+
+    private var roundingPreview: String {
+        let start = InOutRecovered.roundedSecondsFromStartOfDay(
+            450,
+            unitMinutes: roundingUnit,
+            direction: InOutRecovered.RoundingDirection.resolved(roundingStart)
+        )
+        let end = InOutRecovered.roundedSecondsFromStartOfDay(
+            450,
+            unitMinutes: roundingUnit,
+            direction: InOutRecovered.RoundingDirection.resolved(roundingEnd)
+        )
+        return "例: 0時7分30秒は、開始が\(roundingClock(start))、終了が\(roundingClock(end))です。1440分では巻きません。"
+    }
+
+    private func roundingClock(_ seconds: Double) -> String {
+        let sign = seconds < 0 ? "−" : ""
+        let whole = Int(abs(seconds).rounded(.towardZero))
+        return "\(sign)\(whole / 3600)時\((whole / 60) % 60)分\(whole % 60)秒"
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -1542,6 +1606,9 @@ struct WorkplaceEditorView: View {
         workplace.overtimeExtra = min(100_000, max(0, Int(overtimeText.filter(\.isNumber)) ?? 0))
         workplace.customBreaks = customBreaks
         workplace.breakRules = breakRules
+        workplace.roundingUnitMinutes = roundingUnit
+        workplace.roundingStartRaw = roundingStart
+        workplace.roundingEndRaw = roundingEnd
         do {
             try context.save()
         } catch {

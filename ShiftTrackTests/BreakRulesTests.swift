@@ -114,6 +114,9 @@ final class BreakRulesTests: XCTestCase {
         let workplace = place()
         XCTAssertFalse(workplace.customBreaks)
         XCTAssertTrue(workplace.breakRules.isEmpty)
+        XCTAssertEqual(workplace.roundingUnitMinutes, 1)
+        XCTAssertEqual(workplace.roundingStartRaw, 0)
+        XCTAssertEqual(workplace.roundingEndRaw, 0)
         workplace.breakRules = [.init(overMinutes: 360, breakMinutes: 45), .init(overMinutes: 100, breakMinutes: 10)]
         XCTAssertEqual(BreakRules.decode(workplace.breakRulesRaw).map(\.breakMinutes), [45, 10])
         XCTAssertEqual(existing.breakMinutes, 15)
@@ -203,102 +206,128 @@ final class BreakRulesTests: XCTestCase {
         XCTAssertEqual(WeekPage.day(byAddingWeeks: -1, to: stored, calendar: calendar), calendar.date(from: DateComponents(year: 2026, month: 11, day: 1)))
     }
 
-    func testLivePayUsesExistingMinuteRatesAndLeavesFullQuoteAlone() {
+    func testScaledBreakAndRoundingMatchThePublicRecord() {
+        let calendar = calendar()
+        let start = day(2026, 11, 8, 9, 0)
+        let end = start.addingTimeInterval(8 * 3600)
+        let halfway = start.addingTimeInterval(4 * 3600)
+        XCTAssertEqual(InOutRecovered.liveAsOf(now: halfway, shiftEnd: end), halfway)
+        XCTAssertEqual(InOutRecovered.liveAsOf(now: end.addingTimeInterval(3600), shiftEnd: end), end)
+        XCTAssertEqual(InOutRecovered.liveAsOf(now: end, shiftEnd: end), end)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: halfway, breakMinutes: 60), 30)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: start, breakMinutes: 60), 0)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: end, breakMinutes: 60), 60)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: start, asOf: start, breakMinutes: 60), 0)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: end, end: start, asOf: halfway, breakMinutes: 60), 0)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: start.addingTimeInterval(30), breakMinutes: 60), 0)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: start.addingTimeInterval(240), breakMinutes: 60), 1)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: start.addingTimeInterval(-4 * 3600), breakMinutes: 60), -30)
+        XCTAssertEqual(InOutRecovered.scaledBreakMinutes(start: start, end: end, asOf: start.addingTimeInterval(-3600), breakMinutes: 60), -8)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(450, unitMinutes: 0, direction: .up), 450)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(450, unitMinutes: 1, direction: .nearest), 450)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(450, unitMinutes: -5, direction: .up), 450)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(450, unitMinutes: 15, direction: .exact), 450)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(450, unitMinutes: 15, direction: .nearest), 900)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(449, unitMinutes: 15, direction: .nearest), 0)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(1, unitMinutes: 15, direction: .up), 900)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(899, unitMinutes: 15, direction: .down), 0)
+        XCTAssertEqual(InOutRecovered.roundedSecondsFromStartOfDay(-450, unitMinutes: 15, direction: .nearest), -900)
+        let dayStart = calendar.startOfDay(for: start)
+        let sample = dayStart.addingTimeInterval(450)
+        let rounded = InOutRecovered.roundedDate(sample, unitMinutes: 15, direction: .nearest, calendar: calendar)
+        XCTAssertEqual(rounded.timeIntervalSince(dayStart), 900)
+        let endRounded = InOutRecovered.roundedDate(dayStart.addingTimeInterval(899), unitMinutes: 15, direction: .down, calendar: calendar)
+        XCTAssertEqual(endRounded.timeIntervalSince(dayStart), 0)
+        XCTAssertNotEqual(rounded, endRounded)
+    }
+
+    func testLiveScaleDoesNotInventYenAndLaterNowChangesTheBreak() {
         let calendar = calendar()
         let workplace = place(wage: 1200, transport: 500)
-        let start = day(2026, 11, 8, 10, 0)
-        let at30 = day(2026, 11, 8, 10, 30)
-        let atEnd = day(2026, 11, 8, 12, 0)
-        let before = day(2026, 11, 8, 9, 50)
+        let shiftDay = day(2026, 11, 8)
+        let start = day(2026, 11, 8, 9, 0)
+        let halfway = start.addingTimeInterval(4 * 3600)
+        let after = start.addingTimeInterval(9 * 3600)
+        let before = start.addingTimeInterval(-4 * 3600)
         XCTAssertEqual(
-            LivePay.phase(now: before, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 0, workplace: workplace, calendar: calendar),
-            .beforeStart(remainingMinutes: 10)
+            LivePay.phase(now: before, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
+            .beforeStart(remainingMinutes: 240)
+        )
+        XCTAssertFalse(LivePay.line(.beforeStart(remainingMinutes: 240)).contains("円"))
+        XCTAssertFalse(LivePay.breakCaption(.beforeStart(remainingMinutes: 240)).contains("-30"))
+        XCTAssertEqual(
+            LivePay.phase(now: start, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
+            .during(scaledBreak: 0, scheduledBreak: 60, remainingMinutes: 8 * 60)
         )
         XCTAssertEqual(
-            LivePay.phase(now: start, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 0, workplace: workplace, calendar: calendar),
-            .working(earnedYen: 0, remainingMinutes: 120, inUnpaidTail: false)
+            LivePay.phase(now: halfway, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
+            .during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 4 * 60)
         )
         XCTAssertEqual(
-            LivePay.phase(now: at30, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 0, workplace: workplace, calendar: calendar),
-            .working(earnedYen: 600, remainingMinutes: 90, inUnpaidTail: false)
+            LivePay.phase(now: after, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
+            .afterEnd(scaledBreak: 60, scheduledBreak: 60)
         )
-        XCTAssertEqual(
-            LivePay.phase(now: atEnd, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 0, workplace: workplace, calendar: calendar),
-            .finished(earnedYen: 2400)
-        )
-        let full = PayMath.quote(
+        let during = LivePay.line(.during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 240))
+        XCTAssertTrue(during.contains("給与の目安"))
+        XCTAssertTrue(during.contains("円は出していません"))
+        let quote = PayMath.quote(
             workplace: workplace,
-            day: start,
-            start: 10 * 60,
-            end: 12 * 60,
-            breakMinutes: 0,
+            day: shiftDay,
+            start: 9 * 60,
+            end: 17 * 60,
+            breakMinutes: 60,
             customPay: nil,
             adjustment: 0,
             includeTransport: true,
             calendar: calendar
         )
-        XCTAssertEqual(full, 2400 + 500)
-        let untouched = PayMath.quote(
-            workplace: workplace,
-            day: start,
-            start: 9 * 60,
-            end: 18 * 60,
-            breakMinutes: 0,
-            customPay: nil,
-            adjustment: 0,
-            includeTransport: false,
-            calendar: calendar
+        workplace.roundingUnitMinutes = 15
+        workplace.roundingStartRaw = 3
+        workplace.roundingEndRaw = 1
+        XCTAssertEqual(
+            PayMath.quote(
+                workplace: workplace,
+                day: shiftDay,
+                start: 9 * 60,
+                end: 17 * 60,
+                breakMinutes: 60,
+                customPay: nil,
+                adjustment: 0,
+                includeTransport: true,
+                calendar: calendar
+            ),
+            quote
         )
-        XCTAssertEqual(untouched, (1200 * 540 + 30) / 60)
+        let stored = WorkShift(date: shiftDay, startMinutes: 9 * 60, endMinutes: 17 * 60, breakMinutes: 60, workplace: workplace)
+        XCTAssertEqual(stored.startMinutes, 9 * 60)
+        XCTAssertEqual(stored.endMinutes, 17 * 60)
     }
 
-    func testUnpaidBreakIsTheTailNotARecoveredBreakClock() {
+    func testOvernightAfterEndAndTwoWorkplacesStayIndependent() {
         let calendar = calendar()
-        let workplace = place()
-        let start = day(2026, 11, 8, 10, 0)
-        let at90 = day(2026, 11, 8, 11, 30)
-        let at100 = day(2026, 11, 8, 11, 40)
-        let end = day(2026, 11, 8, 12, 0)
+        let first = place()
+        let second = place()
+        let shiftDay = day(2026, 11, 8)
+        let midway = day(2026, 11, 9, 2, 0)
+        let after = day(2026, 11, 9, 7, 0)
         XCTAssertEqual(
-            LivePay.phase(now: at90, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 30, workplace: workplace, calendar: calendar),
-            .working(earnedYen: 1800, remainingMinutes: 30, inUnpaidTail: false)
+            LivePay.phase(now: midway, day: shiftDay, start: 22 * 60, end: 6 * 60, breakMinutes: 60, workplace: first, calendar: calendar),
+            .during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 4 * 60)
         )
         XCTAssertEqual(
-            LivePay.phase(now: at100, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 30, workplace: workplace, calendar: calendar),
-            .working(earnedYen: 1800, remainingMinutes: 20, inUnpaidTail: true)
+            LivePay.phase(now: after, day: shiftDay, start: 22 * 60, end: 6 * 60, breakMinutes: 60, workplace: first, calendar: calendar),
+            .afterEnd(scaledBreak: 60, scheduledBreak: 60)
         )
-        XCTAssertEqual(
-            LivePay.phase(now: end, day: start, start: 10 * 60, end: 12 * 60, breakMinutes: 30, workplace: workplace, calendar: calendar),
-            .finished(earnedYen: 1800)
-        )
-    }
-
-    func testDailyAndCustomPayAreNotSplitByTheSecond() {
-        let calendar = calendar()
-        let daily = place(daily: true)
-        let midway = day(2026, 11, 8, 11, 0)
-        let phase = LivePay.phase(
+        let other = LivePay.phase(
             now: midway,
-            day: day(2026, 11, 8),
+            day: shiftDay,
             start: 10 * 60,
-            end: 18 * 60,
+            end: 12 * 60,
             breakMinutes: 0,
-            workplace: daily,
+            workplace: second,
             calendar: calendar
         )
-        XCTAssertEqual(phase, .working(earnedYen: 8000, remainingMinutes: 7 * 60, inUnpaidTail: false))
-        let customPlace = place()
-        let custom = LivePay.phase(
-            now: midway,
-            day: day(2026, 11, 8),
-            start: 10 * 60,
-            end: 18 * 60,
-            breakMinutes: 0,
-            workplace: customPlace,
-            customPay: 3000,
-            calendar: calendar
-        )
-        XCTAssertEqual(custom, .working(earnedYen: 3000, remainingMinutes: 7 * 60, inUnpaidTail: false))
+        XCTAssertEqual(other, .afterEnd(scaledBreak: 0, scheduledBreak: 0))
     }
 
     @MainActor

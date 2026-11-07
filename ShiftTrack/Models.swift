@@ -36,6 +36,12 @@ final class Workplace {
     var customBreaks: Bool = false
     /// `overMinutes:breakMinutes` pairs, earlier first. Empty is not the legal table.
     var breakRulesRaw: String = ""
+    /// Clock rounding from `PayTerms.rounding`. Unit below 2, or either
+    /// direction `exact` (0), leaves that instant unchanged. Existing rows
+    /// get 1 and exact, which is a no-op. Saving this does not rewrite shifts.
+    var roundingUnitMinutes: Int = 1
+    var roundingStartRaw: Int = 0
+    var roundingEndRaw: Int = 0
     var createdAt: Date
     @Relationship(deleteRule: .cascade, inverse: \WorkShift.workplace)
     var shifts: [WorkShift]
@@ -78,6 +84,9 @@ final class Workplace {
         self.overtimeExtra = 0
         self.customBreaks = false
         self.breakRulesRaw = ""
+        self.roundingUnitMinutes = 1
+        self.roundingStartRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
+        self.roundingEndRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
         self.createdAt = createdAt
         self.shifts = []
     }

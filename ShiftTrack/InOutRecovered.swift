@@ -1,11 +1,13 @@
 import Foundation
 
 /// Reconstruction from the authorized IN/OUT binary. Not original Swift
-/// and not Ghidra output. Payroll arithmetic and PayRounding are not here.
+/// and not Ghidra output. The yen formula is not here.
 ///
 /// Addresses are in `com.graff.inout` 1.0 (3). Pseudocode is in the public
 /// analysis repo. Minute and day calls match commit `ba221ab`. Break
 /// selection, the editor minute count, and week-times-7 match `06aefb3`.
+/// Break scaling and pay-term rounding match `cd54b57`. Rounding changes
+/// a clock instant. It is not a yen amount.
 enum InOutRecovered {
     struct BreakRule {
         var overMinutes: Int
@@ -120,5 +122,98 @@ enum InOutRecovered {
         let remainder = difference % 1440
         let positive = remainder < 0 ? remainder + 1440 : remainder
         return positive == 0 ? 1440 : positive
+    }
+
+    /// Case order matches `0x10011b1d0`: exact, up, down. Any other byte,
+    /// including nearest, uses ties away from zero.
+    enum RoundingDirection: UInt8 {
+        case exact = 0
+        case up = 1
+        case down = 2
+        case nearest = 3
+
+        /// A byte outside the three compared values takes the nearest path.
+        static func resolved(_ raw: Int) -> RoundingDirection {
+            RoundingDirection(rawValue: UInt8(clamping: raw)) ?? .nearest
+        }
+    }
+
+    /// `PayRounding`: unit, then the start direction at byte +8 and the end
+    /// direction at byte +9. `PayTerms.rounding` is field 6.
+    struct PayRounding {
+        var unitMinutes: Int
+        var start: RoundingDirection
+        var end: RoundingDirection
+    }
+
+    /// `0x10011b1d0`. `unitMinutes < 2` or `exact` returns the seconds unchanged.
+    /// Otherwise divide seconds-from-start-of-day by `unitMinutes * 60`,
+    /// round up with `frintp`, down with `frintm`, or ties away from zero,
+    /// then multiply the unit back. This is not a 1440-minute wrap.
+    /// The binary's multiply is checked and traps on overflow. This copy uses
+    /// Swift `*`, which also traps. The published tests do not overflow.
+    static func roundedSecondsFromStartOfDay(
+        _ seconds: Double,
+        unitMinutes: Int,
+        direction: RoundingDirection
+    ) -> Double {
+        if unitMinutes < 2 || direction == .exact {
+            return seconds
+        }
+        let unit = Double(unitMinutes * 60)
+        let units = seconds / unit
+        let rounded: Double
+        switch direction {
+        case .exact:
+            rounded = units
+        case .up:
+            rounded = units.rounded(.up)
+        case .down:
+            rounded = units.rounded(.down)
+        case .nearest:
+            rounded = units.rounded(.toNearestOrAwayFromZero)
+        }
+        return rounded * unit
+    }
+
+    /// Rounds one instant against its own start of day. Start and end each
+    /// call this with their own direction byte.
+    static func roundedDate(
+        _ date: Date,
+        unitMinutes: Int,
+        direction: RoundingDirection,
+        calendar: Calendar = .current
+    ) -> Date {
+        let start = calendar.startOfDay(for: date)
+        let original = date.timeIntervalSince(start)
+        let seconds = roundedSecondsFromStartOfDay(
+            original,
+            unitMinutes: unitMinutes,
+            direction: direction
+        )
+        if seconds == original {
+            return date
+        }
+        return start.addingTimeInterval(seconds)
+    }
+
+    /// `0x10026e844`. `shiftEnd < now` uses the end. Equal instants stay on now.
+    static func liveAsOf(now: Date, shiftEnd: Date) -> Date {
+        shiftEnd < now ? shiftEnd : now
+    }
+
+    /// Same function. Zero or negative duration stores 0. Otherwise
+    /// `frinta(elapsedSeconds * breakMinutes / duration)` then toward zero.
+    /// The result is `WorkRecord.breakMinutes`. Planned start and end stay
+    /// put. A negative elapsed value stays negative. That path was not seen
+    /// on a screen. This number is a break input, not yen.
+    static func scaledBreakMinutes(start: Date, end: Date, asOf: Date, breakMinutes: Int) -> Int {
+        let duration = end.timeIntervalSince(start)
+        if duration <= 0 {
+            return 0
+        }
+        let elapsed = asOf.timeIntervalSince(start)
+        let scaled = (elapsed * Double(breakMinutes) / duration).rounded(.toNearestOrAwayFromZero)
+        return Int(scaled)
     }
 }

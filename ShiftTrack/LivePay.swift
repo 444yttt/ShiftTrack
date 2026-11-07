@@ -1,19 +1,20 @@
 import Foundation
 
-/// Today-screen ticker. The IN/OUT strings describe a number that grows
-/// during a shift ("いま稼いだお給料") and separate pay from transport
-/// ("お給料（交通費の前）"). The pay function itself was not recovered.
-/// Amounts below reuse `PayMath.timedAmount`, which is ShiftTrack's existing
-/// per-minute reimplementation, not IN/OUT's `PayCalculator`.
+/// Today-screen clock. The recovered path scales break minutes from
+/// `TimelineView.Context.date` (`0x10026e844`). It does not produce yen, and
+/// it does not show that worked time is cut at now. Planned start and end
+/// stay on the shift. Yen stays off this screen.
 ///
-/// Break spans were not recovered. Unpaid break minutes are the tail of the
-/// shift. A break that sits in the middle of a shift is not reproduced.
+/// Two recovered timeline periods are 30 seconds and one is 1 second. Which
+/// of them feeds this context was not tied by a pointer.
 enum LivePay {
     enum Phase: Equatable {
         case notAShift
         case beforeStart(remainingMinutes: Int)
-        case working(earnedYen: Int, remainingMinutes: Int, inUnpaidTail: Bool)
-        case finished(earnedYen: Int)
+        /// `scaledBreak` is omitted when the recovered scale is negative.
+        /// A negative break was not observed on a screen.
+        case during(scaledBreak: Int?, scheduledBreak: Int, remainingMinutes: Int)
+        case afterEnd(scaledBreak: Int, scheduledBreak: Int)
     }
 
     static func phase(
@@ -26,6 +27,8 @@ enum LivePay {
         customPay: Int? = nil,
         calendar: Calendar = .current
     ) -> Phase {
+        _ = workplace
+        _ = customPay
         let span = BreakRules.selectionMinutes(start: start, end: end)
         guard span > 0 else { return .notAShift }
         let startDate = calendar.date(
@@ -37,57 +40,48 @@ enum LivePay {
         if now < startDate {
             return .beforeStart(remainingMinutes: remainingMinutes(until: startDate, from: now))
         }
-        let earned = earnedYen(
-            elapsedMinutes: min(span, elapsedMinutes(from: startDate, to: min(now, endDate))),
-            span: span,
-            breakMinutes: breakMinutes,
-            workplace: workplace,
-            day: day,
-            start: start,
-            customPay: customPay,
-            calendar: calendar
+        let asOf = InOutRecovered.liveAsOf(now: now, shiftEnd: endDate)
+        let scaled = InOutRecovered.scaledBreakMinutes(
+            start: startDate,
+            end: endDate,
+            asOf: asOf,
+            breakMinutes: breakMinutes
         )
         if now >= endDate {
-            return .finished(earnedYen: earned)
+            return .afterEnd(scaledBreak: scaled, scheduledBreak: breakMinutes)
         }
-        let paidSpan = max(0, span - max(0, breakMinutes))
-        let elapsed = min(span, elapsedMinutes(from: startDate, to: now))
-        return .working(
-            earnedYen: earned,
-            remainingMinutes: remainingMinutes(until: endDate, from: now),
-            inUnpaidTail: elapsed > paidSpan
+        return .during(
+            scaledBreak: scaled < 0 ? nil : scaled,
+            scheduledBreak: breakMinutes,
+            remainingMinutes: remainingMinutes(until: endDate, from: now)
         )
     }
 
-    static func earnedYen(
-        elapsedMinutes: Int,
-        span: Int,
-        breakMinutes: Int,
-        workplace: Workplace,
-        day: Date,
-        start: Int,
-        customPay: Int?,
-        calendar: Calendar
-    ) -> Int {
-        if let customPay { return max(0, customPay) }
-        if workplace.payIsDaily { return max(0, workplace.dailyWage) }
-        let paidSpan = max(0, span - max(0, breakMinutes))
-        let paidElapsed = min(paidSpan, max(0, elapsedMinutes))
-        return PayMath.timedAmount(
-            workplace: workplace,
-            day: day,
-            start: start,
-            paidMinutes: paidElapsed,
-            calendar: calendar
-        )
+    static func line(_ phase: Phase) -> String {
+        switch phase {
+        case .notAShift:
+            return "開始と終了が同じです"
+        case .beforeStart(let minutes):
+            return "はじまりまで あと \(Formatters.hours(minutes))"
+        case .during(_, _, let minutes):
+            return "給与の目安：円は出していません。終わりまで あと \(Formatters.hours(minutes))"
+        case .afterEnd:
+            return "終了しました。給与の目安：円は出していません"
+        }
     }
 
-    /// Positive elapsed seconds truncated toward zero. Same direction as the
-    /// recovered `fcvtzs` on a seconds value, applied here to the ticker.
-    static func elapsedMinutes(from start: Date, to now: Date) -> Int {
-        let seconds = now.timeIntervalSince(start)
-        guard seconds > 0 else { return 0 }
-        return Int(seconds / 60)
+    static func breakCaption(_ phase: Phase) -> String {
+        switch phase {
+        case .notAShift:
+            return "休憩は計算していません"
+        case .beforeStart:
+            return "開始前です。負の休憩按分は画面で未確認のため出していません"
+        case .during(let scaled, let scheduled, _):
+            guard let scaled else { return "休憩の目安は出していません" }
+            return "休憩の目安 \(scaled)分（予定\(scheduled)分を経過の割合で按分。開始と終了は予定のまま）"
+        case .afterEnd(let scaled, let scheduled):
+            return "終了後の休憩は予定の\(scheduled)分です（按分 \(scaled)分）"
+        }
     }
 
     /// Display for 「あと」. A remainder under a minute still shows 1 so the

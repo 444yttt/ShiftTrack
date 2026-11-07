@@ -2,11 +2,15 @@ import SwiftData
 import SwiftUI
 
 struct TodayScreen: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query private var settingsRows: [AppSettings]
     @State private var day = Calendar.current.startOfDay(for: .now)
     @State private var editor: EditorRoute?
+    /// Bumped when the app becomes active. The recovered 30-second and
+    /// 1-second schedules were not tied to this timeline.
+    @State private var resumedAt = Date.distantPast
 
     private var settings: AppSettings? { settingsRows.first }
     private var weekStartsOnMonday: Bool { settings?.weekStartsOnMonday ?? false }
@@ -14,12 +18,13 @@ struct TodayScreen: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
+            let now = max(context.date, resumedAt)
             ScreenScroll {
-                header(now: context.date)
+                header(now: now)
                 weekStrip
                     .highPriorityGesture(weekSwipe)
-                summary(now: context.date)
-                dayList(now: context.date)
+                summary(now: now)
+                dayList(now: now)
                 LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
                     editor = EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid)
                 }
@@ -27,6 +32,11 @@ struct TodayScreen: View {
             }
         }
         .background(Theme.background)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                resumedAt = .now
+            }
+        }
         .sheet(item: $editor) { route in
             ShiftEditorView(route: route)
         }
@@ -81,16 +91,16 @@ struct TodayScreen: View {
 
     private func summary(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("今日のお給料（交通費の前） \(Formatters.yen(todayYen(now: now)))")
+            Text("給与の目安")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Theme.lime)
-            Text("今月の見込み \(Formatters.yen(monthYen(now: now)))")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white)
-            Text("勤務中の数字は、このアプリの時給計算で経過した分だけ足しています。参考アプリの給与式そのものではありません。")
+            Text("勤務中の円は出していません。休憩だけを、経過した秒の割合で按分しています。金額の式ではなく、勤務時間を今で切った数字でもありません。")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
+            Text("今月の見込み（このアプリの計算） \(Formatters.yen(monthYen(now: now)))")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 16)
@@ -137,31 +147,18 @@ struct TodayScreen: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.muted)
             }
-            Text(phaseLine(phase))
+            Text(LivePay.line(phase))
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.lime)
-            Text("休憩\(shift.breakMinutes)分")
+            Text(LivePay.breakCaption(phase))
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func phaseLine(_ phase: LivePay.Phase) -> String {
-        switch phase {
-        case .notAShift:
-            return "開始と終了が同じです"
-        case .beforeStart(let minutes):
-            return "はじまりまで あと \(Formatters.hours(minutes))"
-        case .working(let yen, let minutes, let tail):
-            let tailNote = tail ? "  休憩の分です" : ""
-            return "いま稼いだお給料 \(Formatters.yen(yen))  終わりまで あと \(Formatters.hours(minutes))\(tailNote)"
-        case .finished(let yen):
-            return "お給料 \(Formatters.yen(yen))"
-        }
     }
 
     private var weekSwipe: some Gesture {
@@ -225,29 +222,6 @@ struct TodayScreen: View {
             workplace: workplace,
             customPay: shift.customPay
         )
-    }
-
-    private func todayYen(now: Date) -> Int {
-        let calendar = Calendar.current
-        return shifts.reduce(0) { sum, shift in
-            guard calendar.isDateInToday(shift.date), let workplace = shift.workplace else { return sum }
-            let phase = LivePay.phase(
-                now: now,
-                day: shift.date,
-                start: shift.startMinutes,
-                end: shift.endMinutes,
-                breakMinutes: shift.breakMinutes,
-                workplace: workplace,
-                customPay: shift.customPay,
-                calendar: calendar
-            )
-            switch phase {
-            case .working(let yen, _, _), .finished(let yen):
-                return sum + yen
-            case .beforeStart, .notAShift:
-                return sum
-            }
-        }
     }
 
     private func monthYen(now: Date) -> Int {
