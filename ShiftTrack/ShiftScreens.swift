@@ -789,7 +789,7 @@ struct ShiftEditorView: View {
             error = "勤務先を選んでください"
             return
         }
-        let storedBreak = workplace.payIsDaily ? 0 : breakMinutes
+        let storedBreak = ShiftDatePolicy.breakToStore(payIsDaily: workplace.payIsDaily, minutes: breakMinutes)
         let minutes = PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: storedBreak)
         guard workplace.payIsDaily || minutes > 0 else {
             error = "終了時刻が開始と同じにならないようにしてください"
@@ -963,7 +963,7 @@ struct MinutesTimePicker: View {
                 title: title,
                 minutes: $draft,
                 onCommit: {
-                    minutes = ShiftDatePolicy.clockMinutes(draft)
+                    minutes = ShiftDatePolicy.minutesAfterDismiss(original: minutes, draft: draft, committed: true)
                     showSheet = false
                 },
                 onCancel: { showSheet = false }
@@ -1085,8 +1085,7 @@ struct BreakMinutesControl: View {
 
     private func nudge(_ label: String, delta: Int, title: String) -> some View {
         Button {
-            let next = minutes + delta
-            minutes = min(range.upperBound, max(range.lowerBound, next))
+            minutes = ShiftDatePolicy.clampedBreak(minutes + delta, range: range)
         } label: {
             Text(title)
                 .font(.body.weight(.bold))

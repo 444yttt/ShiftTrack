@@ -48,4 +48,34 @@ enum ShiftDatePolicy {
         guard calendar.isDate(selected, equalTo: visibleMonth, toGranularity: .month) else { return nil }
         return calendar.startOfDay(for: selected)
     }
+
+    /// The day captured when the add sheet opens. Later month swipes do not move it.
+    static func anchorDay(
+        selectedDay: Date?,
+        visibleMonth: Date,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> Date {
+        if let selectedDay { return calendar.startOfDay(for: selectedDay) }
+        if calendar.isDate(now, equalTo: visibleMonth, toGranularity: .month) {
+            return calendar.startOfDay(for: now)
+        }
+        let parts = calendar.dateComponents([.year, .month], from: visibleMonth)
+        let start = calendar.date(from: parts) ?? visibleMonth
+        return calendar.startOfDay(for: start)
+    }
+
+    /// Cancel keeps the original minutes. Commit stores the draft, wrapped inside one day.
+    static func minutesAfterDismiss(original: Int, draft: Int, committed: Bool) -> Int {
+        guard committed else { return original }
+        return clockMinutes(draft)
+    }
+
+    static func clampedBreak(_ minutes: Int, range: ClosedRange<Int>) -> Int {
+        min(range.upperBound, max(range.lowerBound, minutes))
+    }
+
+    static func breakToStore(payIsDaily: Bool, minutes: Int) -> Int {
+        payIsDaily ? 0 : max(0, minutes)
+    }
 }

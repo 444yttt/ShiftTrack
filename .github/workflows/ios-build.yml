@@ -21,11 +21,33 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
-      - name: Build ShiftTrack
+      - name: Build and test ShiftTrack
         run: |
+          set -euo pipefail
           xcodebuild build \
             -project ShiftTrack.xcodeproj \
             -scheme ShiftTrack \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+          udid=$(python3 - <<'PY'
+          import json, subprocess
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+          devices = []
+          for runtime, rows in json.loads(raw).get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for device in rows:
+                  if device.get("isAvailable", True) and device.get("name", "").startswith("iPhone"):
+                      devices.append(device["udid"])
+          if not devices:
+              raise SystemExit("no iPhone simulator")
+          print(devices[-1])
+          PY
+          )
+          xcodebuild test \
+            -project ShiftTrack.xcodeproj \
+            -scheme ShiftTrack \
+            -destination "id=${udid}" \
+            -only-testing:ShiftTrackTests \
             CODE_SIGNING_ALLOWED=NO

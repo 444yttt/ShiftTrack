@@ -274,10 +274,7 @@ struct CalendarScreen: View {
     }
 
     private var addDay: Date {
-        if let selectedDay { return selectedDay }
-        let calendar = Calendar.current
-        if calendar.isDate(Date(), equalTo: month, toGranularity: .month) { return Date() }
-        return calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? Date()
+        ShiftDatePolicy.anchorDay(selectedDay: selectedDay, visibleMonth: month)
     }
 
     private func isPayday(_ day: Date) -> Bool {
