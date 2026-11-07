@@ -1,0 +1,14 @@
+name: macos-verify
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify recovered sites with macOS tools
+        run: python3 tools/verify_macos.py bin/IN-OUT
