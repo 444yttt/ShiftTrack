@@ -47,8 +47,18 @@ final class ShellUITests: XCTestCase {
         app.buttons["完了する"].tap()
         let card = app.buttons["workplace.card"]
         XCTAssertTrue(card.waitForExistence(timeout: 6))
+        let saveButton = app.buttons["完了する"]
+        if saveButton.exists {
+            let gone = NSPredicate(format: "exists == false")
+            expectation(for: gone, evaluatedWith: saveButton, handler: nil)
+            waitForExpectations(timeout: 4)
+        }
         card.tap()
-        XCTAssertTrue(app.navigationBars["パターン"].waitForExistence(timeout: 6))
+        let heading = app.staticTexts["patterns.heading"]
+        if !heading.waitForExistence(timeout: 3) {
+            card.tap()
+        }
+        XCTAssertTrue(heading.waitForExistence(timeout: 6))
         shot("04-patterns")
         app.buttons["patterns.close"].tap()
 

@@ -17,11 +17,16 @@ struct PatternListView: View {
     var body: some View {
         NavigationStack {
             ScreenScroll {
+                Text("パターン")
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+                    .accessibilityIdentifier("patterns.heading")
                 Text("パターンは曜日のひな形です。ここを保存してもシフトは増えません。入れると、空いている日だけシフトになります。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
 
                 if visiblePatterns.isEmpty {
                     Text("パターンはまだありません。")

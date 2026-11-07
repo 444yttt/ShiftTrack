@@ -7,7 +7,7 @@ struct WorkplaceDirectoryScreen: View {
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @State private var editorID: UUID?
     @State private var showCreator = false
-    @State private var patternsFor: UUID?
+    @State private var patternsFor: WorkplacePatternRoute?
 
     var body: some View {
         ScreenScroll {
@@ -33,7 +33,7 @@ struct WorkplaceDirectoryScreen: View {
                     ForEach(workplaces) { workplace in
                         HStack(spacing: 8) {
                             Button {
-                                patternsFor = workplace.uuid
+                                patternsFor = WorkplacePatternRoute(workplaceID: workplace.uuid)
                             } label: {
                                 HStack(spacing: 12) {
                                     Circle()
@@ -84,12 +84,14 @@ struct WorkplaceDirectoryScreen: View {
         )) {
             WorkplaceEditorView(existingID: editorID)
         }
-        .sheet(isPresented: Binding(
-            get: { patternsFor != nil },
-            set: { if !$0 { patternsFor = nil } }
-        )) {
-            PatternListView(onlyWorkplaceID: patternsFor)
+        .sheet(item: $patternsFor) { route in
+            PatternListView(onlyWorkplaceID: route.workplaceID)
                 .presentationBackground(Theme.background)
         }
     }
+}
+
+struct WorkplacePatternRoute: Identifiable {
+    var id: UUID { workplaceID }
+    var workplaceID: UUID
 }
