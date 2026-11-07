@@ -41,7 +41,7 @@ enum AppModel {
 struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tab: AppTab = .today
+    @State private var tab: AppTab = .list
     @State private var router = ImportRouter.shared
 
     var body: some View {
