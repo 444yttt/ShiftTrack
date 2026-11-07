@@ -10,15 +10,29 @@ struct CalendarScreen: View {
     @State private var month = Date()
     @State private var selectedID: UUID?
     @State private var selectedDay: Date?
-    @State private var showHelp = false
-    @State private var showAddChoices = false
-    @State private var addAnchor = Date()
     @State private var calendarDragging = false
-    @State private var showWorkplace = false
-    @State private var editor: EditorRoute?
-    @State private var showPatterns = false
-    @State private var requestRoute: RequestRoute?
+    @State private var cover: CalendarCover?
     @State private var router = ImportRouter.shared
+
+    private enum CalendarCover: Identifiable {
+        case workplace
+        case add(Date)
+        case editor(EditorRoute)
+        case patterns
+        case request(RequestRoute)
+        case help
+
+        var id: String {
+            switch self {
+            case .workplace: "workplace"
+            case .add(let date): "add-\(date.timeIntervalSinceReferenceDate)"
+            case .editor(let route): "editor-\(route.id)"
+            case .patterns: "patterns"
+            case .request(let route): "request-\(route.id)"
+            case .help: "help"
+            }
+        }
+    }
 
     private var settings: AppSettings? { settingsRows.first }
     private var weekStartsOnMonday: Bool { settings?.weekStartsOnMonday ?? false }
@@ -30,7 +44,7 @@ struct CalendarScreen: View {
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(.white)
                 Spacer()
-                HelpButton { showHelp = true }
+                HelpButton { cover = .help }
             }
             .padding(.top, 8)
 
@@ -108,7 +122,7 @@ struct CalendarScreen: View {
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     LimeCapsuleButton(title: "勤務先を追加", fillWidth: true) {
-                        showWorkplace = true
+                        cover = .workplace
                     }
                 }
             } else if listedShifts.isEmpty {
@@ -120,7 +134,7 @@ struct CalendarScreen: View {
                 VStack(spacing: 10) {
                     ForEach(listedShifts) { shift in
                         Button {
-                            editor = EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid)
+                            cover = .editor(EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid))
                         } label: {
                             ShiftCard(shift: shift, includeTransport: settings?.includeTransport ?? true)
                         }
@@ -142,7 +156,7 @@ struct CalendarScreen: View {
                 VStack(spacing: 10) {
                     ForEach(listedRequests) { request in
                         Button {
-                            requestRoute = RequestRoute(requestID: request.uuid, date: request.date)
+                            cover = .request(RequestRoute(requestID: request.uuid, date: request.date))
                         } label: {
                             requestCard(request)
                         }
@@ -152,15 +166,14 @@ struct CalendarScreen: View {
             }
 
             LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
-                addAnchor = addDay
-                showAddChoices = true
+                cover = .add(addDay)
             }
             .padding(.top, 4)
 
             HStack(spacing: 12) {
-                Button("パターン") { showPatterns = true }
+                Button("パターン") { cover = .patterns }
                 Button("希望を追加") {
-                    requestRoute = RequestRoute(requestID: nil, date: addDay)
+                    cover = .request(RequestRoute(requestID: nil, date: addDay))
                 }
             }
             .font(.system(size: 14, weight: .bold))
@@ -179,39 +192,37 @@ struct CalendarScreen: View {
             .buttonStyle(.plain)
         }
         .background(Theme.background)
-        .sheet(isPresented: $showWorkplace) {
-            WorkplaceEditorView(existingID: nil)
-        }
-        .sheet(isPresented: $showAddChoices) {
-            ShiftAddChooser(day: addAnchor, workplaceID: selectedID, onSaved: reveal)
-        }
-        .sheet(item: $editor) { route in
-            ShiftEditorView(route: route, onSaved: { reveal([$0]) })
-        }
-        .sheet(isPresented: $showPatterns) {
-            PatternListView()
-                .presentationBackground(Theme.background)
-        }
-        .sheet(item: $requestRoute) { route in
-            RequestEditorView(route: route)
-                .presentationBackground(Theme.background)
-        }
         .onChange(of: router.focusRequest) { _, request in
             guard let request else { return }
             reveal(request.dates)
         }
-        .sheet(isPresented: $showHelp) {
-            HelpSheet(
-                title: "カレンダーの見方",
-                paragraphs: [
-                    "カレンダーを横にスワイプすると、見ている月だけが変わります。入っているシフトの日付は変わりません。日をタップすると、その日のシフトを下に出します。",
-                    "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
-                    "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
-                    "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
-                    "パターンは曜日のひな形です。入れるとき、同じ勤務先のシフトが既にある日は作りません。",
-                    "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
-                ]
-            )
+        .sheet(item: $cover) { destination in
+            switch destination {
+            case .workplace:
+                WorkplaceEditorView(existingID: nil)
+            case .add(let day):
+                ShiftAddChooser(day: day, workplaceID: selectedID, onSaved: reveal)
+            case .editor(let route):
+                ShiftEditorView(route: route, onSaved: { reveal([$0]) })
+            case .patterns:
+                PatternListView()
+                    .presentationBackground(Theme.background)
+            case .request(let route):
+                RequestEditorView(route: route)
+                    .presentationBackground(Theme.background)
+            case .help:
+                HelpSheet(
+                    title: "カレンダーの見方",
+                    paragraphs: [
+                        "カレンダーを横にスワイプすると、見ている月だけが変わります。入っているシフトの日付は変わりません。日をタップすると、その日のシフトを下に出します。",
+                        "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
+                        "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
+                        "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
+                        "パターンは曜日のひな形です。入れるとき、同じ勤務先のシフトが既にある日は作りません。",
+                        "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
+                    ]
+                )
+            }
         }
     }
 

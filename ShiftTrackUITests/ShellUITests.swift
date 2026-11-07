@@ -55,34 +55,54 @@ final class ShellUITests: XCTestCase {
         }
         card.tap()
         let heading = app.staticTexts["patterns.heading"]
-        if !heading.waitForExistence(timeout: 3) {
-            card.tap()
+        if !heading.waitForExistence(timeout: 4), card.isHittable {
+            card.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).tap()
         }
-        XCTAssertTrue(heading.waitForExistence(timeout: 6))
+        require(heading, timeout: 6, shotName: "04-patterns-missing", app: app)
         shot("04-patterns")
         app.buttons["patterns.close"].tap()
 
         app.buttons["tab.today"].tap()
         XCTAssertEqual(clock.label, clockBefore)
         app.buttons["＋シフトを追加"].tap()
-        app.buttons["1件ずつ入力"].tap()
-        app.buttons["開始"].tap()
-        XCTAssertTrue(app.navigationBars["開始の時刻"].waitForExistence(timeout: 6))
+        let start = app.buttons["開始"]
+        require(start, timeout: 8, shotName: "05-editor-missing", app: app)
+        start.tap()
+        let timeBar = app.navigationBars["開始の時刻"]
+        require(timeBar, timeout: 6, shotName: "05-time-missing", app: app)
         app.buttons["1時間後"].tap()
         shot("05-time")
-        app.buttons["キャンセル"].tap()
-        XCTAssertFalse(app.navigationBars["開始の時刻"].exists)
+        timeBar.buttons["キャンセル"].tap()
+        let timeGone = NSPredicate(format: "exists == false")
+        expectation(for: timeGone, evaluatedWith: timeBar, handler: nil)
+        waitForExpectations(timeout: 4)
+        let editorBar = app.navigationBars["シフトを追加"]
+        if editorBar.waitForExistence(timeout: 2) {
+            editorBar.buttons["キャンセル"].tap()
+        }
 
         app.buttons["tab.income"].tap()
         shot("06-income")
         app.buttons["income.walls"].tap()
-        XCTAssertTrue(app.staticTexts["walls.title"].waitForExistence(timeout: 6))
+        require(app.staticTexts["walls.title"], timeout: 6, shotName: "07-walls-missing", app: app)
         shot("07-walls")
+        app.buttons["walls.close"].tap()
 
         app.buttons["tab.settings"].tap()
         shot("08-settings")
         XCTAssertFalse(app.staticTexts["勤務先の設定"].exists)
+        app.buttons["tab.today"].tap()
         XCTAssertEqual(clock.label, clockBefore)
+    }
+
+    private func require(_ element: XCUIElement, timeout: TimeInterval, shotName: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        if element.waitForExistence(timeout: timeout) { return }
+        shot(shotName)
+        let attachment = XCTAttachment(string: app.debugDescription)
+        attachment.name = "hierarchy-\(shotName)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTFail("画面に出ませんでした: \(shotName)", file: file, line: line)
     }
 
     private func shot(_ name: String) {
