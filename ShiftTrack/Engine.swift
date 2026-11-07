@@ -114,8 +114,9 @@ enum PayMath {
     }
 
     private static func contains(_ minute: Int, _ start: Int, _ end: Int) -> Bool {
-        let start = ((start % (24 * 60)) + 24 * 60) % (24 * 60)
-        let end = ((end % (24 * 60)) + 24 * 60) % (24 * 60)
+        let minute = ShiftDatePolicy.clockMinutes(minute)
+        let start = ShiftDatePolicy.clockMinutes(start)
+        let end = ShiftDatePolicy.clockMinutes(end)
         if start == end { return false }
         if start < end { return minute >= start && minute < end }
         return minute >= start || minute < end
@@ -125,7 +126,7 @@ enum PayMath {
         let base = calendar.startOfDay(for: day)
         var endDate = calendar.date(byAdding: .minute, value: end, to: base) ?? day
         if end <= start {
-            endDate = calendar.date(byAdding: .day, value: 1, to: endDate) ?? endDate
+            endDate = InOutRecovered.addingDays(1, to: endDate, calendar: calendar) ?? endDate
         }
         return endDate
     }
@@ -294,16 +295,16 @@ enum CalendarGrid {
     }
 
     static func days(in month: Date, weekStartsOnMonday: Bool, calendar: Calendar = .current) -> [Date?] {
+        let intervalStart = calendar.dateInterval(of: .month, for: month)?.start
         let comps = calendar.dateComponents([.year, .month], from: month)
-        guard
-            let first = calendar.date(from: comps),
-            let range = calendar.range(of: .day, in: .month, for: first)
-        else { return [] }
-        let weekday = calendar.component(.weekday, from: first)
+        guard let first = intervalStart ?? calendar.date(from: comps) else { return [] }
+        let start = calendar.startOfDay(for: first)
+        guard let range = calendar.range(of: .day, in: .month, for: start) else { return [] }
+        let weekday = calendar.component(.weekday, from: start)
         let leading = weekStartsOnMonday ? (weekday + 5) % 7 : weekday - 1
         var cells: [Date?] = Array(repeating: nil, count: leading)
         for day in range {
-            cells.append(calendar.date(byAdding: .day, value: day - 1, to: first))
+            cells.append(InOutRecovered.addingDays(day - 1, to: start, calendar: calendar))
         }
         while cells.count % 7 != 0 {
             cells.append(nil)

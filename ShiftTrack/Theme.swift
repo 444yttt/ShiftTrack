@@ -64,8 +64,8 @@ enum Formatters {
     }
 
     static func clock(_ minutes: Int) -> String {
-        let wrapped = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60)
-        return String(format: "%d:%02d", wrapped / 60, wrapped % 60)
+        let parts = InOutRecovered.minuteOfDay(minutes)
+        return String(format: "%d:%02d", parts.hour, parts.minute)
     }
 
     static func monthDayWeekday(_ date: Date, calendar: Calendar = .current) -> String {
