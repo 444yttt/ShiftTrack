@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct WallsScreen: View {
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query private var settingsRows: [AppSettings]
     @State private var expanded: Int?
@@ -23,7 +24,12 @@ struct WallsScreen: View {
                 Text("年収の壁")
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(.white)
+                    .accessibilityIdentifier("walls.title")
                 Spacer()
+                Button("閉じる") { dismiss() }
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    .accessibilityIdentifier("walls.close")
                 HelpButton { showHelp = true }
             }
             .padding(.top, 8)
@@ -67,6 +73,7 @@ struct WallsScreen: View {
                 .padding(.top, 4)
         }
         .background(Theme.background)
+        .accessibilityIdentifier("walls.screen")
         .sheet(isPresented: $showHelp) {
             HelpSheet(
                 title: "年収の壁",

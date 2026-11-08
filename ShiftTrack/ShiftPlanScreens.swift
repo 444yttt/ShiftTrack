@@ -2,21 +2,33 @@ import SwiftData
 import SwiftUI
 
 struct PatternListView: View {
+    var onlyWorkplaceID: UUID? = nil
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \ShiftPattern.createdAt) private var patterns: [ShiftPattern]
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @State private var editor: PatternRoute?
     @State private var apply: PatternRoute?
 
+    private var visiblePatterns: [ShiftPattern] {
+        guard let onlyWorkplaceID else { return patterns }
+        return patterns.filter { $0.workplaceUUID == onlyWorkplaceID }
+    }
+
     var body: some View {
         NavigationStack {
             ScreenScroll {
+                Text("パターン")
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+                    .accessibilityIdentifier("patterns.heading")
                 Text("パターンは曜日のひな形です。ここを保存してもシフトは増えません。入れると、空いている日だけシフトになります。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
 
-                if patterns.isEmpty {
+                if visiblePatterns.isEmpty {
                     Text("パターンはまだありません。")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.muted)
@@ -24,7 +36,7 @@ struct PatternListView: View {
                         .padding(.top, 8)
                 } else {
                     VStack(spacing: 10) {
-                        ForEach(patterns) { pattern in
+                        ForEach(visiblePatterns) { pattern in
                             patternCard(pattern)
                         }
                     }
@@ -45,6 +57,13 @@ struct PatternListView: View {
             .background(Theme.background)
             .navigationTitle("パターン")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.lime)
+                        .accessibilityIdentifier("patterns.close")
+                }
+            }
             .sheet(item: $editor) { route in
                 PatternEditorView(patternID: route.patternID)
             }

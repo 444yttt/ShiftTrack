@@ -45,11 +45,12 @@ jobs:
           print(devices[-1])
           PY
           )
+          rm -rf /tmp/shifttrack-shots
+          mkdir -p /tmp/shifttrack-shots
           xcodebuild test \
             -project ShiftTrack.xcodeproj \
             -scheme ShiftTrack \
             -destination "id=${udid}" \
-            -only-testing:ShiftTrackTests \
             -resultBundlePath "$RUNNER_TEMP/ShiftTrack.xcresult" \
             CODE_SIGNING_ALLOWED=NO
 
@@ -59,4 +60,12 @@ jobs:
         with:
           name: simulator-xcresult
           path: ${{ runner.temp }}/ShiftTrack.xcresult
+          if-no-files-found: ignore
+
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: /tmp/shifttrack-shots
           if-no-files-found: ignore

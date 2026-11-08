@@ -41,21 +41,21 @@ enum AppModel {
 struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tab: AppTab = .today
+    @State private var tab: AppTab = .list
     @State private var router = ImportRouter.shared
 
     var body: some View {
         Group {
             switch tab {
-            case .today:
+            case .list:
                 TodayScreen()
-            case .myShift:
+            case .calendar:
                 CalendarScreen()
-            case .salary:
+            case .workplaces:
+                WorkplaceDirectoryScreen()
+            case .income:
                 IncomeScreen()
-            case .walls:
-                WallsScreen()
-            case .other:
+            case .settings:
                 SettingsScreen()
             }
         }

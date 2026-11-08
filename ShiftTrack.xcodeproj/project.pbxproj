@@ -9,6 +9,7 @@
 /* Begin PBXFileReference section */
 		A10000000000000000000002 /* ShiftTrack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShiftTrack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000000000000000000001 /* ShiftTrackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShiftTrackTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C30000000000000000000001 /* ShiftTrackUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShiftTrackUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -35,6 +36,11 @@
 			path = ShiftTrackTests;
 			sourceTree = "<group>";
 		};
+		C30000000000000000000002 /* ShiftTrackUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShiftTrackUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +58,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C30000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -60,6 +73,7 @@
 			children = (
 				A10000000000000000000005 /* ShiftTrack */,
 				B20000000000000000000002 /* ShiftTrackTests */,
+				C30000000000000000000002 /* ShiftTrackUITests */,
 				A10000000000000000000004 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -69,6 +83,7 @@
 			children = (
 				A10000000000000000000002 /* ShiftTrack.app */,
 				B20000000000000000000001 /* ShiftTrackTests.xctest */,
+				C30000000000000000000001 /* ShiftTrackUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -121,10 +136,40 @@
 			productReference = B20000000000000000000001 /* ShiftTrackTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C30000000000000000000003 /* ShiftTrackUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C3000000000000000000000A /* Build configuration list for PBXNativeTarget "ShiftTrackUITests" */;
+			buildPhases = (
+				C30000000000000000000004 /* Sources */,
+				C30000000000000000000005 /* Frameworks */,
+				C30000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C30000000000000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C30000000000000000000002 /* ShiftTrackUITests */,
+			);
+			name = ShiftTrackUITests;
+			packageProductDependencies = (
+			);
+			productName = ShiftTrackUITests;
+			productReference = C30000000000000000000001 /* ShiftTrackUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXContainerItemProxy section */
 		B20000000000000000000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000009 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000001;
+			remoteInfo = ShiftTrack;
+		};
+		C30000000000000000000008 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A10000000000000000000009 /* Project object */;
 			proxyType = 1;
@@ -138,6 +183,11 @@
 			isa = PBXTargetDependency;
 			target = A10000000000000000000001 /* ShiftTrack */;
 			targetProxy = B20000000000000000000008 /* PBXContainerItemProxy */;
+		};
+		C30000000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000001 /* ShiftTrack */;
+			targetProxy = C30000000000000000000008 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -171,6 +221,7 @@
 			targets = (
 				A10000000000000000000001 /* ShiftTrack */,
 				B20000000000000000000003 /* ShiftTrackTests */,
+				C30000000000000000000003 /* ShiftTrackUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -190,6 +241,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C30000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -201,6 +259,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B20000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C30000000000000000000004 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -354,6 +419,44 @@
 			};
 			name = Release;
 		};
+		C3000000000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.shifttrack.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = ShiftTrack;
+			};
+			name = Debug;
+		};
+		C3000000000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.shifttrack.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = ShiftTrack;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -380,6 +483,15 @@
 			buildConfigurations = (
 				B2000000000000000000000C /* Debug */,
 				B2000000000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C3000000000000000000000A /* Build configuration list for PBXNativeTarget "ShiftTrackUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C3000000000000000000000C /* Debug */,
+				C3000000000000000000000D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -53,6 +53,16 @@
                ReferencedContainer = "container:ShiftTrack.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C30000000000000000000003"
+               BuildableName = "ShiftTrackUITests.xctest"
+               BlueprintName = "ShiftTrackUITests"
+               ReferencedContainer = "container:ShiftTrack.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

@@ -23,6 +23,11 @@ struct TodayScreen: View {
                 header(now: now)
                 weekStrip
                     .highPriorityGesture(weekSwipe)
+                Text("左右の矢印か横にスワイプで、前後の週に移れます。見ている日だけが変わり、入っているシフトの日付は変わりません。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
                 summary(now: now)
                 dayList(now: now)
                 LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
@@ -47,9 +52,20 @@ struct TodayScreen: View {
             Text("今日")
                 .font(.system(size: 28, weight: .black))
                 .foregroundStyle(.white)
-            Text("\(Formatters.longDay(day))  \(clock(now))")
+                .accessibilityIdentifier("today.title")
+            Text(Formatters.longDay(Date()))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Theme.muted)
+                .accessibilityIdentifier("today.clock")
+            Text(clock(now))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .accessibilityIdentifier("today.time")
+            if !Calendar.current.isDateInToday(day) {
+                Text("下に出しているのは \(Formatters.longDay(day))")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 8)
@@ -73,7 +89,7 @@ struct TodayScreen: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(selected ? Theme.ink : .white)
                         Circle()
-                            .fill(hasShift ? Color.white : Color.clear)
+                            .fill(hasShift ? Theme.lime : Color.clear)
                             .frame(width: 5, height: 5)
                     }
                     .frame(maxWidth: .infinity, minHeight: 64)
@@ -87,6 +103,8 @@ struct TodayScreen: View {
             weekButton("chevron.right") { moveWeek(1) }
         }
         .padding(.top, 12)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("today.week")
     }
 
     private func summary(now: Date) -> some View {
@@ -204,6 +222,7 @@ struct TodayScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(symbol == "chevron.left" ? "前の週" : "次の週")
+        .accessibilityIdentifier(symbol == "chevron.left" ? "today.week.previous" : "today.week.next")
     }
 
     private func clock(_ date: Date) -> String {

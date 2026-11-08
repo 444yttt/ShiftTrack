@@ -17,6 +17,7 @@ struct IncomeScreen: View {
     @State private var askApply = false
     @State private var pendingGoal = 0
     @State private var delta: Int?
+    @State private var showWalls = false
 
     var body: some View {
         if let settings = settingsRows.first {
@@ -24,6 +25,18 @@ struct IncomeScreen: View {
         } else {
             Theme.background
         }
+    }
+
+    private var wallLine: String {
+        let year = Calendar.current.component(.year, from: .now)
+        guard let interval = IncomeEngine.yearInterval(year) else { return "今年の見込みを出しています。" }
+        let includeTransport = settingsRows.first?.includeTransport ?? true
+        let snapshots = ShiftMapping.snapshots(shifts, includeTransport: includeTransport)
+        let forecast = IncomeEngine.totals(shifts: snapshots, from: interval.0, until: interval.1, now: .now).forecastYen
+        if let next = IncomeWalls.all.first(where: { forecast < $0.yen }) {
+            return "次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))。押すと内容を見られます。"
+        }
+        return "表示している壁はすべて超えています。押すと内容を見られます。"
     }
 
     private func content(_ settings: AppSettings) -> some View {
@@ -121,12 +134,36 @@ struct IncomeScreen: View {
                 }
             }
 
+            Button {
+                showWalls = true
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("年収の壁")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(wallLine)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.card)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("income.walls")
+
             Text("表示しているのは、その月・年に入る給料です。給料日が翌月の勤務先は、働いた月ではなく入金月に載ります。")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.background)
+        .sheet(isPresented: $showWalls) {
+            WallsScreen()
+                .presentationBackground(Theme.background)
+        }
         .onAppear { refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
         .onChange(of: scope) { _, _ in refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
         .onChange(of: anchor) { _, _ in refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }

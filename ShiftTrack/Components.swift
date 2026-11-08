@@ -1,25 +1,39 @@
 import SwiftUI
 
+/// Root destinations. `InOutTab` cases in the reference binary are
+/// list / calendar / workplaces / income / settings. The Japanese titles
+/// below are words that appear in that binary. No screenshot shows the tab bar,
+/// so this is not a pixel match.
 enum AppTab: Int, CaseIterable, Identifiable {
-    case today, myShift, salary, walls, other
+    case list, calendar, workplaces, income, settings
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .today: "今日"
-        case .myShift: "カレンダー"
-        case .salary: "給料"
-        case .walls: "年収の壁"
-        case .other: "設定"
+        case .list: "今日"
+        case .calendar: "カレンダー"
+        case .workplaces: "勤務先"
+        case .income: "収入"
+        case .settings: "設定"
         }
     }
 
     var symbol: String {
         switch self {
-        case .today: "sun.max"
-        case .myShift: "calendar"
-        case .salary: "yensign.circle"
-        case .walls: "chart.bar"
-        case .other: "gearshape"
+        case .list: "sun.max"
+        case .calendar: "calendar"
+        case .workplaces: "building.2"
+        case .income: "yensign.circle"
+        case .settings: "gearshape"
+        }
+    }
+
+    var accessibilityID: String {
+        switch self {
+        case .list: "tab.today"
+        case .calendar: "tab.calendar"
+        case .workplaces: "tab.workplaces"
+        case .income: "tab.income"
+        case .settings: "tab.settings"
         }
     }
 }
@@ -49,6 +63,7 @@ struct CustomTabBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tab.title)
+                .accessibilityIdentifier(tab.accessibilityID)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }
