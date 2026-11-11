@@ -76,7 +76,7 @@ struct CustomTabBar: View {
         .padding(.bottom, 12)
         .background(Theme.tabBar)
         .clipShape(Capsule())
-        .padding(.horizontal, 16)
+        .padding(ScreenInsets.root)
         .padding(.bottom, 8)
         .background(Theme.background)
     }

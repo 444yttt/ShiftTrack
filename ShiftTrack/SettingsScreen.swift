@@ -13,6 +13,7 @@ struct SettingsScreen: View {
     @State private var transportText = ""
     @FocusState private var focused: Bool
     @State private var showGuide = false
+    @State private var showAboutBubble = false
     @State private var cover: SettingsCover?
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
 
@@ -45,7 +46,7 @@ struct SettingsScreen: View {
                 Spacer()
                 HelpButton { showGuide = true }
             }
-            .padding(.top, 8)
+            .padding(.top, ScreenInsets.settingsOptional)
 
             Button {
                 cover = .messages
@@ -64,10 +65,10 @@ struct SettingsScreen: View {
                     .designFont(16)
                     .foregroundStyle(Theme.muted)
             }
-            .padding(16)
+            .padding(ScreenInsets.settings)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(.top, 8)
+            .padding(.top, ScreenInsets.settingsOptional)
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("位置情報の許可")
@@ -79,10 +80,10 @@ struct SettingsScreen: View {
                         .designFont(16, weight: .bold)
                 }
             }
-            .padding(16)
+            .padding(ScreenInsets.settings)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(.top, 8)
+            .padding(.top, ScreenInsets.settingsOptional)
 
             Button {
                 cover = .calendarAccess
@@ -91,12 +92,7 @@ struct SettingsScreen: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                cover = .about
-            } label: {
-                settingsRow("IN/OUT について")
-            }
-            .buttonStyle(.plain)
+            aboutRow
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("広告")
@@ -111,23 +107,23 @@ struct SettingsScreen: View {
                     .designFont(16)
                     .foregroundStyle(Theme.muted)
             }
-            .padding(16)
+            .padding(ScreenInsets.settings)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(.top, 8)
+            .padding(.top, ScreenInsets.settingsOptional)
 
             Text("勤務先の追加とパターンは「勤務先」タブです。")
                 .designFont(16)
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
+                .padding(.top, ScreenInsets.settingsOptional)
 
             Text("給料の目標")
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
+                .padding(.top, ScreenInsets.settingsOptional)
 
             VStack(spacing: 0) {
                 numberRow("月間目標", text: $monthGoalText)
@@ -178,7 +174,7 @@ struct SettingsScreen: View {
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
+                .padding(.top, ScreenInsets.settingsOptional)
 
             VStack(spacing: 0) {
                 Toggle(isOn: $settings.weekStartsOnMonday) {
@@ -218,7 +214,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 8)
+            .padding(.top, ScreenInsets.settingsOptional)
         }
         .background(Theme.background)
         .focused($focused)
@@ -275,11 +271,63 @@ struct SettingsScreen: View {
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.muted)
         }
-        .padding(16)
+        .padding(ScreenInsets.settings)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, 8)
+        .padding(.top, ScreenInsets.settingsOptional)
+    }
+
+    private var aboutRow: some View {
+        HStack(spacing: 8) {
+            Text("IN/OUT について")
+                .designFont(16, weight: .bold)
+            Button {
+                showAboutBubble.toggle()
+            } label: {
+                Text("?")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(Theme.lime)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("IN/OUT についての説明")
+            Spacer()
+            Button {
+                cover = .about
+            } label: {
+                Image(systemName: "arrow.up.right")
+                    .designFont(16, weight: .bold)
+                    .foregroundStyle(Theme.muted)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("IN/OUT について")
+        }
+        .padding(ScreenInsets.settings)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, ScreenInsets.settingsOptional)
+        .zIndex(showAboutBubble ? 2 : 0)
+        .overlay(alignment: .bottomLeading) {
+            if showAboutBubble {
+                Text(AboutBubble.body)
+                    .designFont(13)
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
+                    .padding(.bottom, 22)
+                    .frame(maxWidth: 320, alignment: .leading)
+                    .background {
+                        SpeechTail(cornerRadius: ScreenInsets.aboutBubbleCorner)
+                            .fill(Color.white)
+                            .shadow(color: Color.black.opacity(0.16), radius: 10, y: 3)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .offset(y: -36)
+                    .accessibilityIdentifier("about.bubble")
+            }
+        }
     }
 
     private func openSystemSettings() {
@@ -302,11 +350,11 @@ struct SettingsScreen: View {
                 .designFont(16)
                 .foregroundStyle(Color.white.opacity(0.7))
         }
-        .padding(16)
+        .padding(ScreenInsets.settings)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.ink)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, 8)
+        .padding(.top, ScreenInsets.settingsOptional)
     }
 
     private var line: some View {
