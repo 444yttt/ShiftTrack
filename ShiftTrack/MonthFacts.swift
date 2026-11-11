@@ -37,20 +37,19 @@ enum MonthFacts {
     }
 
     /// Night is the workplace wall-clock window, usually 22:00–5:00.
+    /// A morning shift can sit inside the 0:00–5:00 half without crossing midnight itself.
     static func overlapsNight(start: Int, end: Int, nightStart: Int, nightEnd: Int) -> Bool {
-        let shiftEnd = end > start ? end : end + 24 * 60
-        let first = overlap(start: start, end: shiftEnd, nightStart: nightStart, nightEnd: 24 * 60)
-        let second = overlap(start: start, end: shiftEnd, nightStart: 24 * 60, nightEnd: 24 * 60 + nightEnd)
-        return first || second
+        let pieces = end > start ? [(start, end)] : [(start, 24 * 60), (0, end)]
+        let nights = [(0, nightEnd), (nightStart, 24 * 60)]
+        return pieces.contains { piece in
+            nights.contains { night in
+                min(piece.1, night.1) > max(piece.0, night.0)
+            }
+        }
     }
 
     static func headline(_ summary: Summary) -> String {
         "\(Formatters.hours(summary.workedMinutes))勤務・給与見込み\(Formatters.yen(summary.estimatedPayYen))・深夜勤務\(summary.lateNightShiftCount)回"
     }
 
-    private static func overlap(start: Int, end: Int, nightStart: Int, nightEnd: Int) -> Bool {
-        let lower = max(start, nightStart)
-        let upper = min(end, nightEnd)
-        return upper > lower
-    }
 }
