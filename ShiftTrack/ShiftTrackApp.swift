@@ -31,6 +31,7 @@ enum AppModel {
         let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self, ShiftPart.self])
         // UI tests pass this so each launch starts empty. The on-disk store stays untouched.
         let testing = ProcessInfo.processInfo.arguments.contains("-UITestingReset")
+            || ProcessInfo.processInfo.arguments.contains("-UITestingSample")
         let configuration = ModelConfiguration(isStoredInMemoryOnly: testing)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
@@ -47,6 +48,7 @@ struct RootView: View {
     @State private var router = ImportRouter.shared
     @State private var draftRouter = WorkplaceDraftRouter.shared
     @State private var showLaunch = !ProcessInfo.processInfo.arguments.contains("-UITestingReset")
+        && !ProcessInfo.processInfo.arguments.contains("-UITestingSample")
 
     var body: some View {
         Group {
@@ -109,6 +111,7 @@ struct RootView: View {
                 }
             }
             AppBootstrap.ensureSettings(in: context)
+            SampleContent.install(in: context)
             ShiftTrackShortcuts.updateAppShortcutParameters()
             router.considerPending()
         }
