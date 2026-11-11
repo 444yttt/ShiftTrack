@@ -28,6 +28,7 @@ struct TypedShiftEntryTests {
             now: Self.now,
             calendar: Self.tokyo,
             knownNames: sample.known,
+            fallbackDate: Self.now,
             defaultWorkplace: sample.defaultWorkplace
         )
         #expect(reading?.canSave == sample.canSave)

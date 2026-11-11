@@ -43,7 +43,8 @@ enum TypedShiftEntry {
         let calendar = gregorian(calendar)
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed.contains(where: \.isNewline) { return nil }
-        if trimmed.contains("来週") || trimmed.contains("朝") || trimmed.contains("夕方") { return nil }
+        let withoutTomorrow = trimmed.replacingOccurrences(of: "明日", with: "")
+        if trimmed.contains("来週") || trimmed.contains("夕方") || withoutTomorrow.contains("朝") { return nil }
 
         var body = ascii(trimmed).replacingOccurrences(of: "曜日", with: "")
         let writtenBreak = firstInt(#"休憩\s*(\d+)\s*分?"#, in: body)
@@ -147,7 +148,7 @@ enum TypedShiftEntry {
     }
 
     private static func timeRange(in text: String) -> TimeHit? {
-        let detailed = #"(翌)?(\d{1,2})(時半|時(\d{1,2})分?|:(\d{2}))\s*-\s*(翌)?(\d{1,2})(時半|時(\d{1,2})分?|:(\d{2}))"#
+        let detailed = #"(翌)?(\d{1,2})(時半|時(?:(\d{1,2})分)?|:(\d{2}))\s*-\s*(翌)?(\d{1,2})(時半|時(?:(\d{1,2})分)?|:(\d{2}))"#
         if let match = firstMatch(detailed, in: text) {
             let ns = text as NSString
             guard let start = piece(match, next: 1, hour: 2, kind: 3, minute: 4, colon: 5, ns: ns),
