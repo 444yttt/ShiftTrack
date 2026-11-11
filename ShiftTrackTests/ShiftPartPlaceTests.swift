@@ -75,7 +75,7 @@ final class ShiftPartPlaceTests: XCTestCase {
     func testEmptyClashPlacesAndSkipsTheSamePartWithoutCopyingBreakOrTodosDone() {
         let calendar = calendar()
         let day = day(2026, 11, 11)
-        let other = day(2026, 11, 12)
+        let other = self.day(2026, 11, 12)
         let part = UUID()
         let workplace = UUID()
         let sourceTodo = ShiftTodoCodec.Item(id: UUID(), title: "レジ", done: true)
@@ -92,14 +92,14 @@ final class ShiftPartPlaceTests: XCTestCase {
         guard case .placed(let drafts) = placed else {
             return XCTFail("expected place")
         }
-        XCTAssertEqual(drafts.map(\.day), [day])
+        XCTAssertEqual(drafts.map { $0.day }, [day])
         XCTAssertEqual(drafts[0].breakMinutes, 0)
         XCTAssertFalse(drafts[0].breakFollowsRules)
         XCTAssertEqual(drafts[0].startMinutes, 9 * 60)
         XCTAssertEqual(drafts[0].endMinutes, 18 * 60)
         XCTAssertFalse(drafts[0].endAddsOneDay)
-        XCTAssertEqual(drafts[0].todos.map(\.title), ["レジ"])
-        XCTAssertEqual(drafts[0].todos.map(\.done), [false])
+        XCTAssertEqual(drafts[0].todos.map { $0.title }, ["レジ"])
+        XCTAssertEqual(drafts[0].todos.map { $0.done }, [false])
         XCTAssertNotEqual(drafts[0].todos[0].id, sourceTodo.id)
         XCTAssertNotEqual(drafts[0].breakMinutes, 45)
         XCTAssertNotEqual(drafts[0].breakMinutes, 60)
