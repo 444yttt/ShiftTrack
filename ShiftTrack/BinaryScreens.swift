@@ -223,7 +223,7 @@ struct PayPeriodDetailView: View {
             group("確認済み", mine.filter { $0.attendanceConfirmed && $0.hasEnded() })
             group("未確認", mine.filter(\.needsAttendanceCheck))
             group("これからのシフト", mine.filter { !$0.hasEnded() })
-            Text("終わった勤務を押すと、時間・休憩を確認できます。")
+            Text("おつかれさまでした、は「確認していない勤務」から開きます。勤務が終わったときは振動だけで、ここからは開きません。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
             Text("給与明細と照らし合わせる")
@@ -279,13 +279,9 @@ struct PayPeriodDetailView: View {
             Text("\(title) \(rows.count)件")
                 .font(.system(size: 14, weight: .bold))
             ForEach(rows) { shift in
-                NavigationLink {
-                    ShiftCheckView(shift: shift)
-                } label: {
-                    Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(shift.needsAttendanceCheck || !shift.hasEnded() ? Theme.muted : Theme.ink)
-                }
+                Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(shift.needsAttendanceCheck || !shift.hasEnded() ? Theme.muted : Theme.ink)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

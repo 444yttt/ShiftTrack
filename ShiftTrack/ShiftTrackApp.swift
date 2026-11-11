@@ -67,6 +67,9 @@ struct RootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CustomTabBar(selection: $tab)
         }
+        .background {
+            ShiftEndPulse()
+        }
         .sheet(isPresented: $router.isPresented) {
             ImportFlowView(startsInReview: router.startInReview, pending: router.pending)
                 .presentationBackground(Theme.background)
