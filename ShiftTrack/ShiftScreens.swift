@@ -1400,6 +1400,8 @@ struct WorkplaceEditorView: View {
     @State private var overtimeRate = 0
     @State private var holidayRates = Array(repeating: 0, count: 7)
     @State private var wageHistory: [Workplace.WageHistoryEntry] = []
+    @State private var payRuleDates: [Date] = []
+    @State private var payRuleDate = Date()
     @State private var wageBands: [Workplace.WageBandEntry] = []
     @State private var bandStart = 22 * 60
     @State private var bandEnd = 5 * 60
@@ -1513,6 +1515,24 @@ struct WorkplaceEditorView: View {
                         field("時給", text: $wageText, number: true)
                     }
                     field("交通費", text: $transportText, number: true)
+                    DatePicker("適用開始日", selection: $payRuleDate, displayedComponents: .date)
+                        .tint(Theme.lime)
+                    ForEach(Array(payRuleDates.enumerated()), id: \.offset) { index, day in
+                        HStack {
+                            Text(Formatters.longDay(day))
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.ink)
+                            Spacer()
+                            Button("削除") { payRuleDates.remove(at: index) }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.destructive)
+                        }
+                    }
+                    Button("お給料の決まりの適用開始日を足す") {
+                        payRuleDates.append(payRuleDate)
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.lime)
                 }
                 formCard {
                     sectionTitle("休日・深夜・残業")
@@ -1751,6 +1771,7 @@ struct WorkplaceEditorView: View {
             overtimeRate = existing.overtimeRatePercent
             holidayRates = existing.holidayRatePercents
             wageHistory = existing.wageHistory
+            payRuleDates = existing.payRuleDates
             wageBands = existing.wageBands
         } else if let settings = settingsRows.first {
             wageText = String(settings.defaultHourlyWage)
@@ -1861,11 +1882,18 @@ struct WorkplaceEditorView: View {
 
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            error = "名前を入力してください"
+        let signedWage = WorkplaceEditorCheck.signedYen(wageText)
+        if let message = WorkplaceEditorCheck.message(
+            name: name,
+            hourlyWage: payIsDaily ? nil : signedWage,
+            wageDates: wageHistory.map(\.at),
+            payRuleDates: payRuleDates,
+            calendar: .current
+        ) {
+            error = message
             return
         }
-        let wage = min(100_000, max(0, Int(wageText.filter(\.isNumber)) ?? 0))
+        let wage = min(100_000, max(0, signedWage))
         let daily = min(100_000, max(0, Int(dailyText.filter(\.isNumber)) ?? 0))
         if payCycle == .week, !(1...7).contains(payWeekday) {
             error = "週払いの曜日を選んでください"
@@ -1955,6 +1983,7 @@ struct WorkplaceEditorView: View {
         workplace.overtimeRatePercent = overtimeRate
         workplace.setHolidayRatePercents(holidayRates)
         workplace.wageHistory = wageHistory
+        workplace.payRuleDates = payRuleDates
         workplace.wageBands = wageBands
         do {
             try context.save()

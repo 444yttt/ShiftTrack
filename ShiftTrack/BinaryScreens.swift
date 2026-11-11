@@ -418,6 +418,9 @@ struct CalendarAccessView: View {
 
 struct LocationNoteView: View {
     @Binding var place: String
+    /// Stays 0 until the person asks for the current location. The request
+    /// runs only while this is nonzero.
+    @State private var locationFlag = 0
 
     var body: some View {
         ScreenScroll {
@@ -427,6 +430,12 @@ struct LocationNoteView: View {
                 .padding(14)
                 .background(Theme.cardRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Button("現在地を使う") {
+                locationFlag = 1
+                WhenInUseLocation.requestWhenInUse(flag: locationFlag)
+            }
+            .designFont(16, weight: .bold)
+            .foregroundStyle(Theme.ink)
             Text("時給の変更を追加")
                 .designFont(16, weight: .bold)
             Text("この文言は位置の画面の関数が読みます。地図の検索結果は未回収なので出しません。時給の行は勤務先の編集にあります。")
@@ -435,6 +444,9 @@ struct LocationNoteView: View {
         }
         .background(Theme.background)
         .navigationTitle("位置")
+        .onAppear {
+            WhenInUseLocation.requestWhenInUse(flag: locationFlag)
+        }
     }
 }
 

@@ -97,8 +97,14 @@ struct RootView: View {
         }
         .task {
             if showLaunch {
-                withAnimation(.easeOut(duration: 0.35)) {
+                switch LaunchCover.motion(returnFlag: LaunchCover.returnFlag()) {
+                case .hold(let seconds):
+                    try? await ContinuousClock().sleep(for: .seconds(seconds))
                     showLaunch = false
+                case .spring(let response, let damping, let delay):
+                    withAnimation(.spring(response: response, dampingFraction: damping).delay(delay)) {
+                        showLaunch = false
+                    }
                 }
             }
             AppBootstrap.ensureSettings(in: context)
@@ -106,6 +112,9 @@ struct RootView: View {
             router.considerPending()
         }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                LaunchCover.markReturn()
+            }
             if phase == .active {
                 router.considerPending()
             }
