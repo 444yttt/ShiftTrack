@@ -45,6 +45,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .list
     @State private var router = ImportRouter.shared
+    @State private var draftRouter = WorkplaceDraftRouter.shared
     @State private var showLaunch = !ProcessInfo.processInfo.arguments.contains("-UITestingReset")
 
     var body: some View {
@@ -74,6 +75,19 @@ struct RootView: View {
             ImportFlowView(startsInReview: router.startInReview, pending: router.pending)
                 .presentationBackground(Theme.background)
         }
+        .sheet(isPresented: draftPresented) {
+            if let id = draftRouter.presentedID, let draft = WorkplaceDraftStore.load(id: id) {
+                NavigationStack {
+                    WorkplaceReadResult(draft: draft) { applied in
+                        _ = WorkplaceActions.insert(draft: applied)
+                        draftRouter.presentedID = nil
+                    } onBack: {
+                        draftRouter.presentedID = nil
+                    }
+                }
+                .presentationBackground(Theme.background)
+            }
+        }
         .overlay {
             if showLaunch {
                 Color("LaunchBackground")
@@ -96,6 +110,13 @@ struct RootView: View {
                 router.considerPending()
             }
         }
+    }
+
+    private var draftPresented: Binding<Bool> {
+        Binding(
+            get: { draftRouter.presentedID != nil },
+            set: { if !$0 { draftRouter.presentedID = nil } }
+        )
     }
 }
 

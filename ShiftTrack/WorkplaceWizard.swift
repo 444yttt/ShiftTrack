@@ -21,6 +21,12 @@ struct WorkplaceWizard: View {
     @State private var endMinute = 22 * 60
     @State private var weekdays: Set<Int> = []
     @State private var notify = true
+    @State private var hours = ""
+    @State private var officialURL = ""
+    @State private var latitude = 0.0
+    @State private var longitude = 0.0
+    @State private var hasCoordinate = false
+    @State private var showImport = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -95,7 +101,7 @@ struct WorkplaceWizard: View {
             field("住所", text: $place, identifier: "field.住所")
             field("連絡先", text: $phone, identifier: "field.連絡先")
             Button {
-                ImportRouter.shared.presentChooser(fallbackDate: .now, defaultWorkplace: name)
+                showImport = true
             } label: {
                 Text("写真から読み取る")
                     .designFont(16, weight: .bold)
@@ -107,6 +113,18 @@ struct WorkplaceWizard: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("wizard.photo")
+            .sheet(isPresented: $showImport) {
+                WorkplaceImportView { draft in
+                    if !draft.name.isEmpty { name = draft.name }
+                    if !draft.address.isEmpty { place = draft.address }
+                    if !draft.phone.isEmpty { phone = draft.phone }
+                    hours = draft.hours
+                    officialURL = draft.officialURL
+                    latitude = draft.latitude
+                    longitude = draft.longitude
+                    hasCoordinate = draft.hasCoordinate
+                }
+            }
         }
     }
 
@@ -259,6 +277,12 @@ struct WorkplaceWizard: View {
         )
         workplace.place = place
         workplace.notes = phone
+        workplace.phone = phone
+        workplace.openingHours = hours
+        workplace.officialURL = officialURL
+        workplace.latitude = latitude
+        workplace.longitude = longitude
+        workplace.hasMapCoordinate = hasCoordinate
         workplace.closingDay = 0
         workplace.customBreaks = !legalBreak
         workplace.wageHistory = [Workplace.WageHistoryEntry(at: effectiveFrom, hourlyWage: wageValue)]

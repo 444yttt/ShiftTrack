@@ -629,10 +629,15 @@ enum ShiftOverlap {
         guard workplace != otherWorkplace, travelMinutes > 0 else { return nil }
         let gap = separation(proposed, existing)
         guard gap < TimeInterval(travelMinutes * 60) else { return nil }
-        return .travel(minutes: max(0, Int(gap / 60)))
+        return .travel(minutes: max(0, shownTravelMinutes(gap)))
     }
 
-    static func first(
+    /// Minutes shown in 「分しかありません」. The comparison itself uses seconds.
+    static func shownTravelMinutes(_ gap: TimeInterval) -> Int {
+        Int((gap / 60).rounded(.towardZero))
+    }
+
+    static func hits(
         start: Int,
         end: Int,
         day: Date,
@@ -641,10 +646,10 @@ enum ShiftOverlap {
         shifts: [WorkShift],
         travelMinutes: Int,
         calendar: Calendar = .current
-    ) -> Hit? {
-        for other in shifts.sorted(by: { $0.startMinutes < $1.startMinutes }) {
-            if other.uuid == ignoring { continue }
-            guard let otherWorkplace = other.workplace?.uuid else { continue }
+    ) -> [Hit] {
+        shifts.sorted(by: { $0.startMinutes < $1.startMinutes }).compactMap { other in
+            if other.uuid == ignoring { return nil }
+            guard let otherWorkplace = other.workplace?.uuid else { return nil }
             guard let kind = classify(
                 start: start,
                 end: end,
@@ -656,10 +661,36 @@ enum ShiftOverlap {
                 otherWorkplace: otherWorkplace,
                 travelMinutes: travelMinutes,
                 calendar: calendar
-            ) else { continue }
+            ) else { return nil }
             return Hit(otherID: other.uuid, kind: kind)
         }
-        return nil
+    }
+
+    static func message(kind: Kind, otherName: String, otherStart: Int, otherEnd: Int) -> String {
+        let clocks = "\(Formatters.clock(otherStart))〜\(Formatters.clock(otherEnd))"
+        switch kind {
+        case .time:
+            return "\(otherName) \(clocks) と時間が重なっています"
+        case .existingShift:
+            return "\(otherName) \(clocks) のシフトがあります"
+        case .travel(let minutes):
+            return "\(minutes)分しかありません（移動に"
+        }
+    }
+
+    /// The next few days the repeat editor can compare before it saves the template.
+    static func upcoming(weekdays: Set<Int>, from: Date, calendar: Calendar = .current) -> [Date] {
+        var days: [Date] = []
+        var day = calendar.startOfDay(for: from)
+        for _ in 0..<14 {
+            if weekdays.contains(calendar.component(.weekday, from: day)) {
+                days.append(day)
+            }
+            if days.count == 7 { break }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return days
     }
 
     private static func separation(_ a: (Date, Date), _ b: (Date, Date)) -> TimeInterval {
@@ -696,7 +727,7 @@ struct ShiftEditorView: View {
     @State private var draftDate = Date()
     @State private var userEditedDate = false
     @State private var loaded = false
-    @State private var overlap: ShiftOverlap.Hit?
+    @State private var overlap: [ShiftOverlap.Hit] = []
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
     @State private var chosenPart: UUID?
     @State private var destinationName = ""
@@ -776,6 +807,11 @@ struct ShiftEditorView: View {
                         HStack(alignment: .top, spacing: 10) {
                             MinutesTimePicker(title: "開始", minutes: $startMinutes)
                             MinutesTimePicker(title: "終了", minutes: $endMinutes)
+                        }
+                        if let existing, existing.clockedInAt != nil || existing.clockedOutAt != nil {
+                            Text(clockStamp(existing))
+                                .designFont(13)
+                                .foregroundStyle(Theme.muted)
                         }
                         if selectedWorkplace?.payIsDaily == true {
                             Text("日給の勤務先では、休憩時間は給料から引きません。")
@@ -895,42 +931,24 @@ struct ShiftEditorView: View {
                 if let workplaceID, ids.contains(workplaceID) { return }
                 self.workplaceID = workplaces.last?.uuid
             }
-            .overlay {
-                if let overlap, let other = shifts.first(where: { $0.uuid == overlap.otherID }) {
-                    ZStack {
-                        Color.black.opacity(0.35).ignoresSafeArea()
-                        VStack(spacing: 14) {
-                            Text("このシフトは確認が必要です")
-                                .designFont(16, weight: .bold)
-                                .multilineTextAlignment(.center)
-                            Text(overlapMessage(overlap.kind, other: other))
-                                .designFont(16)
-                                .multilineTextAlignment(.center)
-                            HStack(spacing: 10) {
-                                Button("やめる") { self.overlap = nil }
-                                    .designFont(16, weight: .bold)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(Theme.cardRaised)
-                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                Button("このまま保存") {
-                                    self.overlap = nil
-                                    save(force: true)
-                                }
-                                .designFont(16, weight: .bold)
-                                .foregroundStyle(Color.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(Theme.ink)
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            }
-                        }
-                        .padding(20)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .padding(.horizontal, 24)
-                    }
+            .alert("このシフトは確認が必要です", isPresented: overlapPresented) {
+                Button("このまま保存") {
+                    overlap = []
+                    save(force: true)
                 }
+                Button("やめる", role: .cancel) {
+                    overlap = []
+                }
+            } message: {
+                Text(overlap.map { hit in
+                    let other = shifts.first { $0.uuid == hit.otherID }
+                    return ShiftOverlap.message(
+                        kind: hit.kind,
+                        otherName: other?.workplace?.name ?? "シフト",
+                        otherStart: other?.startMinutes ?? 0,
+                        otherEnd: other?.endMinutes ?? 0
+                    )
+                }.joined(separator: "\n"))
             }
             .alert("このシフトを削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) { deleteShift() }
@@ -996,17 +1014,18 @@ struct ShiftEditorView: View {
         }
     }
 
-    private func overlapMessage(_ kind: ShiftOverlap.Kind, other: WorkShift) -> String {
-        let name = other.workplace?.name ?? "シフト"
-        let clocks = "\(Formatters.clock(other.startMinutes))〜\(Formatters.clock(other.endMinutes))"
-        switch kind {
-        case .time:
-            return "\(name) \(clocks) と時間が重なっています"
-        case .existingShift:
-            return "\(name) \(clocks) のシフトがあります"
-        case .travel(let minutes):
-            return "\(minutes)分しかありません（移動に"
-        }
+    private func clockStamp(_ shift: WorkShift) -> String {
+        let clock = DateFormatter()
+        clock.locale = Locale(identifier: "ja_JP")
+        clock.dateFormat = "H:mm"
+        var parts: [String] = []
+        if let start = shift.clockedInAt { parts.append("出勤 \(clock.string(from: start))") }
+        if let end = shift.clockedOutAt { parts.append("退勤 \(clock.string(from: end))") }
+        return parts.joined(separator: "  ") + "（予定の時刻と給料は変わりません）"
+    }
+
+    private var overlapPresented: Binding<Bool> {
+        Binding(get: { !overlap.isEmpty }, set: { if !$0 { overlap = [] } })
     }
 
     private var workplaceParts: [ShiftPart] {
@@ -1041,17 +1060,20 @@ struct ShiftEditorView: View {
             draft: date,
             userEditedDate: userEditedDate
         )
-        if !force, let hit = ShiftOverlap.first(
-            start: startMinutes,
-            end: endMinutes,
-            day: storedDate,
-            workplace: workplace.uuid,
-            ignoring: existing?.uuid,
-            shifts: shifts,
-            travelMinutes: travelMinutes
-        ) {
-            overlap = hit
-            return
+        if !force {
+            let found = ShiftOverlap.hits(
+                start: startMinutes,
+                end: endMinutes,
+                day: storedDate,
+                workplace: workplace.uuid,
+                ignoring: existing?.uuid,
+                shifts: shifts,
+                travelMinutes: travelMinutes
+            )
+            if !found.isEmpty {
+                overlap = found
+                return
+            }
         }
         if let existing {
             existing.date = storedDate
@@ -1410,6 +1432,9 @@ struct WorkplaceEditorView: View {
     @State private var notes = ""
     @State private var genre = ""
     @State private var place = ""
+    @State private var phone = ""
+    @State private var openingHours = ""
+    @State private var officialURL = ""
     @State private var closingDay = 0
     @State private var paydayOffset = 0
     @State private var paydayDay = 0
@@ -1459,6 +1484,9 @@ struct WorkplaceEditorView: View {
                     field("名前", text: $name)
                     field("ジャンル", text: $genre)
                     field("場所", text: $place)
+                    field("電話番号", text: $phone)
+                    field("営業時間", text: $openingHours)
+                    field("公式サイト", text: $officialURL)
                     Text("カレンダーでの表示色")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.muted)
@@ -1754,6 +1782,9 @@ struct WorkplaceEditorView: View {
             notes = existing.notes
             genre = existing.genre
             place = existing.place
+            phone = existing.phone
+            openingHours = existing.openingHours
+            officialURL = existing.officialURL
             closingDay = existing.closingDay
             paydayOffset = existing.paydayMonthOffset
             paydayDay = existing.paydayDay
@@ -1954,6 +1985,9 @@ struct WorkplaceEditorView: View {
         workplace.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         workplace.genre = genre.trimmingCharacters(in: .whitespacesAndNewlines)
         workplace.place = place.trimmingCharacters(in: .whitespacesAndNewlines)
+        workplace.phone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        workplace.openingHours = openingHours.trimmingCharacters(in: .whitespacesAndNewlines)
+        workplace.officialURL = officialURL.trimmingCharacters(in: .whitespacesAndNewlines)
         workplace.closingDay = closingDay
         workplace.paydayMonthOffset = paydayOffset
         workplace.paydayDay = paydayDay

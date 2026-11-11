@@ -60,7 +60,7 @@ struct SettingsScreen: View {
                 Text("シフトの重なり")
                     .designFont(16, weight: .bold)
                 Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
-                Text("違う勤務先の間がこの時間より短いと、保存の前に確認します。バイナリの閾値が設定のどの値かは未確定で、この画面の分数を使っています。")
+                Text("シフトの時間が重なったときや、違う勤務先の間がこの時間より短いときに、保存の前に確認します。0分にすると、間隔は見ません。")
                     .designFont(16)
                     .foregroundStyle(Theme.muted)
             }

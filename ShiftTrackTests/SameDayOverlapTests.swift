@@ -73,6 +73,42 @@ final class ShiftOverlapTests: XCTestCase {
         ))
     }
 
+    func testTravelMinutesFloorTheSeconds() {
+        XCTAssertEqual(ShiftOverlap.shownTravelMinutes(119), 1)
+        XCTAssertEqual(ShiftOverlap.shownTravelMinutes(59), 0)
+        XCTAssertEqual(ShiftOverlap.shownTravelMinutes(120), 2)
+    }
+
+    func testNegativeTravelMinutesSkipsTheGap() {
+        XCTAssertNil(kind(
+            start: 9 * 60, end: 12 * 60, place: placeA,
+            otherStart: 12 * 60 + 10, otherEnd: 15 * 60, otherDay: day, otherPlace: placeB,
+            travel: -10
+        ))
+    }
+
+    func testHitsKeepsTimeAndTravelTogether() {
+        let early = Workplace(name: "架空茶房", colorHex: "111111", hourlyWage: 1000, transportAllowance: 0)
+        early.uuid = placeA
+        let late = Workplace(name: "架空書店", colorHex: "111111", hourlyWage: 1000, transportAllowance: 0)
+        late.uuid = placeB
+        let overlapping = WorkShift(date: day, startMinutes: 11 * 60, endMinutes: 15 * 60, breakMinutes: 0, workplace: early)
+        let close = WorkShift(date: day, startMinutes: 12 * 60 + 10, endMinutes: 15 * 60, breakMinutes: 0, workplace: late)
+        let found = ShiftOverlap.hits(
+            start: 9 * 60,
+            end: 12 * 60,
+            day: day,
+            workplace: placeA,
+            ignoring: nil,
+            shifts: [overlapping, close],
+            travelMinutes: 30,
+            calendar: calendar
+        )
+        XCTAssertEqual(found.count, 2)
+        XCTAssertTrue(found.contains { $0.kind == .time || $0.kind == .existingShift })
+        XCTAssertTrue(found.contains { if case .travel(let minutes) = $0.kind { return minutes == 10 } else { return false } })
+    }
+
     func testZeroTravelMinutesSkipsTheGap() {
         XCTAssertNil(kind(
             start: 9 * 60, end: 12 * 60, place: placeA,

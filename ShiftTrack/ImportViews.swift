@@ -597,7 +597,7 @@ struct CandidateEditor: View {
     }
 }
 
-private struct PickedPhoto: Transferable {
+struct PickedPhoto: Transferable {
     let data: Data
 
     static var transferRepresentation: some TransferRepresentation {
