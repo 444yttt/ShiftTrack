@@ -136,6 +136,26 @@ struct IncomeScreen: View {
             yearForecastCard(totals)
                 .padding(.top, 12)
 
+            if scope == .month {
+                let monthRows = shifts
+                    .filter { calendar.isDate($0.date, equalTo: anchor, toGranularity: .month) }
+                    .map { shift in
+                        MonthShiftFact(
+                            startMinutes: shift.startMinutes,
+                            endMinutes: shift.endMinutes,
+                            workedMinutes: shift.workedMinutes,
+                            yen: shift.estimatedYen(includeTransport: settings.includeTransport),
+                            workplaceName: shift.workplace?.name ?? ""
+                        )
+                    }
+                let monthLine = MonthFacts.headline(MonthFacts.summarize(monthRows))
+                Text(monthLine)
+                    .designFont(13)
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(monthLine)
+            }
+
             ForEach(workplaces) { workplace in
                 Button {
                     forecastWorkplace = workplace.uuid
