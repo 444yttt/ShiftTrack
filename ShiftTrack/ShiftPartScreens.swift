@@ -38,7 +38,7 @@ struct ShiftPartSection: View {
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("外す命令は未回収なので、ここは置くだけです。別のシフトがある日は、重なりの式が未回収のため保留し、そのタップでは1件も追加しません。同じパターンが既にある日は足しません。休憩の分数は写しません。")
+            Text("外す命令は未回収なので、ここは置くだけです。別のシフトがある日は、配置の確定が未回収のため保留し、そのタップでは1件も追加しません。同じパターンが既にある日は足しません。休憩の分数は写しません。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
