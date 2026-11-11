@@ -520,7 +520,7 @@ enum WorkplaceRead {
 
     static func validAddress(_ text: String) -> String? {
         var value = trim(text)
-        if let range = value.range(of: #"駅から徒歩\d*分?"#, options: .regularExpression) {
+        if let range = value.range(of: #"[^\s　]*駅から徒歩\d*分?"#, options: .regularExpression) {
             value = trim(String(value[..<range.lowerBound]))
         }
         guard let prefecture = prefecture(in: value) else { return nil }

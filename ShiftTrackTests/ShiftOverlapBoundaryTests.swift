@@ -63,9 +63,11 @@ struct ShiftOverlapBoundaryTests {
         let before = NSTimeZone.default
         NSTimeZone.default = TimeZone(identifier: "Pacific/Honolulu")!
         defer { NSTimeZone.default = before }
-        let sample = Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60, otherEnd: 15 * 60, samePlace: false, travel: 30, expect: .none)
+        let sample = Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60, otherEnd: 15 * 60, samePlace: false, travel: 30, expect: .travel(minutes: 0))
         let hits = compare(sample)
-        #expect(hits.isEmpty)
+        #expect(hits.count == 1)
+        #expect(hits.first?.kind == .travel(minutes: 0))
+        #expect(hits.first?.start == date(year: 2026, month: 11, day: 12, hour: 12, minute: 0, second: 0))
     }
 
     @Test
