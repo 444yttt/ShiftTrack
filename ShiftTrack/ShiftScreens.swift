@@ -1271,6 +1271,7 @@ struct TimeAdjustSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル", action: onCancel)
                         .foregroundStyle(Theme.lime)
+                        .accessibilityIdentifier("time.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("決定", action: onCommit)
