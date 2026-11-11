@@ -1,29 +1,30 @@
 import SwiftUI
 
-/// Root destinations. `InOutTab` cases in the reference binary are
-/// list / calendar / workplaces / income / settings. The Japanese titles
-/// below are words that appear in that binary. No screenshot shows the tab bar,
-/// so this is not a pixel match.
+/// Tab order is the screenshot: 一覧, カレンダー, 勤務先, 年収, 設定.
+/// `calendar`, `building.2`, and `yensign` are the recovered names for the
+/// middle three. `slider.horizontal` is the recovered 17-byte name and sits on
+/// 設定; `w21 == 0` is not the leftmost tab. 一覧's symbol name is not in that
+/// switch, so the glyph follows the screenshot (`archivebox.fill`).
 enum AppTab: Int, CaseIterable, Identifiable {
     case list, calendar, workplaces, income, settings
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .list: "今日"
+        case .list: "一覧"
         case .calendar: "カレンダー"
         case .workplaces: "勤務先"
-        case .income: "収入"
+        case .income: "年収"
         case .settings: "設定"
         }
     }
 
     var symbol: String {
         switch self {
-        case .list: "sun.max"
+        case .list: "archivebox.fill"
         case .calendar: "calendar"
         case .workplaces: "building.2"
-        case .income: "yensign.circle"
-        case .settings: "gearshape"
+        case .income: "yensign"
+        case .settings: "slider.horizontal"
         }
     }
 
@@ -49,13 +50,15 @@ struct CustomTabBar: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: tab.symbol)
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(selection == tab ? Theme.lime : Theme.muted)
-                            .frame(width: 28, height: 24)
+                            .foregroundStyle(selection == tab ? Theme.ink : Color.white)
+                            .frame(width: 36, height: 36)
+                            .background(selection == tab ? Theme.lime : Color.clear)
+                            .clipShape(Circle())
                         Text(tab.title)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(selection == tab ? Theme.lime : Theme.muted)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -68,8 +71,12 @@ struct CustomTabBar: View {
             }
         }
         .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(Theme.tabBar)
+        .clipShape(Capsule())
+        .padding(.horizontal, 16)
         .padding(.bottom, 8)
-        .background(Theme.tabBar.ignoresSafeArea(edges: .bottom))
+        .background(Theme.background)
     }
 }
 
@@ -101,12 +108,12 @@ struct HelpButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                Circle().fill(Theme.chip)
+                Circle().fill(Color.white)
                 Image(systemName: "questionmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.muted)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.ink)
             }
-            .frame(width: 28, height: 28)
+            .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("ヘルプ")
@@ -125,7 +132,7 @@ struct ShiftCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(shift.workplace?.name ?? "勤務先なし")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text(shift.scheduleLabel)
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
@@ -213,7 +220,7 @@ struct DarkSheetModifier: ViewModifier {
             .presentationDragIndicator(.visible)
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 

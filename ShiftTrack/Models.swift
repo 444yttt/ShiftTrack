@@ -217,6 +217,11 @@ final class WorkShift {
     var patternEndOnNextDay: Bool = false
     /// Copied todos. `done` stays false on the place path. Empty for older rows.
     var todosRaw: String = ""
+    /// Set only when the user taps 「このとおり」. Existing rows stay false.
+    var attendanceConfirmed: Bool = false
+    /// Optional trip target. Empty means the workplace itself. Does not change pay.
+    var destinationName: String = ""
+    var destinationPlace: String = ""
     var workplace: Workplace?
 
     init(
@@ -232,7 +237,10 @@ final class WorkShift {
         partID: UUID? = nil,
         patternEndOnNextDay: Bool = false,
         todosRaw: String = "",
-        workplace: Workplace?
+        workplace: Workplace?,
+        attendanceConfirmed: Bool = false,
+        destinationName: String = "",
+        destinationPlace: String = ""
     ) {
         self.uuid = UUID()
         self.date = Calendar.current.startOfDay(for: date)
@@ -248,6 +256,9 @@ final class WorkShift {
         self.patternEndOnNextDay = patternEndOnNextDay
         self.todosRaw = todosRaw
         self.workplace = workplace
+        self.attendanceConfirmed = attendanceConfirmed
+        self.destinationName = destinationName
+        self.destinationPlace = destinationPlace
     }
 
     var todos: [ShiftTodoCodec.Item] {
@@ -275,6 +286,10 @@ final class WorkShift {
     func estimatedYen(includeTransport: Bool) -> Int {
         guard let workplace else { return 0 }
         return PayMath.shiftYen(self, includeTransport: includeTransport)
+    }
+
+    var needsAttendanceCheck: Bool {
+        hasEnded() && !attendanceConfirmed
     }
 
     func hasEnded(now: Date = .now, calendar: Calendar = .current) -> Bool {

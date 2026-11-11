@@ -25,7 +25,9 @@ final class PatternPlaceUITests: XCTestCase {
         name.typeText("店")
         dismissKeyboard(app)
         app.swipeUp()
-        app.buttons["完了する"].tap()
+        app.buttons["追加して次へ"].tap()
+        app.buttons["次へ"].tap()
+        app.buttons["はじめる"].tap()
         XCTAssertTrue(app.buttons["workplace.card"].waitForExistence(timeout: 6))
 
         app.buttons["tab.calendar"].tap()

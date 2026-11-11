@@ -1,5 +1,8 @@
 import SwiftData
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SettingsScreen: View {
     @Environment(\.modelContext) private var context
@@ -9,6 +12,20 @@ struct SettingsScreen: View {
     @State private var wageText = ""
     @State private var transportText = ""
     @FocusState private var focused: Bool
+    @State private var showGuide = false
+    @State private var cover: SettingsCover?
+    @AppStorage("settings.travelMinutes") private var travelMinutes = 30
+
+    private enum SettingsCover: Identifiable {
+        case messages, calendarAccess, about
+        var id: String {
+            switch self {
+            case .messages: "messages"
+            case .calendarAccess: "calendar"
+            case .about: "about"
+            }
+        }
+    }
 
     var body: some View {
         if let settings = settingsRows.first {
@@ -21,11 +38,84 @@ struct SettingsScreen: View {
     private func form(_ settings: AppSettings) -> some View {
         @Bindable var settings = settings
         return ScreenScroll {
-            Text("設定")
-                .font(.system(size: 28, weight: .black))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
+            HStack {
+                Text("設定")
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                HelpButton { showGuide = true }
+            }
+            .padding(.top, 8)
+
+            Button {
+                cover = .messages
+            } label: {
+                settingsRow("メッセージの文章")
+            }
+            .buttonStyle(.plain)
+
+            settingsNoticeCard
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("シフトの重なり")
+                    .font(.system(size: 15, weight: .bold))
+                Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
+                Text("違う勤務先の間がこの時間より短いと、保存の前に確認します。バイナリの閾値が設定のどの値かは未確定で、この画面の分数を使っています。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(16)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("位置情報の許可")
+                    .font(.system(size: 15, weight: .bold))
+                HStack {
+                    Text("未設定")
+                    Spacer()
+                    Button("位置情報を許可する") { openSystemSettings() }
+                        .font(.system(size: 14, weight: .bold))
+                }
+            }
+            .padding(16)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.top, 8)
+
+            Button {
+                cover = .calendarAccess
+            } label: {
+                settingsRow("カレンダー・リマインダー")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                cover = .about
+            } label: {
+                settingsRow("IN/OUT について")
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("広告")
+                    .font(.system(size: 15, weight: .bold))
+                HStack {
+                    Text("広告")
+                    Spacer()
+                    Text("非表示")
+                        .foregroundStyle(Theme.muted)
+                }
+                Text("このアプリに広告 SDK はありません。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.top, 8)
 
             Text("勤務先の追加とパターンは「勤務先」タブです。")
                 .font(.system(size: 13))
@@ -35,7 +125,7 @@ struct SettingsScreen: View {
 
             Text("給料の目標")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
@@ -86,7 +176,7 @@ struct SettingsScreen: View {
 
             Text("カレンダーの設定")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
@@ -94,7 +184,7 @@ struct SettingsScreen: View {
                 Toggle(isOn: $settings.weekStartsOnMonday) {
                     Text("週の始まりを月曜にする")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
@@ -102,7 +192,7 @@ struct SettingsScreen: View {
                 Toggle(isOn: $settings.showPaydayOnCalendar) {
                     Text("給料日の表示")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
@@ -110,7 +200,7 @@ struct SettingsScreen: View {
                 Toggle(isOn: $settings.includeTransport) {
                     Text("交通費を給料に含める")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
@@ -122,7 +212,7 @@ struct SettingsScreen: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Siri / ショートカット")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text("「しふとらっくでシフト表を取り込む」と言うと、読み上げた内容から候補を作り、保存前に確認できます。画像はショートカットの「シフト表の画像を取り込む」に渡せます。どちらも端末内で処理します。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
@@ -132,12 +222,91 @@ struct SettingsScreen: View {
         }
         .background(Theme.background)
         .focused($focused)
+        .onAppear {
+            if !GuideMemory.suppressed && !GuideMemory.seen("settings") {
+                showGuide = true
+            }
+        }
+        .overlay {
+            if showGuide {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    GuideCard(
+                        page: 1,
+                        total: GuideCopy.settings.count,
+                        text: GuideCopy.settings[0],
+                        onBack: nil,
+                        onNext: {
+                            GuideMemory.mark("settings")
+                            showGuide = false
+                        },
+                        onClose: {
+                            GuideMemory.mark("settings")
+                            showGuide = false
+                        }
+                    )
+                }
+            }
+        }
+        .sheet(item: $cover) { destination in
+            switch destination {
+            case .messages:
+                LateTemplateList()
+            case .calendarAccess:
+                CalendarAccessView()
+            case .about:
+                AboutSheet()
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("完了") { focused = false }
             }
         }
+    }
+
+    private func settingsRow(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, 8)
+    }
+
+    private func openSystemSettings() {
+        #if canImport(UIKit)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+        #endif
+    }
+
+    private var settingsNoticeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("通知")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.white)
+            Text("勤務の終わりに確認")
+                .foregroundStyle(Color.white)
+            Text("シフトの前に通知")
+                .foregroundStyle(Color.white)
+            Text("通知の配信そのものは、回収した命令へ結んでいません。スイッチは見た目です。")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.7))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.ink)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, 8)
     }
 
     private var line: some View {
@@ -148,7 +317,7 @@ struct SettingsScreen: View {
         HStack {
             Text(title)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             Spacer()
             Text("¥")
                 .foregroundStyle(Theme.muted)

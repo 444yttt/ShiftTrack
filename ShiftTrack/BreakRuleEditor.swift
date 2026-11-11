@@ -35,7 +35,7 @@ struct BreakRuleEditor: View {
             stepRow(value: rules[index].overMinutes, range: 0...1439) { rules[index].overMinutes = $0 }
             Text("休憩 \(Formatters.hours(rules[index].breakMinutes))")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             stepRow(value: rules[index].breakMinutes, range: 0...600) { rules[index].breakMinutes = $0 }
             HStack(spacing: 8) {
                 smallButton("上へ") { move(index, by: -1) }
@@ -54,7 +54,7 @@ struct BreakRuleEditor: View {
         VStack(spacing: 8) {
             Text(Formatters.hours(value))
                 .font(.title3.weight(.black))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 8) {
                 nudge("−15分", delta: -15, value: value, range: range, set: set)
@@ -85,7 +85,7 @@ struct BreakRuleEditor: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, minHeight: 36)
                 .background(Theme.card)
                 .clipShape(Capsule())

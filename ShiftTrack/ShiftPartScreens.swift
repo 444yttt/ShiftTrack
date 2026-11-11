@@ -32,19 +32,19 @@ struct ShiftPartSection: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("シフトパターン")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .accessibilityIdentifier("pattern.heading")
             Text("日付をいくつか選んで、シフトパターンをまとめて置いたり、外したりします。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("外す命令は未回収なので、ここは置くだけです。別のシフトがある日は、重なりの式が未回収のため保留し、そのタップでは1件も追加しません。同じパターンが既にある日は足しません。休憩の分数は写しません。")
+            Text("外す命令は未回収なので、ここは置くだけです。別のシフトがある日は、配置の確定が未回収のため保留し、そのタップでは1件も追加しません。同じパターンが既にある日は足しません。休憩の分数は写しません。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
             Text(note)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("pattern.result")
             if let pending {
@@ -60,7 +60,7 @@ struct ShiftPartSection: View {
                 if gathering {
                     Text("選んだ日 \(pickedCount)")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                         .accessibilityIdentifier("calendar.picked.count")
                 }
             }
@@ -118,14 +118,14 @@ struct ShiftPartSection: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("確認が必要な日があります")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             Text("このシフトは確認が必要です")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Theme.lime)
             ForEach(Array(pending.clashes.enumerated()), id: \.offset) { _, line in
                 Text(line)
                     .font(.system(size: 13))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
             }
             Text("このタップではシフトを追加していません。")
                 .font(.system(size: 12))
@@ -150,7 +150,7 @@ struct ShiftPartSection: View {
                 .frame(width: 8, height: 8)
             Text(part.name)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             Text("この日に置く")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Theme.ink)
@@ -173,7 +173,7 @@ struct ShiftPartSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(part.name)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text("\(Formatters.clock(part.startMinute))–\(Formatters.clock(part.endMinute))")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
@@ -214,7 +214,7 @@ struct ShiftPartEditor: View {
             ScreenScroll {
                 Text("シフトパターンを作る")
                     .font(.system(size: 22, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("置くとき、開始と終了と勤務先だけを読みます。パターンに残した休憩は写しません。法定休憩も入れません。開始が終了以上のときは終了を翌日にします。同じ分も翌日です。")
                     .font(.system(size: 13))
@@ -223,7 +223,7 @@ struct ShiftPartEditor: View {
                 TextField("パターンの名前（例：遅番）", text: $name)
                     .focused($typing)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .padding(12)
                     .background(Theme.cardRaised)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -249,7 +249,7 @@ struct ShiftPartEditor: View {
                     TextField("改行で複数", text: $todoText, axis: .vertical)
                         .focused($typing)
                         .font(.system(size: 16))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                         .padding(12)
                         .background(Theme.cardRaised)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -264,7 +264,7 @@ struct ShiftPartEditor: View {
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.behind)
                 }
-                LimeCapsuleButton(title: "シフトパターンに追加", fillWidth: true, identifier: "pattern.save", action: save)
+                LimeCapsuleButton(title: "保存", fillWidth: true, identifier: "pattern.save", action: save)
                     .disabled(workplaces.isEmpty)
             }
             .background(Theme.background)

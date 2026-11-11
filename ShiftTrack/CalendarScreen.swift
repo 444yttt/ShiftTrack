@@ -19,6 +19,7 @@ struct CalendarScreen: View {
     @State private var pickedDays: [Date] = []
     @State private var pendingPlace: ShiftPartPlace.Pending?
     @State private var placeNote = ""
+    @State private var showGuide = false
 
     private enum CalendarCover: Identifiable {
         case workplace
@@ -48,9 +49,7 @@ struct CalendarScreen: View {
     var body: some View {
         ScreenScroll {
             HStack {
-                Text("カレンダー")
-                    .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                InOutWordmark()
                 Spacer()
                 HelpButton { cover = .help }
             }
@@ -63,8 +62,8 @@ struct CalendarScreen: View {
 
             HStack(alignment: .center) {
                 Text(Formatters.monthTitle(month))
-                    .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                    .font(.doto(40))
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 monthButton("chevron.left", label: "前の月", identifier: "calendar.previousMonth") { moveMonth(-1) }
                 monthButton("chevron.right", label: "次の月", identifier: "calendar.nextMonth") { moveMonth(1) }
@@ -115,7 +114,7 @@ struct CalendarScreen: View {
             HStack {
                 Text(listTitle)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 if selectedDay != nil {
                     Button("月の一覧") { selectedDay = nil }
@@ -157,7 +156,7 @@ struct CalendarScreen: View {
             if !listedRequests.isEmpty {
                 Text("希望")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 4)
                 Text("希望はシフトではありません。給料の見込にも、今日の予定全体の時給分にも入りません。")
@@ -207,6 +206,32 @@ struct CalendarScreen: View {
             guard let request else { return }
             reveal(request.dates)
         }
+        .onAppear {
+            if !GuideMemory.suppressed && !GuideMemory.seen("calendar") {
+                showGuide = true
+            }
+        }
+        .overlay {
+            if showGuide {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    GuideCard(
+                        page: 1,
+                        total: GuideCopy.calendar.count,
+                        text: GuideCopy.calendar[0],
+                        onBack: nil,
+                        onNext: {
+                            GuideMemory.mark("calendar")
+                            showGuide = false
+                        },
+                        onClose: {
+                            GuideMemory.mark("calendar")
+                            showGuide = false
+                        }
+                    )
+                }
+            }
+        }
         .sheet(item: $cover) { destination in
             switch destination {
             case .workplace:
@@ -233,7 +258,7 @@ struct CalendarScreen: View {
                         "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
                         "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
                         "シフトパターンは、選んだ日へ開始・終了・勤務先を置きます。同じパターンの日は足しません。別のシフトがある日は保留して、そのタップでは追加しません。休憩は写しません。曜日のひな形は別の「パターン」です。",
-                        "日付を押すと、その日の予定が下に出ます。選ぶモードのときだけ、その日をまとめて置く相手に加えます。赤い「！」は、時間の重なりや移動時間の不足がある日、と元の文にあります。その条件は未回収なので、この画面には出していません。",
+                        "日付を押すと、その日の予定が下に出ます。選ぶモードのときだけ、その日をまとめて置く相手に加えます。赤い「！」は、時間の重なりや移動時間の不足がある日、と元の文にあります。印の出し方は未回収なので、この画面には出していません。保存の前の確認はシフト編集で出します。",
                         "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                     ]
                 )
@@ -286,8 +311,8 @@ struct CalendarScreen: View {
         } label: {
             VStack(spacing: 4) {
                 Text("\(Calendar.current.component(.day, from: day))")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(selected ? Theme.ink : .white)
+                    .font(.doto(16))
+                    .foregroundStyle(selected ? Theme.ink : (dayShifts.isEmpty ? Theme.ink : Theme.lime))
                 HStack(spacing: 3) {
                     if colors.isEmpty {
                         Circle().fill(Color.clear).frame(width: 5, height: 5)
@@ -302,16 +327,12 @@ struct CalendarScreen: View {
                 .frame(height: 8)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(selected ? Theme.lime : (dayShifts.isEmpty ? Color.clear : Theme.dayFilled))
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .frame(height: 52)
+            .background(selected ? Theme.lime : (dayShifts.isEmpty ? Theme.cardRaised : Theme.ink))
+            .clipShape(Capsule())
             .overlay {
-                if isToday && !selected {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Theme.lime, lineWidth: 1.5)
-                } else if picked && !selected {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Theme.lime, lineWidth: 1.5)
+                if picked && !selected {
+                    Capsule().stroke(Theme.lime, lineWidth: 1.5)
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -514,7 +535,7 @@ struct CalendarScreen: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(workplace?.name ?? "勤務先未定")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text("\(Formatters.monthDayWeekday(request.date))  \(Formatters.clock(request.startMinutes))–\(Formatters.clock(request.endMinutes))")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
@@ -559,7 +580,7 @@ struct CalendarScreen: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(width: 32, height: 32)
                 .background(Theme.dayFilled)
                 .clipShape(Circle())

@@ -19,7 +19,7 @@ struct PatternListView: View {
             ScreenScroll {
                 Text("パターン")
                     .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 8)
                     .accessibilityIdentifier("patterns.heading")
@@ -84,7 +84,7 @@ struct PatternListView: View {
                     .frame(width: 10, height: 10)
                 Text(pattern.name)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Spacer()
             }
             Text("\(workplace?.name ?? "勤務先なし")  \(ShiftPatternPlan.weekdayLabel(pattern.weekdays))  \(Formatters.clock(pattern.startMinutes))–\(Formatters.clock(pattern.endMinutes))")
@@ -150,7 +150,7 @@ struct PatternEditorView: View {
                 }
                 Stepper(value: $breakMinutes, in: 0...300) {
                     Text("休憩 \(breakMinutes)分")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 Text("入れる曜日")
                     .font(.system(size: 12, weight: .medium))
@@ -196,7 +196,7 @@ struct PatternEditorView: View {
                 .foregroundStyle(Theme.muted)
             TextField("早番", text: $name)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
         }
     }
 
@@ -292,7 +292,7 @@ struct PatternApplyView: View {
             ScreenScroll {
                 Text(pattern?.name ?? "パターン")
                     .font(.system(size: 22, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("選んだ期間の、パターンの曜日だけを見ます。同じ勤務先のシフトが既にある日は作りません。時間も休憩も書き換えません。")
                     .font(.system(size: 13))
@@ -304,7 +304,7 @@ struct PatternApplyView: View {
                     .tint(Theme.lime)
                 Text(summary(result))
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("作ったシフトは給料の見込に入ります。希望ではありません。")
                     .font(.system(size: 12))
@@ -410,6 +410,7 @@ struct RequestEditorView: View {
     @State private var breakMinutes = 60
     @State private var note = ""
     @State private var error = ""
+    @State private var showPlanner = false
 
     init(route: RequestRoute) {
         self.route = route
@@ -440,16 +441,39 @@ struct RequestEditorView: View {
                 }
                 Stepper(value: $breakMinutes, in: 0...300) {
                     Text("休憩 \(breakMinutes)分")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 TextField("メモ", text: $note)
                     .font(.system(size: 16))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 if !error.isEmpty {
                     Text(error)
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.behind)
                 }
+                Text(note.isEmpty ? "予定はありません" : note)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Text("出勤")
+                    Text("休み")
+                    Text("時間指定")
+                }
+                .font(.system(size: 13, weight: .bold))
+                Button("クリア") {
+                    note = ""
+                    startMinutes = 9 * 60
+                    endMinutes = 17 * 60
+                }
+                .font(.system(size: 14, weight: .bold))
+                Button("テキスト生成") { showPlanner = true }
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.lime)
+                    .clipShape(Capsule())
                 LimeCapsuleButton(title: "希望を保存", fillWidth: true, action: save)
                 if existing?.isOpen == true {
                     LimeCapsuleButton(title: "シフトにする", fillWidth: true, action: accept)
@@ -469,6 +493,9 @@ struct RequestEditorView: View {
                 }
             }
             .onAppear(perform: load)
+            .sheet(isPresented: $showPlanner) {
+                RequestPlannerView(month: date)
+            }
         }
     }
 
