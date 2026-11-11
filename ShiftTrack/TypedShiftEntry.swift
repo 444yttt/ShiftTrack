@@ -334,10 +334,12 @@ enum TypedShiftEntry {
     }
 
     private static func workplaceText(in text: String, knownNames: [String], defaultWorkplace: String) -> String {
-        var hits = knownNames.filter { !$0.isEmpty && text.contains($0) }
-        hits.removeAll { short in hits.contains { other in other != short && other.contains(short) } }
-        if hits.count == 1 { return hits[0] }
-        if hits.count > 1 { return "" }
+        let hits = knownNames.filter { !$0.isEmpty && text.contains($0) }
+        let kept = hits.filter { short in
+            !hits.contains { other in other != short && other.contains(short) }
+        }
+        if kept.count == 1 { return kept[0] }
+        if kept.count > 1 { return "" }
         let cleaned = replacing(#"\d{1,2}\s*/\s*\d{1,2}|\d{1,2}月\s*\d{1,2}日?|(?<!\d)\d{1,2}日"#, in: text, with: " ")
             .replacingOccurrences(of: "明日", with: " ")
             .replacingOccurrences(of: "今日", with: " ")
