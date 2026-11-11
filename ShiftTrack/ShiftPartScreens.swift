@@ -213,16 +213,16 @@ struct ShiftPartEditor: View {
         NavigationStack {
             ScreenScroll {
                 Text("シフトパターンを作る")
-                    .font(.system(size: 22, weight: .black))
+                    .designFont(16, weight: .black)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("置くとき、開始と終了と勤務先だけを読みます。パターンに残した休憩は写しません。法定休憩も入れません。開始が終了以上のときは終了を翌日にします。同じ分も翌日です。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 TextField("パターンの名前（例：遅番）", text: $name)
                     .focused($typing)
-                    .font(.system(size: 16, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.ink)
                     .padding(12)
                     .background(Theme.cardRaised)
@@ -230,7 +230,7 @@ struct ShiftPartEditor: View {
                     .accessibilityIdentifier("field.パターン名")
                 if workplaces.isEmpty {
                     Text("先に勤務先を1件追加してください。")
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.muted)
                 } else {
                     Picker("勤務先", selection: $workplaceID) {
@@ -244,27 +244,27 @@ struct ShiftPartEditor: View {
                         MinutesTimePicker(title: "終了", minutes: $endMinute)
                     }
                     Text("やることを追加")
-                        .font(.system(size: 12, weight: .medium))
+                        .designFont(13, weight: .medium)
                         .foregroundStyle(Theme.muted)
                     TextField("改行で複数", text: $todoText, axis: .vertical)
                         .focused($typing)
-                        .font(.system(size: 16))
+                        .designFont(16)
                         .foregroundStyle(Theme.ink)
                         .padding(12)
                         .background(Theme.cardRaised)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .accessibilityIdentifier("field.やること")
                     Text("置いたシフトでは、やることは未了のままです。丸を押してリマインダーへ反映する操作はこの経路にありません。")
-                        .font(.system(size: 12))
+                        .designFont(13)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !error.isEmpty {
                     Text(error)
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.behind)
                 }
-                LimeCapsuleButton(title: "保存", fillWidth: true, identifier: "pattern.save", action: save)
+                LimeCapsuleButton(title: "保存", fillWidth: true, identifier: "pattern.save", designSize: 16, action: save)
                     .disabled(workplaces.isEmpty)
             }
             .background(Theme.background)

@@ -25,8 +25,32 @@ enum Theme {
 extension Font {
     /// Official Google Fonts Doto, instantiated at Black and maximum roundness.
     /// The reference calls this face `Doto-BlackRound`. The file is not from the IPA.
+    /// Those calls are `Font.custom`, not `scaledValueForValue:`, so they stay fixed.
     static func doto(_ size: CGFloat) -> Font {
         .custom("Doto-BlackRound", size: size)
+    }
+}
+
+/// Design size passed to `scaledValueForValue:`. At the default content size the
+/// drawn size is this number. Dynamic Type changes it. Which string uses which
+/// number was not identified, so the choice follows the screenshot.
+struct DesignFont: ViewModifier {
+    var weight: Font.Weight
+    @ScaledMetric(relativeTo: .body) private var size: CGFloat
+
+    init(_ size: CGFloat, weight: Font.Weight = .regular) {
+        self.weight = weight
+        _size = ScaledMetric(wrappedValue: size, relativeTo: .body)
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight))
+    }
+}
+
+extension View {
+    func designFont(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
+        modifier(DesignFont(size, weight: weight))
     }
 }
 

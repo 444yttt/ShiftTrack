@@ -146,7 +146,7 @@ struct DayDetailSheet: View {
             ScreenScroll {
                 if dayShifts.isEmpty {
                     Text("この日のシフトはありません")
-                        .font(.system(size: 14))
+                        .designFont(20)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 12)
@@ -163,7 +163,7 @@ struct DayDetailSheet: View {
                     }
                     .padding(.top, 8)
                 }
-                LimeCapsuleButton(title: "+ この日に追加", fillWidth: true) {
+                LimeCapsuleButton(title: "+ この日に追加", fillWidth: true, designSize: 20) {
                     editor = EditorRoute(shiftID: nil, date: day, workplaceID: workplaceID)
                 }
                 .padding(.top, 16)
@@ -712,15 +712,15 @@ struct ShiftEditorView: View {
             ScreenScroll {
                 if workplaces.isEmpty {
                     Text("先に勤務先を追加してください。")
-                        .font(.system(size: 14))
+                        .designFont(13)
                         .foregroundStyle(Theme.muted)
-                    LimeCapsuleButton(title: "勤務先を追加", fillWidth: true) {
+                    LimeCapsuleButton(title: "勤務先を追加", fillWidth: true, designSize: 16) {
                         showWorkplaceCreator = true
                     }
                     .padding(.top, 12)
                 } else {
                     Text("\(Formatters.monthDayWeekday(date))のシフト")
-                        .font(.system(size: 20, weight: .black))
+                        .designFont(16, weight: .black)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if !workplaceParts.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -740,7 +740,7 @@ struct ShiftEditorView: View {
                         labeled("勤務先") {
                             if existing != nil {
                                 Text(selectedWorkplace?.name ?? "なし")
-                                    .font(.system(size: 16, weight: .bold))
+                                    .designFont(16, weight: .bold)
                             } else {
                                 Picker("勤務先", selection: $workplaceID) {
                                     ForEach(workplaces) { workplace in
@@ -779,7 +779,7 @@ struct ShiftEditorView: View {
                         }
                         if selectedWorkplace?.payIsDaily == true {
                             Text("日給の勤務先では、休憩時間は給料から引きません。")
-                                .font(.system(size: 12))
+                                .designFont(13)
                                 .foregroundStyle(Theme.muted)
                         } else {
                             Toggle("休憩を規則から入れる", isOn: breakFollowsBinding)
@@ -790,7 +790,7 @@ struct ShiftEditorView: View {
                                     rules: selectedWorkplace?.breakRules ?? []
                                  ) + "時刻を変えるとこの休憩も変わります。"
                                  : "手入力です。時刻を変えても、この休憩は残します。")
-                                .font(.system(size: 12))
+                                .designFont(13)
                                 .foregroundStyle(Theme.muted)
                                 .fixedSize(horizontal: false, vertical: true)
                             BreakMinutesControl(minutes: breakEntryBinding, range: 0...600)
@@ -808,11 +808,11 @@ struct ShiftEditorView: View {
                             yenField("天引はマイナス", text: $adjustmentText, signed: true)
                         }
                         TextField("天引・手当の詳細", text: $adjustmentNote)
-                            .font(.system(size: 14))
+                            .designFont(16)
                             .focused($typing)
                         divider
                         TextField("メモ", text: $notes, axis: .vertical)
-                            .font(.system(size: 15))
+                            .designFont(16)
                             .foregroundStyle(Theme.ink)
                             .focused($typing)
                     }
@@ -828,22 +828,22 @@ struct ShiftEditorView: View {
                             includeTransport: includeTransport
                         )
                         Text("給料 \(Formatters.yen(amount))")
-                            .font(.system(size: 16, weight: .bold))
+                            .designFont(16, weight: .bold)
                             .foregroundStyle(Theme.lime)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !shownError.isEmpty {
                         Text(shownError)
-                            .font(.system(size: 13))
+                            .designFont(13)
                             .foregroundStyle(Theme.behind)
                     }
                     formCard {
                         Text("行き先")
-                            .font(.system(size: 15, weight: .bold))
+                            .designFont(16, weight: .bold)
                         Text("マップで探す")
-                            .font(.system(size: 14, weight: .bold))
+                            .designFont(16, weight: .bold)
                         Text("検索結果は未回収です。")
-                            .font(.system(size: 12))
+                            .designFont(13)
                             .foregroundStyle(Theme.muted)
                         TextField("名前", text: $destinationName)
                             .padding(12)
@@ -854,16 +854,16 @@ struct ShiftEditorView: View {
                             .background(Theme.cardRaised)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         Text("空のときは勤務先に向かいます")
-                            .font(.system(size: 12))
+                            .designFont(13)
                             .foregroundStyle(Theme.muted)
                     }
-                    LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true) { save() }
+                    LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true, designSize: 16) { save() }
                         .disabled(!canSave)
                         .opacity(canSave ? 1 : 0.4)
                         .padding(.top, 8)
                     if existing != nil {
                         Button("削除する") { confirmDelete = true }
-                            .font(.system(size: 14, weight: .bold))
+                            .designFont(16, weight: .bold)
                             .foregroundStyle(Theme.destructive)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 8)
@@ -901,14 +901,14 @@ struct ShiftEditorView: View {
                         Color.black.opacity(0.35).ignoresSafeArea()
                         VStack(spacing: 14) {
                             Text("このシフトは確認が必要です")
-                                .font(.system(size: 18, weight: .bold))
+                                .designFont(16, weight: .bold)
                                 .multilineTextAlignment(.center)
                             Text(overlapMessage(overlap.kind, other: other))
-                                .font(.system(size: 15))
+                                .designFont(16)
                                 .multilineTextAlignment(.center)
                             HStack(spacing: 10) {
                                 Button("やめる") { self.overlap = nil }
-                                    .font(.system(size: 16, weight: .bold))
+                                    .designFont(16, weight: .bold)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
                                     .background(Theme.cardRaised)
@@ -917,7 +917,7 @@ struct ShiftEditorView: View {
                                     self.overlap = nil
                                     save(force: true)
                                 }
-                                .font(.system(size: 16, weight: .bold))
+                                .designFont(16, weight: .bold)
                                 .foregroundStyle(Color.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
@@ -1015,7 +1015,7 @@ struct ShiftEditorView: View {
 
     private func patternChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .font(.system(size: 14, weight: .bold))
+            .designFont(16, weight: .bold)
             .foregroundStyle(selected ? Color.white : Theme.ink)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -1155,11 +1155,11 @@ struct ShiftEditorView: View {
     private func yenField(_ prompt: String, text: Binding<String>, signed: Bool = false) -> some View {
         HStack(spacing: 6) {
             Text("¥")
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.muted)
             TextField(prompt, text: text)
                 .keyboardType(signed ? .numbersAndPunctuation : .numberPad)
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .focused($typing)
         }
     }
@@ -1208,7 +1208,7 @@ struct ShiftEditorView: View {
     private func labeled<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .designFont(13, weight: .medium)
                 .foregroundStyle(Theme.muted)
             content()
                 .foregroundStyle(Theme.ink)

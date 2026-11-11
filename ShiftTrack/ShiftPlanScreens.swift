@@ -423,7 +423,7 @@ struct RequestEditorView: View {
         NavigationStack {
             ScreenScroll {
                 Text("希望はシフトではありません。給料の見込にも、今日の予定全体の時給分にも入りません。シフトにするまで金額は動きません。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 DatePicker("日付", selection: $date, displayedComponents: .date)
@@ -441,18 +441,19 @@ struct RequestEditorView: View {
                 }
                 Stepper(value: $breakMinutes, in: 0...300) {
                     Text("休憩 \(breakMinutes)分")
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.ink)
                 }
                 TextField("メモ", text: $note)
-                    .font(.system(size: 16))
+                    .designFont(16)
                     .foregroundStyle(Theme.ink)
                 if !error.isEmpty {
                     Text(error)
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.behind)
                 }
                 Text(note.isEmpty ? "予定はありません" : note)
-                    .font(.system(size: 14))
+                    .designFont(20)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
@@ -460,25 +461,25 @@ struct RequestEditorView: View {
                     Text("休み")
                     Text("時間指定")
                 }
-                .font(.system(size: 13, weight: .bold))
+                .designFont(16, weight: .bold)
                 Button("クリア") {
                     note = ""
                     startMinutes = 9 * 60
                     endMinutes = 17 * 60
                 }
-                .font(.system(size: 14, weight: .bold))
+                .designFont(13, weight: .bold)
                 Button("テキスト生成") { showPlanner = true }
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Theme.lime)
                     .clipShape(Capsule())
-                LimeCapsuleButton(title: "希望を保存", fillWidth: true, action: save)
+                LimeCapsuleButton(title: "希望を保存", fillWidth: true, designSize: 16, action: save)
                 if existing?.isOpen == true {
-                    LimeCapsuleButton(title: "シフトにする", fillWidth: true, action: accept)
+                    LimeCapsuleButton(title: "シフトにする", fillWidth: true, designSize: 16, action: accept)
                     Button("希望を見送る") { decline() }
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(13, weight: .bold)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
                 }
