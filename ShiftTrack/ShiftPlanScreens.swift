@@ -536,6 +536,7 @@ struct RequestEditorView: View {
     @State private var endMinutes = 17 * 60
     @State private var breakMinutes = 60
     @State private var note = ""
+    @State private var kind = ShiftRequestKind.hopedAttendance
     @State private var error = ""
     @State private var showPlanner = false
 
@@ -584,11 +585,16 @@ struct RequestEditorView: View {
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
-                    Text("出勤")
-                    Text("休み")
+                    kindChip("出勤", selected: kind == ShiftRequestKind.hopedAttendance) {
+                        kind = ShiftRequestKind.hopedAttendance
+                    }
+                    kindChip("休み", selected: kind == ShiftRequestKind.hopedRest) {
+                        kind = ShiftRequestKind.hopedRest
+                    }
                     Text("時間指定")
                 }
                 .designFont(16, weight: .bold)
+                monthLists
                 Button("クリア") {
                     note = ""
                     startMinutes = 9 * 60
@@ -635,6 +641,41 @@ struct RequestEditorView: View {
         endMinutes = existing.endMinutes
         breakMinutes = existing.breakMinutes
         note = existing.note
+        kind = existing.kindRaw
+    }
+
+    private var monthLists: some View {
+        let calendar = Calendar.current
+        let items = requests.map {
+            ShiftRequestLists.Item(id: $0.uuid, date: $0.date, kind: $0.kindRaw)
+        }
+        let pair: ShiftRequestLists.Pair = {
+            guard let month = ShiftRequestLists.month(containing: date, calendar: calendar) else {
+                return ShiftRequestLists.Pair(attendance: [], rest: [])
+            }
+            return ShiftRequestLists.split(items, month: month)
+        }()
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("この月の出勤希望 \(pair.attendance.count)件")
+            Text("この月の休み希望 \(pair.rest.count)件")
+            Text("0を出勤希望、1を休み希望にしています。どちらがどちらかは未確定です。")
+                .designFont(12)
+                .foregroundStyle(Theme.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func kindChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .designFont(16, weight: .bold)
+                .foregroundStyle(selected ? Theme.ink : Theme.muted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(selected ? Theme.lime : Color.clear)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func save() {
@@ -646,6 +687,7 @@ struct RequestEditorView: View {
             existing.endMinutes = endMinutes
             existing.breakMinutes = breakMinutes
             existing.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            existing.kindRaw = kind
             if existing.statusRaw.isEmpty { existing.statusRaw = ShiftRequestStatus.open }
         } else {
             context.insert(ShiftRequest(
@@ -654,7 +696,8 @@ struct RequestEditorView: View {
                 endMinutes: endMinutes,
                 breakMinutes: breakMinutes,
                 note: note.trimmingCharacters(in: .whitespacesAndNewlines),
-                workplaceUUID: workplaceID
+                workplaceUUID: workplaceID,
+                kindRaw: kind
             ))
         }
         do {

@@ -50,6 +50,8 @@ final class Workplace {
     /// `effectiveFrom|yen` rows, walked from the end. Empty selects wage 0.
     /// A row whose calendar day is after the shift does not match.
     var wageHistoryRaw: String = ""
+    /// Calendar days the pay rules start. Empty on older rows. Not used by pay math.
+    var payRuleDatesRaw: String = ""
     /// Stored `start|end|yen|night` rows. Band bounds are not closed, so the
     /// scheduled amount does not switch wages from these rows.
     var wageBandsRaw: String = ""
@@ -118,6 +120,7 @@ final class Workplace {
         self.overtimeRatePercent = 0
         self.holidayRatesRaw = ""
         self.wageHistoryRaw = ""
+        self.payRuleDatesRaw = ""
         self.wageBandsRaw = ""
         self.customBreaks = false
         self.breakRulesRaw = ""
@@ -180,6 +183,17 @@ final class Workplace {
         }
         set {
             wageHistoryRaw = newValue.map { "\($0.at.timeIntervalSince1970)|\($0.hourlyWage)" }.joined(separator: ";")
+        }
+    }
+
+    var payRuleDates: [Date] {
+        get {
+            payRuleDatesRaw.split(separator: ";").compactMap { TimeInterval($0) }.map {
+                Date(timeIntervalSince1970: $0)
+            }
+        }
+        set {
+            payRuleDatesRaw = newValue.map { "\($0.timeIntervalSince1970)" }.joined(separator: ";")
         }
     }
 

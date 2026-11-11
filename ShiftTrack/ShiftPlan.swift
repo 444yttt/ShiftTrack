@@ -162,6 +162,9 @@ final class ShiftRequest {
     var note: String
     var workplaceUUID: UUID?
     var statusRaw: String
+    /// 0 is shown as 出勤希望 and 1 as 休み希望. The assignment is not confirmed.
+    /// Older rows stay 0.
+    var kindRaw: Int = 0
     var createdAt: Date
 
     init(
@@ -172,6 +175,7 @@ final class ShiftRequest {
         note: String = "",
         workplaceUUID: UUID? = nil,
         statusRaw: String = ShiftRequestStatus.open,
+        kindRaw: Int = ShiftRequestKind.hopedAttendance,
         createdAt: Date = .now
     ) {
         self.uuid = UUID()
@@ -182,6 +186,7 @@ final class ShiftRequest {
         self.note = note
         self.workplaceUUID = workplaceUUID
         self.statusRaw = statusRaw
+        self.kindRaw = kindRaw
         self.createdAt = createdAt
     }
 
