@@ -74,6 +74,7 @@ final class PatternPlaceUITests: XCTestCase {
         XCTAssertFalse(app.buttons["calendar.shift"].exists)
         shot("13-clash-pending")
         tapIdentifier(app, "pattern.pending.close")
+        revealGrid(app)
 
         tapVisible(app, days[1])
         tapIdentifier(app, "calendar.daychip.別")
