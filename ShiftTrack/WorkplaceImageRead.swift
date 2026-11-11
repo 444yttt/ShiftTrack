@@ -1,16 +1,26 @@
-import CoreImage
-import CoreLocation
 import UIKit
 import Vision
 
 enum WorkplaceImageRead {
-    static func transcript(from data: Data) async -> String {
+    static func read(data: Data) async -> WorkplaceDraft {
+        let recognized = await lines(from: data)
+        var hints = DetectedHints()
         if #available(iOS 26.0, *) {
-            if let text = try? await documentText(data), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return text
-            }
+            hints = await documentHints(data)
         }
-        return (try? await ShiftImageReader.recognizeText(in: data)) ?? ""
+        var draft = WorkplaceRead.draft(from: recognized.lines, detected: hints)
+        if recognized.lines.isEmpty, hints.phones.isEmpty, hints.addresses.isEmpty {
+            draft.mapsNotice = WorkplaceDraft.imageUnreadable
+        }
+        draft.imageJPEG = data
+        if let pick = await WorkplaceModel.pick(lines: modelLines(recognized.lines)) {
+            draft = WorkplaceRead.merge(draft, pick: pick, modelRan: true)
+        }
+        return draft
+    }
+
+    static func transcript(from data: Data) async -> String {
+        await lines(from: data).lines.map(\.text).joined(separator: "\n")
     }
 
     static func transcript(from image: CGImage) async -> String {
@@ -18,58 +28,60 @@ enum WorkplaceImageRead {
         return await transcript(from: data)
     }
 
-    @available(iOS 26.0, *)
-    private static func documentText(_ data: Data) async throws -> String {
-        let request = RecognizeDocumentsRequest()
-        let observations = try await request.perform(on: data, orientation: .up)
-        guard let document = observations.first?.document else { return "" }
-        return document.paragraphs
-            .map(\.transcript)
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .joined(separator: "\n")
-    }
-}
-
-enum WorkplaceLocator {
-    static func coordinate(for address: String) async -> CLLocationCoordinate2D? {
-        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        let marks = try? await CLGeocoder().geocodeAddressString(trimmed)
-        return marks?.first?.location?.coordinate
-    }
-}
-
-@MainActor
-enum WorkplaceDraftStore {
-    private static var folder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ShiftTrack", isDirectory: true)
-            .appendingPathComponent("workplace-drafts", isDirectory: true)
-    }
-
-    static func save(_ draft: WorkplaceDraft, id: UUID) {
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(draft)
-            try data.write(to: folder.appendingPathComponent(id.uuidString), options: .atomic)
-        } catch {
-            return
+    private static func modelLines(_ lines: [ReadLine]) -> [ReadLine] {
+        lines.filter { line in
+            let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return false }
+            if text.contains("。") || text.contains("です") || text.contains("ます") || text.contains("にあります") { return false }
+            if text.count > 40 { return false }
+            return true
         }
+        .prefix(80)
+        .map { $0 }
     }
 
-    static func load(id: UUID) -> WorkplaceDraft? {
-        guard let data = try? Data(contentsOf: folder.appendingPathComponent(id.uuidString)) else { return nil }
-        return try? JSONDecoder().decode(WorkplaceDraft.self, from: data)
+    private static func lines(from data: Data) async -> (lines: [ReadLine], transcript: String) {
+        let fallback = (try? await ShiftImageReader.recognizeLines(in: data)) ?? []
+        return (fallback, fallback.map(\.text).joined(separator: "\n"))
+    }
+
+    @available(iOS 26.0, *)
+    private static func documentHints(_ data: Data) async -> DetectedHints {
+        let request = RecognizeDocumentsRequest()
+        guard let document = try? await request.perform(on: data, orientation: .up).first?.document else {
+            return DetectedHints()
+        }
+        return DocumentHints.read(document)
     }
 }
 
-@MainActor
-@Observable
-final class WorkplaceDraftRouter {
-    static let shared = WorkplaceDraftRouter()
-    var presentedID: UUID?
+#if canImport(DataDetection)
+import DataDetection
 
-    func open(id: UUID) {
-        presentedID = id
+@available(iOS 26.0, *)
+enum DocumentHints {
+    static func read(_ document: DocumentObservation.Container) -> DetectedHints {
+        var hints = DetectedHints()
+        for item in document.text.detectedData {
+            switch item.match.details {
+            case .phoneNumber(let phone):
+                hints.phones.append(phone.phoneNumber)
+            case .postalAddress(let address):
+                hints.addresses.append(address.fullAddress)
+            case .link(let link):
+                hints.urls.append(link.url.absoluteString)
+            default:
+                break
+            }
+        }
+        return hints
     }
 }
+#else
+@available(iOS 26.0, *)
+enum DocumentHints {
+    static func read(_ document: DocumentObservation.Container) -> DetectedHints {
+        DetectedHints()
+    }
+}
+#endif

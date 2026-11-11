@@ -1,3 +1,4 @@
+import MapKit
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -117,9 +118,12 @@ struct WorkplaceImportView: View {
     }
 
     private func readLink() {
-        let read = WorkplaceRead.draft(fromMapsLink: link)
-        draft = read
+        working = true
         notice = ""
+        Task {
+            draft = await WorkplaceMaps.read(link)
+            working = false
+        }
     }
 
     private func readPhoto(_ item: PhotosPickerItem) async {
@@ -135,14 +139,13 @@ struct WorkplaceImportView: View {
 
     private func readImage(_ data: Data) async {
         working = true
-        let text = await WorkplaceImageRead.transcript(from: data)
-        var read = WorkplaceRead.draft(from: text)
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            read.mapsNotice = "画像から文字を見つけられませんでした。店名や住所を直接入力してください。"
-        }
-        draft = read
+        draft = await WorkplaceImageRead.read(data: data)
         working = false
     }
+}
+
+private enum ReadFieldID: Hashable {
+    case name, phone, address, hours, url
 }
 
 struct WorkplaceReadResult: View {
@@ -155,7 +158,7 @@ struct WorkplaceReadResult: View {
     @State private var showAddresses = false
     @State private var showHours = false
     @State private var showURLs = false
-    @State private var showTranscript = false
+    @FocusState private var focus: ReadFieldID?
 
     init(draft: WorkplaceDraft, onApply: @escaping (WorkplaceDraft) -> Void, onBack: @escaping () -> Void) {
         _draft = State(initialValue: draft)
@@ -165,41 +168,28 @@ struct WorkplaceReadResult: View {
 
     var body: some View {
         ScreenScroll {
+            thumbnail
             if !draft.mapsNotice.isEmpty {
                 Text(draft.mapsNotice)
                     .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            field("名前", text: $draft.name, choices: draft.nameChoices, open: $showNames)
-            field("電話番号", text: $draft.phone, choices: draft.phoneChoices, open: $showPhones)
-            field("住所", text: $draft.address, choices: draft.addressChoices, open: $showAddresses)
-            field("営業時間", text: $draft.hours, choices: draft.hoursChoices, open: $showHours)
-            field("公式URL", text: $draft.officialURL, choices: draft.urlChoices, open: $showURLs)
-            Toggle("住所から勤務先の位置を設定", isOn: $draft.locateFromAddress)
-                .designFont(16, weight: .bold)
-                .tint(Theme.lime)
-                .padding(.top, 8)
-            Text("オンにすると「反映」を押したときに住所を Apple のマップサービスに送り、位置を探します。住所は勤務先に保存します。位置はあとから地図で直せます。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            DisclosureGroup("読み取った文字", isExpanded: $showTranscript) {
-                Text(draft.transcript.isEmpty ? "文字はありません。" : draft.transcript)
-                    .designFont(13)
-                    .foregroundStyle(Theme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-            }
-            .designFont(16, weight: .bold)
-            .tint(Theme.ink)
-            .padding(.top, 8)
+            field("名前", id: .name, text: text(\.name, \.nameNote), note: draft.nameNote, choicesOpen: $showNames)
+            field("電話番号", id: .phone, text: text(\.phone, \.phoneNote), note: draft.phoneNote, choicesOpen: $showPhones)
+            field("住所", id: .address, text: text(\.address, \.addressNote), note: draft.addressNote, choicesOpen: $showAddresses)
+            locate
+            field("営業時間", id: .hours, text: text(\.hours, \.hoursNote), note: draft.hoursNote, choicesOpen: $showHours)
+            field("公式URL", id: .url, text: text(\.officialURL, \.urlNote), note: draft.urlNote, choicesOpen: $showURLs)
             if working {
                 ProgressView().tint(Theme.lime).frame(maxWidth: .infinity).padding(.top, 16)
             } else {
-                LimeCapsuleButton(title: "反映", fillWidth: true, designSize: 16) {
+                LimeCapsuleButton(title: "勤務先を追加", fillWidth: true, designSize: 16) {
                     Task { await apply() }
                 }
                 .padding(.top, 16)
+                .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
             }
         }
         .background(Theme.background)
@@ -211,27 +201,153 @@ struct WorkplaceReadResult: View {
                     .foregroundStyle(Theme.ink)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("反映") { Task { await apply() } }
+                Button("勤務先を追加") { Task { await apply() } }
                     .foregroundStyle(Theme.ink)
-                    .disabled(working)
+                    .disabled(working || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .darkSheet()
+        .task {
+            if draft.locateFromAddress, !draft.hasCoordinate {
+                await locate()
+            }
+        }
     }
 
-    private func field(_ title: String, text: Binding<String>, choices: [String], open: Binding<Bool>) -> some View {
-        let extras = choices.filter { $0 != text.wrappedValue }
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let data = draft.imageJPEG, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: 240)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay { boxes }
+                .accessibilityLabel("読み取った画像")
+        }
+    }
+
+    private var boxes: some View {
+        GeometryReader { geo in
+            ForEach(draft.lines.filter(\.hasBox)) { line in
+                let rect = CGRect(
+                    x: line.x * geo.size.width,
+                    y: line.y * geo.size.height,
+                    width: max(line.width * geo.size.width, 8),
+                    height: max(line.height * geo.size.height, 8)
+                )
+                let active = highlighted.contains(line.id)
+                Button {
+                    use(line)
+                } label: {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .stroke(active ? Theme.ink : Theme.muted, lineWidth: active ? 2 : 1)
+                        .background(active ? Theme.lime.opacity(0.45) : Color.white.opacity(0.05))
+                }
+                .buttonStyle(.plain)
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY)
+                .accessibilityLabel(line.text)
+            }
+        }
+    }
+
+    private var highlighted: Set<Int> {
+        switch focus {
+        case .name: return Set(draft.nameNote.lineIDs)
+        case .phone: return Set(draft.phoneNote.lineIDs)
+        case .address: return Set(draft.addressNote.lineIDs)
+        case .hours: return Set(draft.hoursNote.lineIDs)
+        case .url: return Set(draft.urlNote.lineIDs)
+        case nil: return []
+        }
+    }
+
+    private var locate: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("住所から位置を探す", isOn: $draft.locateFromAddress)
+                .designFont(16, weight: .bold)
+                .tint(Theme.lime)
+                .disabled(draft.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if draft.locateFromAddress, draft.hasCoordinate {
+                let coordinate = CLLocationCoordinate2D(latitude: draft.latitude, longitude: draft.longitude)
+                Map(initialPosition: .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 500, longitudinalMeters: 500))) {
+                    Marker(draft.locatedName.isEmpty ? "住所" : draft.locatedName, coordinate: coordinate)
+                }
+                .frame(height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .allowsHitTesting(false)
+                if !draft.locatedName.isEmpty {
+                    Text(draft.locatedName)
+                        .designFont(13)
+                        .foregroundStyle(Theme.ink)
+                }
+                if draft.namesDiffer {
+                    Label("見つかった場所の名前が店名と違います", systemImage: "exclamationmark.triangle")
+                        .designFont(13, weight: .bold)
+                        .foregroundStyle(Theme.ink)
+                }
+            }
+            Text("住所を Apple のマップサービスに送ります。位置の検索以外には使いません。")
+                .designFont(13)
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(.top, 8)
+        .onChange(of: draft.locateFromAddress) { _, on in
+            if on {
+                Task { await locate() }
+            } else {
+                draft.hasCoordinate = false
+                draft.locatedName = ""
+            }
+        }
+        .onChange(of: draft.address) { _, address in
+            if address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                draft.locateFromAddress = false
+                draft.hasCoordinate = false
+                draft.locatedName = ""
+            }
+        }
+    }
+
+    private func field(
+        _ title: String,
+        id: ReadFieldID,
+        text: Binding<String>,
+        note: FieldNote,
+        choicesOpen: Binding<Bool>
+    ) -> some View {
+        let extras = note.choices.filter { $0 != text.wrappedValue }.prefix(3)
         return VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .designFont(13, weight: .bold)
+            HStack(spacing: 6) {
+                Text(title)
+                    .designFont(13, weight: .bold)
+                if note.confidence == .review && !note.edited {
+                    Label("要確認", systemImage: "exclamationmark.triangle")
+                        .designFont(13, weight: .bold)
+                        .foregroundStyle(Theme.ink)
+                        .accessibilityLabel("要確認")
+                }
+            }
             TextField(title, text: text)
+                .focused($focus, equals: id)
                 .designFont(16)
                 .padding(14)
                 .background(Theme.card)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            if note.confidence == .missing || text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("見つかりませんでした")
+                    .designFont(13)
+                    .foregroundStyle(Theme.muted)
+            }
+            if !note.edited, let origin = note.origin, !text.wrappedValue.isEmpty {
+                Text(origin.footnote)
+                    .designFont(13)
+                    .foregroundStyle(Theme.muted)
+            }
             if !extras.isEmpty {
-                DisclosureGroup("ほかの候補", isExpanded: open) {
-                    ForEach(extras, id: \.self) { choice in
+                DisclosureGroup("候補が\(extras.count)件", isExpanded: choicesOpen) {
+                    ForEach(Array(extras), id: \.self) { choice in
                         Button(choice) { text.wrappedValue = choice }
                             .designFont(16)
                             .foregroundStyle(Theme.ink)
@@ -245,23 +361,64 @@ struct WorkplaceReadResult: View {
         .padding(.top, 8)
     }
 
+    private func text(_ key: WritableKeyPath<WorkplaceDraft, String>, _ note: WritableKeyPath<WorkplaceDraft, FieldNote>) -> Binding<String> {
+        Binding(
+            get: { draft[keyPath: key] },
+            set: { newValue in
+                draft[keyPath: key] = newValue
+                draft[keyPath: note].edited = true
+                draft[keyPath: note].origin = nil
+                let empty = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                draft[keyPath: note].confidence = empty ? .missing : .high
+            }
+        )
+    }
+
+    private func use(_ line: ReadLine) {
+        let value = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        switch focus ?? destination(for: value) {
+        case .name: draft.name = value; mark(\.nameNote)
+        case .phone: draft.phone = WorkplaceRead.validPhone(value) ?? value; mark(\.phoneNote)
+        case .address: draft.address = value; mark(\.addressNote)
+        case .hours: draft.hours = WorkplaceRead.hourValue(value) ?? value; mark(\.hoursNote)
+        case .url: draft.officialURL = value; mark(\.urlNote)
+        }
+    }
+
+    private func destination(for value: String) -> ReadFieldID {
+        if WorkplaceRead.validPhone(value) != nil { return .phone }
+        if WorkplaceRead.validAddress(value) != nil { return .address }
+        if WorkplaceRead.hourValue(value) != nil { return .hours }
+        if WorkplaceRead.urlClass(value) == .official { return .url }
+        return .name
+    }
+
+    private func mark(_ note: WritableKeyPath<WorkplaceDraft, FieldNote>) {
+        draft[keyPath: note].edited = true
+        draft[keyPath: note].origin = nil
+        draft[keyPath: note].confidence = .high
+    }
+
+    private func locate() async {
+        let address = draft.address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty, let place = await WorkplaceLocator.locate(address: address) else {
+            draft.hasCoordinate = false
+            draft.locatedName = ""
+            return
+        }
+        draft.latitude = place.latitude
+        draft.longitude = place.longitude
+        draft.hasCoordinate = true
+        draft.locatedName = place.name
+    }
+
     private func apply() async {
         working = true
-        var copy = draft
-        if copy.locateFromAddress {
-            let address = copy.address.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let coordinate = await WorkplaceLocator.coordinate(for: address) {
-                copy.latitude = coordinate.latitude
-                copy.longitude = coordinate.longitude
-                copy.hasCoordinate = true
-            } else {
-                copy.hasCoordinate = false
-            }
-        } else {
-            copy.hasCoordinate = false
+        if draft.locateFromAddress {
+            await locate()
         }
-        draft = copy
         working = false
-        onApply(copy)
+        onApply(draft)
     }
 }

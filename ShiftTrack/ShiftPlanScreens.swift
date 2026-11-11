@@ -128,6 +128,7 @@ struct PatternEditorView: View {
     @State private var error = ""
     @State private var confirmDelete = false
     @State private var overlap: [ShiftOverlap.Hit] = []
+    @State private var overlapSheet = false
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
 
     private var existing: ShiftPattern? { patterns.first { $0.uuid == patternID } }
@@ -159,6 +160,12 @@ struct PatternEditorView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.muted)
                 WeekdaySelector(days: $weekdays)
+                ForEach(liveOverlap) { hit in
+                    Text(ShiftOverlap.row(hit))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if !error.isEmpty {
                     Text(error)
                         .font(.system(size: 13))
@@ -189,32 +196,53 @@ struct PatternEditorView: View {
                 Button("削除", role: .destructive, action: deletePattern)
                 Button("キャンセル", role: .cancel) {}
             }
-            .alert("このシフトは確認が必要です", isPresented: overlapPresented) {
+            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
                 Button("このまま保存") {
                     overlap = []
                     save(force: true)
                 }
                 Button("やめる", role: .cancel) { overlap = [] }
             } message: {
-                Text(overlapMessage)
+                Text(ShiftOverlap.confirmMessage(overlap))
+            }
+            .sheet(isPresented: $overlapSheet) {
+                ShiftOverlapList(hits: overlap, onSave: {
+                    overlapSheet = false
+                    overlap = []
+                    save(force: true)
+                }, onCancel: {
+                    overlapSheet = false
+                    overlap = []
+                })
             }
         }
     }
 
-    private var overlapPresented: Binding<Bool> {
-        Binding(get: { !overlap.isEmpty }, set: { if !$0 { overlap = [] } })
+    private var overlapAlert: Binding<Bool> {
+        Binding(get: { overlap.count == 1 && !overlapSheet }, set: { if !$0 { overlap = [] } })
     }
 
-    private var overlapMessage: String {
-        overlap.map { hit in
-            let other = shifts.first { $0.uuid == hit.otherID }
-            return ShiftOverlap.message(
-                kind: hit.kind,
-                otherName: other?.workplace?.name ?? "シフト",
-                otherStart: other?.startMinutes ?? 0,
-                otherEnd: other?.endMinutes ?? 0
+    private var liveOverlap: [ShiftOverlap.Hit] {
+        guard let workplaceID else { return [] }
+        let calendar = ShiftOverlap.tokyo
+        let workplace = workplaces.first { $0.uuid == workplaceID }
+        let proposed = ShiftOverlap.upcoming(weekdays: weekdays, from: .now, calendar: calendar).enumerated().map { index, day in
+            ShiftOverlap.span(
+                id: "template-\(index)",
+                name: workplace?.name ?? "シフト",
+                workplace: workplaceID,
+                day: day,
+                start: startMinutes,
+                end: endMinutes,
+                calendar: calendar
             )
-        }.joined(separator: "\n")
+        }
+        return ShiftOverlap.conflicts(
+            batch: proposed,
+            existing: shifts.map { ShiftOverlap.span(from: $0, calendar: calendar) },
+            travelMinutes: travelMinutes,
+            calendar: calendar
+        )
     }
 
     private var field: some View {
@@ -261,20 +289,15 @@ struct PatternEditorView: View {
             return
         }
         if !force {
-            var found: [ShiftOverlap.Hit] = []
-            for day in ShiftOverlap.upcoming(weekdays: weekdays, from: .now) {
-                found.append(contentsOf: ShiftOverlap.hits(
-                    start: startMinutes,
-                    end: endMinutes,
-                    day: day,
-                    workplace: workplaceID,
-                    ignoring: nil,
-                    shifts: shifts,
-                    travelMinutes: travelMinutes
-                ))
-            }
-            if !found.isEmpty {
+            let found = liveOverlap
+            if found.count == 1 {
                 overlap = found
+                overlapSheet = false
+                return
+            }
+            if ShiftOverlap.usesSheet(found) {
+                overlap = found
+                overlapSheet = true
                 return
             }
         }
@@ -326,6 +349,7 @@ struct PatternApplyView: View {
     @State private var message = ""
     @State private var savedCount: Int?
     @State private var overlap: [ShiftOverlap.Hit] = []
+    @State private var overlapSheet = false
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
 
     private var pattern: ShiftPattern? { patterns.first { $0.uuid == patternID } }
@@ -372,7 +396,7 @@ struct PatternApplyView: View {
                 }
                 .disabled(result.create.isEmpty)
             }
-            .alert("このシフトは確認が必要です", isPresented: overlapPresented) {
+            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
                 Button("このまま保存") {
                     let pending = overlap
                     overlap = []
@@ -380,15 +404,18 @@ struct PatternApplyView: View {
                 }
                 Button("やめる", role: .cancel) { overlap = [] }
             } message: {
-                Text(overlap.map { hit in
-                    let other = shifts.first { $0.uuid == hit.otherID }
-                    return ShiftOverlap.message(
-                        kind: hit.kind,
-                        otherName: other?.workplace?.name ?? "シフト",
-                        otherStart: other?.startMinutes ?? 0,
-                        otherEnd: other?.endMinutes ?? 0
-                    )
-                }.joined(separator: "\n"))
+                Text(ShiftOverlap.confirmMessage(overlap))
+            }
+            .sheet(isPresented: $overlapSheet) {
+                ShiftOverlapList(hits: overlap, onSave: {
+                    let pending = overlap
+                    overlapSheet = false
+                    overlap = []
+                    if !pending.isEmpty { apply(currentResult, force: true) }
+                }, onCancel: {
+                    overlapSheet = false
+                    overlap = []
+                })
             }
             .background(Theme.background)
             .navigationTitle("曜日に入れる")
@@ -432,27 +459,39 @@ struct PatternApplyView: View {
         return "新しく\(result.create.count)件。既にあるので作らない日が\(result.skippedExisting)日。"
     }
 
-    private var overlapPresented: Binding<Bool> {
-        Binding(get: { !overlap.isEmpty }, set: { if !$0 { overlap = [] } })
+    private var overlapAlert: Binding<Bool> {
+        Binding(get: { overlap.count == 1 && !overlapSheet }, set: { if !$0 { overlap = [] } })
     }
 
     private func apply(_ result: ShiftPatternPlan.Result, force: Bool = false) {
         guard let workplace, !result.create.isEmpty else { return }
         if !force {
-            var found: [ShiftOverlap.Hit] = []
-            for proposal in result.create {
-                found.append(contentsOf: ShiftOverlap.hits(
+            let calendar = ShiftOverlap.tokyo
+            let proposed = result.create.enumerated().map { index, proposal in
+                ShiftOverlap.span(
+                    id: "new-\(index)",
+                    name: workplace.name,
+                    workplace: workplace.uuid,
+                    day: proposal.day,
                     start: proposal.startMinutes,
                     end: proposal.endMinutes,
-                    day: proposal.day,
-                    workplace: workplace.uuid,
-                    ignoring: nil,
-                    shifts: shifts,
-                    travelMinutes: travelMinutes
-                ))
+                    calendar: calendar
+                )
             }
-            if !found.isEmpty {
+            let found = ShiftOverlap.conflicts(
+                batch: proposed,
+                existing: shifts.map { ShiftOverlap.span(from: $0, calendar: calendar) },
+                travelMinutes: travelMinutes,
+                calendar: calendar
+            )
+            if found.count == 1 {
                 overlap = found
+                overlapSheet = false
+                return
+            }
+            if ShiftOverlap.usesSheet(found) {
+                overlap = found
+                overlapSheet = true
                 return
             }
         }

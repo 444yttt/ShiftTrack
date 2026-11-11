@@ -70,23 +70,28 @@ enum WorkplaceActions {
         guard let workplace = allWorkplaces().first(where: { $0.uuid == workplaceID }) else {
             return "勤務先が見つかりません。"
         }
-        let calendar = Calendar.current
+        let calendar = ShiftOverlap.tokyo
         let day = calendar.startOfDay(for: date)
         let startMinutes = ShiftDatePolicy.clockMinutes(from: start, calendar: calendar)
         let endMinutes = ShiftDatePolicy.clockMinutes(from: end, calendar: calendar)
-        guard workplace.payIsDaily || startMinutes != endMinutes else {
-            return "開始と終了を異なる時刻にしてください。"
+        guard startMinutes != endMinutes else {
+            return "開始と終了が同じです。保存できません。"
         }
         let shifts = (try? context.fetch(FetchDescriptor<WorkShift>())) ?? []
         let travel = UserDefaults.standard.integer(forKey: "settings.travelMinutes")
         let travelMinutes = UserDefaults.standard.object(forKey: "settings.travelMinutes") == nil ? 30 : travel
-        let found = ShiftOverlap.hits(
+        let proposed = ShiftOverlap.span(
+            id: "new",
+            name: workplace.name,
+            workplace: workplace.uuid,
+            day: day,
             start: startMinutes,
             end: endMinutes,
-            day: day,
-            workplace: workplace.uuid,
-            ignoring: nil,
-            shifts: shifts,
+            calendar: calendar
+        )
+        let found = ShiftOverlap.conflicts(
+            of: proposed,
+            among: shifts.map { ShiftOverlap.span(from: $0, calendar: calendar) },
             travelMinutes: travelMinutes,
             calendar: calendar
         )
