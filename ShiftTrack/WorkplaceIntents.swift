@@ -1,8 +1,6 @@
 import AppIntents
-import CoreImage
 import Foundation
 import SwiftData
-import VisualIntelligence
 
 enum MonthForecastMath {
     static func yen(days: [(date: Date, yen: Int)], now: Date, calendar: Calendar = .current) -> Int {
@@ -315,6 +313,10 @@ struct OpenWorkplaceDraftIntent: OpenIntent {
     }
 }
 
+#if canImport(VisualIntelligence)
+import CoreImage
+import VisualIntelligence
+
 @available(iOS 26.0, *)
 struct WorkplaceSeenQuery: IntentValueQuery {
     func values(for input: SemanticContentDescriptor) async throws -> [WorkplaceDraftEntity] {
@@ -329,3 +331,4 @@ struct WorkplaceSeenQuery: IntentValueQuery {
         return [WorkplaceDraftEntity(id: id, name: draft.name.isEmpty ? draft.address : draft.name)]
     }
 }
+#endif
