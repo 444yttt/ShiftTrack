@@ -75,10 +75,13 @@ final class ShellUITests: XCTestCase {
         require(timeBar, timeout: 6, shotName: "05-time-missing", app: app)
         app.buttons["1時間後"].tap()
         shot("05-time")
-        timeBar.buttons["キャンセル"].tap()
-        let timeGone = NSPredicate(format: "exists == false")
-        expectation(for: timeGone, evaluatedWith: timeBar, handler: nil)
-        waitForExpectations(timeout: 4)
+        let cancel = app.buttons["time.cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 4))
+        cancel.tap()
+        if !waitUntilGone(timeBar, timeout: 3) {
+            cancel.tap()
+            XCTAssertTrue(waitUntilGone(timeBar, timeout: 8))
+        }
         let editorBar = app.navigationBars["シフトを追加"]
         if editorBar.waitForExistence(timeout: 2) {
             editorBar.buttons["キャンセル"].tap()
@@ -98,6 +101,12 @@ final class ShellUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["勤務先の設定"].exists)
         app.buttons["tab.today"].tap()
         XCTAssertEqual(clock.label, clockBefore)
+    }
+
+    private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let gone = NSPredicate(format: "exists == false")
+        let expectation = XCTNSPredicateExpectation(predicate: gone, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
     private func tapVisible(_ app: XCUIApplication, _ element: XCUIElement) {

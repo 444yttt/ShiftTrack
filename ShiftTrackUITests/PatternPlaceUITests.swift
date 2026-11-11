@@ -74,6 +74,7 @@ final class PatternPlaceUITests: XCTestCase {
         XCTAssertFalse(app.buttons["calendar.shift"].exists)
         shot("13-clash-pending")
         tapIdentifier(app, "pattern.pending.close")
+        revealGrid(app)
 
         tapVisible(app, days[1])
         tapIdentifier(app, "calendar.daychip.別")
@@ -193,7 +194,7 @@ final class PatternPlaceUITests: XCTestCase {
     }
 
     private func revealGrid(_ app: XCUIApplication) {
-        for _ in 0..<4 {
+        for _ in 0..<8 {
             app.swipeDown()
         }
     }

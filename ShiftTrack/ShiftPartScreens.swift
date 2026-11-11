@@ -250,7 +250,7 @@ struct ShiftPartEditor: View {
                         .focused($typing)
                         .designFont(16)
                         .foregroundStyle(Theme.ink)
-                        .padding(12)
+                        .padding(ScreenInsets.todo)
                         .background(Theme.cardRaised)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .accessibilityIdentifier("field.やること")

@@ -168,7 +168,25 @@ struct WorkplaceReadResult: View {
 
     var body: some View {
         ScreenScroll {
-            thumbnail
+            let sections = ImportSectionLayout.sections()
+            if sections.contains(.mapNote) {
+                Text(ImportSection.mapNote.rawValue)
+                    .designFont(13)
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if sections.contains(.readText) {
+                Text(ImportSection.readText.rawValue)
+                    .designFont(16, weight: .bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                thumbnail
+                ForEach(draft.lines) { line in
+                    Text(line.text)
+                        .designFont(13)
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
             if !draft.mapsNotice.isEmpty {
                 Text(draft.mapsNotice)
                     .designFont(13)
@@ -288,9 +306,6 @@ struct WorkplaceReadResult: View {
                         .foregroundStyle(Theme.ink)
                 }
             }
-            Text("住所を Apple のマップサービスに送ります。位置の検索以外には使いません。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
         }
         .padding(.top, 8)
         .onChange(of: draft.locateFromAddress) { _, on in

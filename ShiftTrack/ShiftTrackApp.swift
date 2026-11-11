@@ -64,6 +64,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(ScreenInsets.rootWide)
         .background(Theme.background)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CustomTabBar(selection: $tab)

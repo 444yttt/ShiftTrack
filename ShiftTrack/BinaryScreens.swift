@@ -525,26 +525,38 @@ struct LateMessageComposer: View {
     @State private var ending = "分ほど遅れます"
     @State private var saved = false
 
+    /// Each section can be omitted on its own. All four are shown until a branch hides one.
+    var hiddenSections: Set<LateMessageSection> = []
+
     var body: some View {
         ScreenScroll {
-            Text("① 遅れる理由")
-                .designFont(16, weight: .bold)
-            Picker("理由", selection: $reason) {
-                ForEach(Self.reasons, id: \.self) { Text($0).tag($0) }
+            let shown = LateMessageLayout.sections(hidden: hiddenSections)
+            if shown.contains(.reason) {
+                Text(LateMessageSection.reason.rawValue)
+                    .designFont(16, weight: .bold)
+                Picker("理由", selection: $reason) {
+                    ForEach(Self.reasons, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.inline)
             }
-            .pickerStyle(.inline)
-            Text("② 遅れる時間")
-                .designFont(16, weight: .bold)
-            Stepper("\(minutes)分", value: $minutes, in: 0...180)
-            Text("③ 言葉づかい")
-                .designFont(16, weight: .bold)
-            Picker("結び", selection: $ending) {
-                ForEach(Self.endings, id: \.self) { Text($0).tag($0) }
+            if shown.contains(.delay) {
+                Text(LateMessageSection.delay.rawValue)
+                    .designFont(16, weight: .bold)
+                Stepper("\(minutes)分", value: $minutes, in: 0...180)
             }
-            .pickerStyle(.segmented)
-            Text("文章はここで直せます。①〜③の答えを変えると作り直します。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
+            if shown.contains(.tone) {
+                Text(LateMessageSection.tone.rawValue)
+                    .designFont(16, weight: .bold)
+                Picker("結び", selection: $ending) {
+                    ForEach(Self.endings, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+            if shown.contains(.note) {
+                Text(LateMessageSection.note.rawValue)
+                    .designFont(13)
+                    .foregroundStyle(Theme.muted)
+            }
             Text(draft)
                 .designFont(16, weight: .bold)
                 .frame(maxWidth: .infinity, alignment: .leading)

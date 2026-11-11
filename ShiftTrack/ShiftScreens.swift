@@ -640,6 +640,7 @@ struct ShiftEditorView: View {
     var body: some View {
         NavigationStack {
             ScreenScroll {
+                Group {
                 if workplaces.isEmpty {
                     Text("先に勤務先を追加してください。")
                         .designFont(13)
@@ -810,6 +811,8 @@ struct ShiftEditorView: View {
                             .padding(.top, 8)
                     }
                 }
+                }
+                .padding(ScreenInsets.shiftEditor)
             }
             .background(Theme.background)
             .navigationTitle(existing == nil ? "シフトを追加" : "シフトの詳細")
@@ -1268,6 +1271,7 @@ struct TimeAdjustSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル", action: onCancel)
                         .foregroundStyle(Theme.lime)
+                        .accessibilityIdentifier("time.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("決定", action: onCommit)
