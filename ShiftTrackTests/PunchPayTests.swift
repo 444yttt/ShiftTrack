@@ -25,7 +25,9 @@ struct PunchPayTests {
         let unixStart = Date(timeIntervalSince1970: (clockIn.timeIntervalSince1970 / 3600).rounded(.down) * 3600)
         #expect(PunchPay.clock(unixStart, calendar: calendar) == "9:30")
         #expect(view.payableStart != unixStart)
-        #expect(view.shorterThanPunch)
+        #expect(view.actualMinutes == 477)
+        #expect(view.payableMinutes == 480)
+        #expect(view.shorterThanPunch == false)
     }
 
     @Test
