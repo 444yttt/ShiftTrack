@@ -86,7 +86,9 @@ final class ShellUITests: XCTestCase {
 
         app.buttons["tab.income"].tap()
         shot("06-income")
-        app.buttons["income.walls"].tap()
+        let walls = app.buttons["income.walls"]
+        XCTAssertTrue(walls.waitForExistence(timeout: 6))
+        tapVisible(app, walls)
         require(app.staticTexts["walls.title"], timeout: 6, shotName: "07-walls-missing", app: app)
         shot("07-walls")
         app.buttons["walls.close"].tap()
@@ -96,6 +98,24 @@ final class ShellUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["勤務先の設定"].exists)
         app.buttons["tab.today"].tap()
         XCTAssertEqual(clock.label, clockBefore)
+    }
+
+    private func tapVisible(_ app: XCUIApplication, _ element: XCUIElement) {
+        let top: CGFloat = 90
+        let bottom = app.frame.maxY - 120
+        for _ in 0..<8 {
+            let frame = element.frame
+            if element.isHittable && frame.minY > top && frame.maxY < bottom {
+                element.tap()
+                return
+            }
+            if frame.minY < top {
+                app.swipeDown()
+            } else {
+                app.swipeUp()
+            }
+        }
+        element.tap()
     }
 
     private func require(_ element: XCUIElement, timeout: TimeInterval, shotName: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {

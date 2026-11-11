@@ -138,7 +138,7 @@ private struct PayPeriodRow: View {
         }
     }
 
-    private static func dayText(_ date: Date) -> String {
+    static func dayText(_ date: Date) -> String {
         let calendar = Calendar.current
         return String(format: "%04d/%d/%d", calendar.component(.year, from: date), calendar.component(.month, from: date), calendar.component(.day, from: date))
     }
