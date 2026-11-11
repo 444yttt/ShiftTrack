@@ -19,6 +19,7 @@ struct IncomeScreen: View {
     @State private var pendingGoal = 0
     @State private var delta: Int?
     @State private var showWalls = false
+    @State private var showGuideTable = false
     @State private var showGuide = false
     @State private var countByPayday = false
     @State private var forecastWorkplace: UUID?
@@ -188,6 +189,26 @@ struct IncomeScreen: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("income.walls")
 
+            Button {
+                showGuideTable = true
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("年収の目安")
+                        .designFont(16, weight: .bold)
+                        .foregroundStyle(Theme.ink)
+                    Text("2026-11-11 の相談メモです。一次資料では未確認です。")
+                        .designFont(16)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.card)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("income.guide")
+
             Text("表示しているのは、その月・年に入る給料です。給料日が翌月の勤務先は、働いた月ではなく入金月に載ります。")
                 .designFont(16)
                 .foregroundStyle(Theme.muted)
@@ -217,6 +238,10 @@ struct IncomeScreen: View {
         }
         .sheet(isPresented: $showWalls) {
             WallsScreen()
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showGuideTable) {
+            IncomeGuideScreen(estimate: totals.forecastYen)
                 .presentationBackground(Theme.background)
         }
         .onAppear { refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
