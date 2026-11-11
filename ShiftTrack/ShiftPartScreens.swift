@@ -139,6 +139,7 @@ struct ShiftPartSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.cardRaised)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pattern.pending")
     }
 
