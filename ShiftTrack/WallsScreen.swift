@@ -24,12 +24,12 @@ struct WallsScreen: View {
         return ScreenScroll {
             HStack {
                 Text("年収の壁")
-                    .font(.system(size: 28, weight: .black))
+                    .designFont(16, weight: .black)
                     .foregroundStyle(Theme.ink)
                     .accessibilityIdentifier("walls.title")
                 Spacer()
                 Button("閉じる") { dismiss() }
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.lime)
                     .accessibilityIdentifier("walls.close")
                 HelpButton { showHelp = true }
@@ -38,7 +38,7 @@ struct WallsScreen: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("金額")
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(16, weight: .bold)
                 TextField("0", text: $amountText)
                     .keyboardType(.numberPad)
                     .font(.doto(28))
@@ -53,16 +53,16 @@ struct WallsScreen: View {
                                 Image(systemName: "checkmark")
                             }
                         }
-                        .font(.system(size: 15, weight: .bold))
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(notifyMode == mode ? Theme.ink : Theme.muted)
                     }
                     .buttonStyle(.plain)
                 }
                 Text("「残り金額で通知」を読む関数は遅刻の画面だけを呼びます。スクショでは壁のシートに出ているので、ここにも置いています。通知は送りません。")
-                    .font(.system(size: 12))
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
                 Button("保存") { dismiss() }
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -76,20 +76,20 @@ struct WallsScreen: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("今年の給料見込")
-                    .font(.system(size: 12, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.muted)
                 Text(Formatters.yen(forecast))
-                    .font(.system(size: 32, weight: .black))
+                    .designFont(16, weight: .black)
                     .foregroundStyle(Theme.lime)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                 if let next {
                     Text("次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))")
-                        .font(.system(size: 13, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 } else {
                     Text("表示している壁はすべて超えています")
-                        .font(.system(size: 13, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
             }
@@ -107,7 +107,7 @@ struct WallsScreen: View {
             .padding(.top, 4)
 
             Text(IncomeWalls.disclaimer)
-                .font(.system(size: 11))
+                .designFont(16)
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 4)
@@ -132,15 +132,15 @@ struct WallsScreen: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(wall.title)
-                            .font(.system(size: 15, weight: .bold))
+                            .designFont(16, weight: .bold)
                             .foregroundStyle(Theme.ink)
                         Text(wall.subtitle)
-                            .font(.system(size: 11))
+                            .designFont(16)
                             .foregroundStyle(Theme.muted)
                     }
                     Spacer()
                     Text(Formatters.percent(ratio, decimals: false))
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.lime)
                 }
                 GeometryReader { proxy in
@@ -154,7 +154,7 @@ struct WallsScreen: View {
                 .frame(height: 8)
                 if open {
                     Text(wall.detail)
-                        .font(.system(size: 12))
+                        .designFont(16)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)

@@ -40,7 +40,7 @@ struct SettingsScreen: View {
         return ScreenScroll {
             HStack {
                 Text("設定")
-                    .font(.system(size: 32, weight: .black))
+                    .designFont(16, weight: .black)
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 HelpButton { showGuide = true }
@@ -58,10 +58,10 @@ struct SettingsScreen: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("シフトの重なり")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                 Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
-                Text("違う勤務先の間がこの時間より短いと、保存の前に確認します。バイナリの閾値が設定のどの値かは未確定で、この画面の分数を使っています。")
-                    .font(.system(size: 12))
+                Text("シフトの時間が重なったときや、違う勤務先の間がこの時間より短いときに、保存の前に確認します。0分にすると、間隔は見ません。")
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
             }
             .padding(16)
@@ -71,12 +71,12 @@ struct SettingsScreen: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("位置情報の許可")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                 HStack {
                     Text("未設定")
                     Spacer()
                     Button("位置情報を許可する") { openSystemSettings() }
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(16, weight: .bold)
                 }
             }
             .padding(16)
@@ -100,7 +100,7 @@ struct SettingsScreen: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("広告")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                 HStack {
                     Text("広告")
                     Spacer()
@@ -108,7 +108,7 @@ struct SettingsScreen: View {
                         .foregroundStyle(Theme.muted)
                 }
                 Text("このアプリに広告 SDK はありません。")
-                    .font(.system(size: 12))
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
             }
             .padding(16)
@@ -118,13 +118,13 @@ struct SettingsScreen: View {
             .padding(.top, 8)
 
             Text("勤務先の追加とパターンは「勤務先」タブです。")
-                .font(.system(size: 13))
+                .designFont(16)
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
             Text("給料の目標")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
@@ -138,7 +138,7 @@ struct SettingsScreen: View {
                 line
                 numberRow("新しい勤務先の交通費", text: $transportText)
                 Text("月間は5,000円以上100万円未満、年間は1万円以上1,000万円未満です。給料画面で月や年ごとに変えた金額が優先されます。")
-                    .font(.system(size: 12))
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 12)
@@ -175,7 +175,7 @@ struct SettingsScreen: View {
             }
 
             Text("カレンダーの設定")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
@@ -183,7 +183,7 @@ struct SettingsScreen: View {
             VStack(spacing: 0) {
                 Toggle(isOn: $settings.weekStartsOnMonday) {
                     Text("週の始まりを月曜にする")
-                        .font(.system(size: 14, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
@@ -191,7 +191,7 @@ struct SettingsScreen: View {
                 Rectangle().fill(Theme.line).frame(height: 1)
                 Toggle(isOn: $settings.showPaydayOnCalendar) {
                     Text("給料日の表示")
-                        .font(.system(size: 14, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
@@ -199,7 +199,7 @@ struct SettingsScreen: View {
                 Rectangle().fill(Theme.line).frame(height: 1)
                 Toggle(isOn: $settings.includeTransport) {
                     Text("交通費を給料に含める")
-                        .font(.system(size: 14, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
@@ -211,10 +211,10 @@ struct SettingsScreen: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Siri / ショートカット")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Text("「しふとらっくでシフト表を取り込む」と言うと、読み上げた内容から候補を作り、保存前に確認できます。画像はショートカットの「シフト表の画像を取り込む」に渡せます。どちらも端末内で処理します。")
-                    .font(.system(size: 13))
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -269,10 +269,10 @@ struct SettingsScreen: View {
     private func settingsRow(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
             Spacer()
             Image(systemName: "arrow.up.right")
-                .font(.system(size: 12, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.muted)
         }
         .padding(16)
@@ -292,14 +292,14 @@ struct SettingsScreen: View {
     private var settingsNoticeCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("通知")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
             Text("勤務の終わりに確認")
                 .foregroundStyle(Color.white)
             Text("シフトの前に通知")
                 .foregroundStyle(Color.white)
             Text("通知の配信そのものは、回収した命令へ結んでいません。スイッチは見た目です。")
-                .font(.system(size: 12))
+                .designFont(16)
                 .foregroundStyle(Color.white.opacity(0.7))
         }
         .padding(16)
@@ -316,7 +316,7 @@ struct SettingsScreen: View {
     private func numberRow(_ title: String, text: Binding<String>) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .designFont(16, weight: .medium)
                 .foregroundStyle(Theme.ink)
             Spacer()
             Text("¥")
@@ -324,7 +324,7 @@ struct SettingsScreen: View {
             TextField("0", text: text)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.trailing)
-                .font(.system(size: 14, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.lime)
                 .frame(width: 110)
                 .focused($focused)

@@ -22,6 +22,6 @@
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleDarkContent</string>
 	<key>NSCameraUsageDescription</key>
-	<string>シフト表を撮影して勤務の候補を読み取ります。画像は端末内で処理し、サーバーには送信しません。</string>
+	<string>勤務先のカードやシフト表を撮影します。画像は端末内で処理し、サーバーには送信しません。</string>
 </dict>
 </plist>

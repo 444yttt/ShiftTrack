@@ -21,6 +21,12 @@ struct WorkplaceWizard: View {
     @State private var endMinute = 22 * 60
     @State private var weekdays: Set<Int> = []
     @State private var notify = true
+    @State private var hours = ""
+    @State private var officialURL = ""
+    @State private var latitude = 0.0
+    @State private var longitude = 0.0
+    @State private var hasCoordinate = false
+    @State private var showImport = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,7 +48,7 @@ struct WorkplaceWizard: View {
         HStack(spacing: 8) {
             ForEach(1...3, id: \.self) { index in
                 Text(String(format: "%02d", index))
-                    .font(.system(size: 13, weight: .bold))
+                    .designFont(13, weight: .bold)
                     .foregroundStyle(step == index ? Theme.ink : Theme.muted)
                     .frame(width: 36, height: 36)
                     .background(step == index ? Theme.lime : (index < step ? Theme.ink : Theme.cardRaised))
@@ -72,12 +78,12 @@ struct WorkplaceWizard: View {
         VStack(alignment: .leading, spacing: 12) {
             ShopPlaceholder()
             Text("勤務先を登録")
-                .font(.system(size: 22, weight: .black))
+                .designFont(16, weight: .black)
             Text("働いているお店の名前を入れます。住所と電話番号は、道順や遅刻の連絡に使います。")
-                .font(.system(size: 14))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             Text("マップで探す")
-                .font(.system(size: 14, weight: .bold))
+                .designFont(13, weight: .bold)
             HStack {
                 RoundedRectangle(cornerRadius: 14).fill(Theme.cardRaised).frame(height: 48)
                 Button {
@@ -95,10 +101,10 @@ struct WorkplaceWizard: View {
             field("住所", text: $place, identifier: "field.住所")
             field("連絡先", text: $phone, identifier: "field.連絡先")
             Button {
-                ImportRouter.shared.presentChooser(fallbackDate: .now, defaultWorkplace: name)
+                showImport = true
             } label: {
                 Text("写真から読み取る")
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.white)
@@ -107,6 +113,18 @@ struct WorkplaceWizard: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("wizard.photo")
+            .sheet(isPresented: $showImport) {
+                WorkplaceImportView { draft in
+                    if !draft.name.isEmpty { name = draft.name }
+                    if !draft.address.isEmpty { place = draft.address }
+                    if !draft.phone.isEmpty { phone = draft.phone }
+                    hours = draft.hours
+                    officialURL = draft.officialURL
+                    latitude = draft.latitude
+                    longitude = draft.longitude
+                    hasCoordinate = draft.hasCoordinate
+                }
+            }
         }
     }
 
@@ -114,9 +132,9 @@ struct WorkplaceWizard: View {
         VStack(alignment: .leading, spacing: 12) {
             PayPlaceholder()
             Text("お給料の決まり")
-                .font(.system(size: 22, weight: .black))
+                .designFont(16, weight: .black)
             Text("お給料の見込みの計算に使います。あとから勤務先の画面で直せます。")
-                .font(.system(size: 14))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             HStack {
                 Text("時給")
@@ -143,15 +161,15 @@ struct WorkplaceWizard: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             toggleRow("深夜割増（22時〜5時）", isOn: $night)
             Text(night ? "25%" : "0%")
-                .font(.system(size: 13, weight: .bold))
+                .designFont(13, weight: .bold)
                 .foregroundStyle(Theme.muted)
             toggleRow("残業割増（1日8時間超）", isOn: $overtime)
             Text(overtime ? "25%" : "0%")
-                .font(.system(size: 13, weight: .bold))
+                .designFont(13, weight: .bold)
                 .foregroundStyle(Theme.muted)
             toggleRow("休憩", isOn: $legalBreak)
             Text("法律で決まった休憩で計算します（6時間を超えたら45分、8時間を超えたら60分）。")
-                .font(.system(size: 12))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
         }
     }
@@ -160,9 +178,9 @@ struct WorkplaceWizard: View {
         VStack(alignment: .leading, spacing: 12) {
             CalendarPlaceholder()
             Text("いつものシフト")
-                .font(.system(size: 22, weight: .black))
+                .designFont(16, weight: .black)
             Text("毎週決まって入るシフトがあれば入れます。なければそのまま「はじめる」で進めます。")
-                .font(.system(size: 14))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             field("シフト名", text: $patternName, identifier: "field.シフト名")
             HStack {
@@ -176,14 +194,14 @@ struct WorkplaceWizard: View {
                 MinutesTimePicker(title: "終了", minutes: $endMinute)
             }
             Text("毎週入る曜日")
-                .font(.system(size: 14, weight: .bold))
+                .designFont(13, weight: .bold)
             HStack {
                 ForEach(Array(["日", "月", "火", "水", "木", "金", "土"].enumerated()), id: \.offset) { index, label in
                     let weekday = index + 1
                     Button(label) {
                         if weekdays.contains(weekday) { weekdays.remove(weekday) } else { weekdays.insert(weekday) }
                     }
-                    .font(.system(size: 13, weight: .bold))
+                    .designFont(13, weight: .bold)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .background(weekdays.contains(weekday) ? Theme.ink : Color.white)
@@ -201,7 +219,7 @@ struct WorkplaceWizard: View {
             Button(step == 1 ? "スキップ" : "戻る") {
                 if step == 1 { dismiss() } else { step -= 1 }
             }
-            .font(.system(size: 16, weight: .bold))
+            .designFont(16, weight: .bold)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(Theme.cardRaised)
@@ -209,7 +227,7 @@ struct WorkplaceWizard: View {
             Button(step == 3 ? "はじめる" : (step == 1 ? "追加して次へ" : "次へ")) {
                 if step < 3 { step += 1 } else { save() }
             }
-            .font(.system(size: 16, weight: .bold))
+            .designFont(16, weight: .bold)
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -223,8 +241,9 @@ struct WorkplaceWizard: View {
     private func field(_ title: String, text: Binding<String>, identifier: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 14, weight: .bold))
+                .designFont(13, weight: .bold)
             TextField(title, text: text)
+                .designFont(16)
                 .padding(14)
                 .background(Theme.cardRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -235,7 +254,7 @@ struct WorkplaceWizard: View {
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Text(title)
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
         }
         .tint(Theme.lime)
         .padding(14)
@@ -258,6 +277,12 @@ struct WorkplaceWizard: View {
         )
         workplace.place = place
         workplace.notes = phone
+        workplace.phone = phone
+        workplace.openingHours = hours
+        workplace.officialURL = officialURL
+        workplace.latitude = latitude
+        workplace.longitude = longitude
+        workplace.hasMapCoordinate = hasCoordinate
         workplace.closingDay = 0
         workplace.customBreaks = !legalBreak
         workplace.wageHistory = [Workplace.WageHistoryEntry(at: effectiveFrom, hourlyWage: wageValue)]

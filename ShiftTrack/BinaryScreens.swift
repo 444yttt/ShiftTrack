@@ -123,14 +123,14 @@ private struct PayPeriodRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(PayWindows.rangeTitle(window))
-                .font(.system(size: 16, weight: .bold))
+                .designFont(13, weight: .bold)
             Text("支給日 \(Self.dayText(window.payday))")
-                .font(.system(size: 12))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             let open = mine.filter(\.needsAttendanceCheck).count
             if open > 0 {
                 Text("未確認の勤務 \(open)件")
-                    .font(.system(size: 12))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
             }
             Text(Formatters.yen(mine.reduce(0) { $0 + $1.estimatedYen(includeTransport: true) }))
@@ -223,7 +223,7 @@ struct PayPeriodDetailView: View {
             group("確認済み", mine.filter { $0.attendanceConfirmed && $0.hasEnded() })
             group("未確認", mine.filter(\.needsAttendanceCheck))
             group("これからのシフト", mine.filter { !$0.hasEnded() })
-            Text("終わった勤務を押すと、時間・休憩を確認できます。")
+            Text("おつかれさまでした、は「確認していない勤務」から開きます。勤務が終わったときは振動だけで、ここからは開きません。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
             Text("給与明細と照らし合わせる")
@@ -279,13 +279,9 @@ struct PayPeriodDetailView: View {
             Text("\(title) \(rows.count)件")
                 .font(.system(size: 14, weight: .bold))
             ForEach(rows) { shift in
-                NavigationLink {
-                    ShiftCheckView(shift: shift)
-                } label: {
-                    Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(shift.needsAttendanceCheck || !shift.hasEnded() ? Theme.muted : Theme.ink)
-                }
+                Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(shift.needsAttendanceCheck || !shift.hasEnded() ? Theme.muted : Theme.ink)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -349,7 +345,7 @@ struct PayTermsNote: View {
     var body: some View {
         ScreenScroll {
             Text("締め日と支払日")
-                .font(.system(size: 22, weight: .black))
+                .designFont(13, weight: .black)
             Text("締めと支払日")
             Text("締めの曜日までの7日間が1回分です。0日は締め日に支払います。")
                 .foregroundStyle(Theme.muted)
@@ -360,7 +356,7 @@ struct PayTermsNote: View {
             Text("交通費を追加")
             Text("交通費を削除")
             Text("入力そのものは勤務先の編集にあります。ここから保存しても、入っているシフトは再計算しません。")
-                .font(.system(size: 13))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
         }
         .background(Theme.background)
@@ -389,18 +385,18 @@ struct CalendarAccessView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("カレンダーの許可")
-                .font(.system(size: 22, weight: .black))
+                .designFont(20, weight: .black)
             Text("許可の分岐は未回収です。予定の読み取りはまだ繋いでいません。")
-                .font(.system(size: 14))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             Button("入力を続ける") { dismiss() }
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Theme.cardRaised)
                 .clipShape(Capsule())
             Button("設定アプリを開く") { openSettings() }
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -426,15 +422,15 @@ struct LocationNoteView: View {
     var body: some View {
         ScreenScroll {
             Text("住所・位置（任意）")
-                .font(.system(size: 22, weight: .black))
+                .designFont(16, weight: .black)
             TextField("住所", text: $place)
                 .padding(14)
                 .background(Theme.cardRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             Text("時給の変更を追加")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
             Text("この文言は位置の画面の関数が読みます。地図の検索結果は未回収なので出しません。時給の行は勤務先の編集にあります。")
-                .font(.system(size: 13))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
         }
         .background(Theme.background)
@@ -489,6 +485,7 @@ struct LateTemplateList: View {
                     }
                 }
             }
+            .designFont(16)
             .navigationTitle("メッセージの文章")
             .toolbar {
                 Button("閉じる") { dismiss() }
@@ -519,37 +516,37 @@ struct LateMessageComposer: View {
     var body: some View {
         ScreenScroll {
             Text("① 遅れる理由")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
             Picker("理由", selection: $reason) {
                 ForEach(Self.reasons, id: \.self) { Text($0).tag($0) }
             }
             .pickerStyle(.inline)
             Text("② 遅れる時間")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
             Stepper("\(minutes)分", value: $minutes, in: 0...180)
             Text("③ 言葉づかい")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
             Picker("結び", selection: $ending) {
                 ForEach(Self.endings, id: \.self) { Text($0).tag($0) }
             }
             .pickerStyle(.segmented)
             Text("文章はここで直せます。①〜③の答えを変えると作り直します。")
-                .font(.system(size: 13))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             Text(draft)
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             Text("選び方の式は未回収です。上の文は、選んだ文言を並べただけです。")
-                .font(.system(size: 12))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             Button("保存") {
                 UserDefaults.standard.set(draft, forKey: Self.storageKey)
                 saved = true
             }
-            .font(.system(size: 16, weight: .bold))
+            .designFont(16, weight: .bold)
             .foregroundStyle(Theme.ink)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -557,9 +554,9 @@ struct LateMessageComposer: View {
             .clipShape(Capsule())
             if saved {
                 Text("型を保存しました")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                 Text("この端末に下書きを残しました。送信はしていません。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
             }
         }
@@ -625,12 +622,12 @@ struct ShiftCheckView: View {
     var body: some View {
         ScreenScroll {
             Text("おつかれさまでした")
-                .font(.system(size: 28, weight: .black))
+                .designFont(20, weight: .black)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text("\(shift.workplace?.name ?? "勤務先") の勤務時間はこのとおりでしたか？違っていたら押して直せます。")
-                .font(.system(size: 15))
+                .designFont(16)
             Text("\(shift.workplace?.name ?? "勤務先") - \(Formatters.longDay(shift.date))")
-                .font(.system(size: 14))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
             HStack(spacing: 10) {
                 clockCard("IN", shift.startMinutes)
@@ -638,7 +635,7 @@ struct ShiftCheckView: View {
             }
             HStack {
                 Text("休憩 \(breakMinutes)分")
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(16, weight: .bold)
                 Spacer()
                 Button("−") { breakMinutes = max(0, breakMinutes - 15) }
                     .buttonStyle(.plain)
@@ -652,14 +649,15 @@ struct ShiftCheckView: View {
                     .clipShape(Circle())
             }
             Button("+ 休憩の時間帯を入れる") { showBandNote = true }
-                .font(.system(size: 14, weight: .bold))
+                .designFont(16, weight: .bold)
             if showBandNote {
                 Text("休憩の開始と終了の帯は未回収です。分数だけを変えています。")
-                    .font(.system(size: 12))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("働いた時間 \(Formatters.hours(minutes))")
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Color.white)
                 Text("\(yenBody(yen))円")
                     .font(.doto(32))
@@ -684,7 +682,7 @@ struct ShiftCheckView: View {
             }
             if let onEdit {
                 Button("この日のシフトを編集", action: onEdit)
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(13, weight: .bold)
                     .foregroundStyle(Theme.muted)
             }
         }
@@ -692,7 +690,7 @@ struct ShiftCheckView: View {
         .navigationTitle("おつかれさまでした")
         .safeAreaInset(edge: .bottom) {
             Button("このとおり", action: confirm)
-                .font(.system(size: 17, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -712,7 +710,7 @@ struct ShiftCheckView: View {
     private func clockCard(_ title: String, _ minutes: Int) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 13, weight: .bold))
+                .designFont(13, weight: .bold)
                 .foregroundStyle(Theme.muted)
             Text(Formatters.clock(minutes))
                 .font(.doto(28))

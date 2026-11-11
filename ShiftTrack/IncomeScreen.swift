@@ -71,7 +71,7 @@ struct IncomeScreen: View {
                     .minimumScaleFactor(0.6)
                 if scope == .year {
                     Text("年")
-                        .font(.system(size: 22, weight: .bold))
+                        .designFont(16, weight: .bold)
                 }
                 Spacer(minLength: 4)
                 HStack(spacing: 6) {
@@ -84,7 +84,7 @@ struct IncomeScreen: View {
                             scope = item
                         } label: {
                             Text(item.rawValue)
-                                .font(.system(size: 13, weight: .bold))
+                                .designFont(16, weight: .bold)
                                 .foregroundStyle(scope == item ? Theme.ink : Theme.muted)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
@@ -109,7 +109,7 @@ struct IncomeScreen: View {
                 } label: {
                     HStack {
                         Text(PayWindows.phrase(workplace))
-                            .font(.system(size: 15, weight: .medium))
+                            .designFont(16, weight: .medium)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .foregroundStyle(Theme.muted)
@@ -131,14 +131,14 @@ struct IncomeScreen: View {
                 .padding(.top, 12)
 
             Text("勤務先ごと")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 4)
 
             if totals.rows.isEmpty {
                 Text(emptySalaryText(calendar: calendar))
-                    .font(.system(size: 14))
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -150,15 +150,15 @@ struct IncomeScreen: View {
                                 .frame(width: 10, height: 10)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.name)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .designFont(16, weight: .medium)
                                     .foregroundStyle(Theme.ink)
                                 Text(Formatters.hours(row.minutes))
-                                    .font(.system(size: 11))
+                                    .designFont(16)
                                     .foregroundStyle(Theme.muted)
                             }
                             Spacer()
                             Text(Formatters.yen(row.yen))
-                                .font(.system(size: 14, weight: .bold))
+                                .designFont(16, weight: .bold)
                                 .foregroundStyle(Theme.lime)
                         }
                         .padding(14)
@@ -173,10 +173,10 @@ struct IncomeScreen: View {
             } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("年収の壁")
-                        .font(.system(size: 15, weight: .bold))
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.ink)
                     Text(wallLine)
-                        .font(.system(size: 12))
+                        .designFont(16)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -189,7 +189,7 @@ struct IncomeScreen: View {
             .accessibilityIdentifier("income.walls")
 
             Text("表示しているのは、その月・年に入る給料です。給料日が翌月の勤務先は、働いた月ではなく入金月に載ります。")
-                .font(.system(size: 11))
+                .designFont(16)
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -246,7 +246,7 @@ struct IncomeScreen: View {
     private func yearForecastCard(_ totals: IncomeEngine.Totals) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("年収の見込み")
-                .font(.system(size: 14, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
             forecastLine("働いた分", totals.workedYen)
             forecastLine(scope == .year ? "年末までのシフト分" : "この期間のシフト分", totals.scheduledYen)
@@ -257,7 +257,7 @@ struct IncomeScreen: View {
             }
             if countByPayday {
                 Text("支給日で束ねる式は未回収です。合計は働いた日と同じです。")
-                    .font(.system(size: 11))
+                    .designFont(16)
                     .foregroundStyle(Color.white.opacity(0.75))
             }
         }
@@ -280,7 +280,7 @@ struct IncomeScreen: View {
 
     private func countChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .font(.system(size: 13, weight: .bold))
+            .designFont(16, weight: .bold)
             .foregroundStyle(selected ? Theme.ink : Color.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -292,15 +292,15 @@ struct IncomeScreen: View {
     private func goalHeader(title: String, goal: Int, edit: @escaping () -> Void) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 13, weight: .medium))
+                .designFont(16, weight: .medium)
                 .foregroundStyle(Theme.muted)
             Spacer()
             Button(action: edit) {
                 HStack(spacing: 6) {
                     Text(Formatters.yen(goal))
-                        .font(.system(size: 16, weight: .black))
+                        .designFont(16, weight: .black)
                     Image(systemName: "pencil")
-                        .font(.system(size: 12, weight: .bold))
+                        .designFont(16, weight: .bold)
                 }
                 .foregroundStyle(Theme.lime)
             }
@@ -315,11 +315,11 @@ struct IncomeScreen: View {
             SalaryDonut(rows: totals.rows, center: Formatters.yen(totals.workedYen), delta: delta)
             HStack {
                 Text(goal > 0 ? Formatters.percent(ratio, decimals: true) : "—")
-                    .font(.system(size: 22, weight: .black))
+                    .designFont(16, weight: .black)
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 Text(remainingLabel(remaining))
-                    .font(.system(size: 13, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.ink)
             }
             GeometryReader { proxy in
@@ -344,10 +344,10 @@ struct IncomeScreen: View {
     private func mini(_ title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .designFont(16, weight: .medium)
                 .foregroundStyle(Theme.muted)
             Text(value)
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -407,7 +407,7 @@ struct IncomeScreen: View {
     private func chevron(_ name: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: name)
-                .font(.system(size: 12, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(width: 28, height: 28)
                 .background(Theme.dayFilled)
@@ -454,16 +454,16 @@ private struct SalaryDonut: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("今日までの給料")
-                    .font(.system(size: 12, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.muted)
                 Text(center)
-                    .font(.system(size: 26, weight: .black))
+                    .designFont(16, weight: .black)
                     .foregroundStyle(Theme.lime)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 if let delta, delta != 0 {
                     Text(delta > 0 ? "+\(Formatters.yen(delta))" : Formatters.yen(delta))
-                        .font(.system(size: 13, weight: .bold))
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(delta > 0 ? Theme.lime : Theme.behind)
                 }
             }
@@ -487,28 +487,28 @@ struct GoalEditorSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.muted)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("¥")
-                        .font(.system(size: 28, weight: .black))
+                        .designFont(16, weight: .black)
                         .foregroundStyle(Theme.lime)
                     TextField("0", text: $text)
                         .keyboardType(.numberPad)
-                        .font(.system(size: 36, weight: .black))
+                        .designFont(16, weight: .black)
                         .foregroundStyle(Theme.ink)
                         .focused($typing)
                 }
                 Text("\(Formatters.yen(minimum))〜\(Formatters.yen(upper - 1))")
-                    .font(.system(size: 12))
+                    .designFont(16)
                     .foregroundStyle(Theme.muted)
                 if !error.isEmpty {
                     Text(error)
-                        .font(.system(size: 13))
+                        .designFont(16)
                         .foregroundStyle(Theme.behind)
                 }
                 Spacer()
-                LimeCapsuleButton(title: "完了する", fillWidth: true) { commit() }
+                LimeCapsuleButton(title: "完了する", fillWidth: true, designSize: 16) { commit() }
             }
             .padding(20)
             .background(Theme.background)

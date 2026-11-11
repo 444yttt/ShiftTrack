@@ -60,5 +60,26 @@ struct ShiftTrackShortcuts: AppShortcutsProvider {
             shortTitle: "シフト表を取り込む",
             systemImageName: "text.viewfinder"
         )
+        AppShortcut(
+            intent: ClockInIntent(),
+            phrases: ["\(.applicationName)で出勤"],
+            shortTitle: "出勤",
+            systemImageName: "figure.walk.arrival"
+        )
+        AppShortcut(
+            intent: ClockOutIntent(),
+            phrases: ["\(.applicationName)で退勤"],
+            shortTitle: "退勤",
+            systemImageName: "figure.walk.departure"
+        )
+        AppShortcut(
+            intent: MonthForecastIntent(),
+            phrases: [
+                "\(.applicationName)で今月の見込み",
+                "\(.applicationName)の今月の収入"
+            ],
+            shortTitle: "今月の見込み",
+            systemImageName: "yensign.circle"
+        )
     }
 }

@@ -117,6 +117,7 @@ struct PatternEditorView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \ShiftPattern.createdAt) private var patterns: [ShiftPattern]
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
+    @Query private var shifts: [WorkShift]
 
     @State private var name = ""
     @State private var workplaceID: UUID?
@@ -126,6 +127,9 @@ struct PatternEditorView: View {
     @State private var weekdays: Set<Int> = [2, 3, 4, 5, 6]
     @State private var error = ""
     @State private var confirmDelete = false
+    @State private var overlap: [ShiftOverlap.Hit] = []
+    @State private var overlapSheet = false
+    @AppStorage("settings.travelMinutes") private var travelMinutes = 30
 
     private var existing: ShiftPattern? { patterns.first { $0.uuid == patternID } }
 
@@ -156,12 +160,18 @@ struct PatternEditorView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.muted)
                 WeekdaySelector(days: $weekdays)
+                ForEach(liveOverlap) { hit in
+                    Text(ShiftOverlap.row(hit))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if !error.isEmpty {
                     Text(error)
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.behind)
                 }
-                LimeCapsuleButton(title: existing == nil ? "パターンを保存" : "変更を保存", fillWidth: true, action: save)
+                LimeCapsuleButton(title: existing == nil ? "パターンを保存" : "変更を保存", fillWidth: true) { save() }
                 if existing != nil {
                     Button("パターンを削除") { confirmDelete = true }
                         .font(.system(size: 14, weight: .bold))
@@ -186,7 +196,53 @@ struct PatternEditorView: View {
                 Button("削除", role: .destructive, action: deletePattern)
                 Button("キャンセル", role: .cancel) {}
             }
+            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
+                Button("このまま保存") {
+                    overlap = []
+                    save(force: true)
+                }
+                Button("やめる", role: .cancel) { overlap = [] }
+            } message: {
+                Text(ShiftOverlap.confirmMessage(overlap))
+            }
+            .sheet(isPresented: $overlapSheet) {
+                ShiftOverlapList(hits: overlap, onSave: {
+                    overlapSheet = false
+                    overlap = []
+                    save(force: true)
+                }, onCancel: {
+                    overlapSheet = false
+                    overlap = []
+                })
+            }
         }
+    }
+
+    private var overlapAlert: Binding<Bool> {
+        Binding(get: { overlap.count == 1 && !overlapSheet }, set: { if !$0 { overlap = [] } })
+    }
+
+    private var liveOverlap: [ShiftOverlap.Hit] {
+        guard let workplaceID else { return [] }
+        let calendar = ShiftOverlap.tokyo
+        let workplace = workplaces.first { $0.uuid == workplaceID }
+        let proposed = ShiftOverlap.upcoming(weekdays: weekdays, from: .now, calendar: calendar).enumerated().map { index, day in
+            ShiftOverlap.span(
+                id: "template-\(index)",
+                name: workplace?.name ?? "シフト",
+                workplace: workplaceID,
+                day: day,
+                start: startMinutes,
+                end: endMinutes,
+                calendar: calendar
+            )
+        }
+        return ShiftOverlap.conflicts(
+            batch: proposed,
+            existing: shifts.map { ShiftOverlap.span(from: $0, calendar: calendar) },
+            travelMinutes: travelMinutes,
+            calendar: calendar
+        )
     }
 
     private var field: some View {
@@ -213,7 +269,7 @@ struct PatternEditorView: View {
         weekdays = existing.weekdays
     }
 
-    private func save() {
+    private func save(force: Bool = false) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             error = "名前を入力してください"
@@ -231,6 +287,19 @@ struct PatternEditorView: View {
         if workplace?.payIsDaily != true, ShiftDatePolicy.clockMinutes(startMinutes) == ShiftDatePolicy.clockMinutes(endMinutes) {
             error = "開始と終了が同じです。日給の勤務先以外は保存できません。"
             return
+        }
+        if !force {
+            let found = liveOverlap
+            if found.count == 1 {
+                overlap = found
+                overlapSheet = false
+                return
+            }
+            if ShiftOverlap.usesSheet(found) {
+                overlap = found
+                overlapSheet = true
+                return
+            }
         }
         error = ""
         if let existing {
@@ -279,6 +348,9 @@ struct PatternApplyView: View {
     @State private var end = Calendar.current.date(byAdding: .day, value: 27, to: Calendar.current.startOfDay(for: .now)) ?? .now
     @State private var message = ""
     @State private var savedCount: Int?
+    @State private var overlap: [ShiftOverlap.Hit] = []
+    @State private var overlapSheet = false
+    @AppStorage("settings.travelMinutes") private var travelMinutes = 30
 
     private var pattern: ShiftPattern? { patterns.first { $0.uuid == patternID } }
     private var workplace: Workplace? {
@@ -324,6 +396,27 @@ struct PatternApplyView: View {
                 }
                 .disabled(result.create.isEmpty)
             }
+            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
+                Button("このまま保存") {
+                    let pending = overlap
+                    overlap = []
+                    if !pending.isEmpty { apply(currentResult, force: true) }
+                }
+                Button("やめる", role: .cancel) { overlap = [] }
+            } message: {
+                Text(ShiftOverlap.confirmMessage(overlap))
+            }
+            .sheet(isPresented: $overlapSheet) {
+                ShiftOverlapList(hits: overlap, onSave: {
+                    let pending = overlap
+                    overlapSheet = false
+                    overlap = []
+                    if !pending.isEmpty { apply(currentResult, force: true) }
+                }, onCancel: {
+                    overlapSheet = false
+                    overlap = []
+                })
+            }
             .background(Theme.background)
             .navigationTitle("曜日に入れる")
             .navigationBarTitleDisplayMode(.inline)
@@ -366,8 +459,42 @@ struct PatternApplyView: View {
         return "新しく\(result.create.count)件。既にあるので作らない日が\(result.skippedExisting)日。"
     }
 
-    private func apply(_ result: ShiftPatternPlan.Result) {
+    private var overlapAlert: Binding<Bool> {
+        Binding(get: { overlap.count == 1 && !overlapSheet }, set: { if !$0 { overlap = [] } })
+    }
+
+    private func apply(_ result: ShiftPatternPlan.Result, force: Bool = false) {
         guard let workplace, !result.create.isEmpty else { return }
+        if !force {
+            let calendar = ShiftOverlap.tokyo
+            let proposed = result.create.enumerated().map { index, proposal in
+                ShiftOverlap.span(
+                    id: "new-\(index)",
+                    name: workplace.name,
+                    workplace: workplace.uuid,
+                    day: proposal.day,
+                    start: proposal.startMinutes,
+                    end: proposal.endMinutes,
+                    calendar: calendar
+                )
+            }
+            let found = ShiftOverlap.conflicts(
+                batch: proposed,
+                existing: shifts.map { ShiftOverlap.span(from: $0, calendar: calendar) },
+                travelMinutes: travelMinutes,
+                calendar: calendar
+            )
+            if found.count == 1 {
+                overlap = found
+                overlapSheet = false
+                return
+            }
+            if ShiftOverlap.usesSheet(found) {
+                overlap = found
+                overlapSheet = true
+                return
+            }
+        }
         for proposal in result.create {
             context.insert(WorkShift(
                 date: proposal.day,
@@ -423,7 +550,7 @@ struct RequestEditorView: View {
         NavigationStack {
             ScreenScroll {
                 Text("希望はシフトではありません。給料の見込にも、今日の予定全体の時給分にも入りません。シフトにするまで金額は動きません。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 DatePicker("日付", selection: $date, displayedComponents: .date)
@@ -441,18 +568,19 @@ struct RequestEditorView: View {
                 }
                 Stepper(value: $breakMinutes, in: 0...300) {
                     Text("休憩 \(breakMinutes)分")
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.ink)
                 }
                 TextField("メモ", text: $note)
-                    .font(.system(size: 16))
+                    .designFont(16)
                     .foregroundStyle(Theme.ink)
                 if !error.isEmpty {
                     Text(error)
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.behind)
                 }
                 Text(note.isEmpty ? "予定はありません" : note)
-                    .font(.system(size: 14))
+                    .designFont(20)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
@@ -460,25 +588,25 @@ struct RequestEditorView: View {
                     Text("休み")
                     Text("時間指定")
                 }
-                .font(.system(size: 13, weight: .bold))
+                .designFont(16, weight: .bold)
                 Button("クリア") {
                     note = ""
                     startMinutes = 9 * 60
                     endMinutes = 17 * 60
                 }
-                .font(.system(size: 14, weight: .bold))
+                .designFont(13, weight: .bold)
                 Button("テキスト生成") { showPlanner = true }
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Theme.lime)
                     .clipShape(Capsule())
-                LimeCapsuleButton(title: "希望を保存", fillWidth: true, action: save)
+                LimeCapsuleButton(title: "希望を保存", fillWidth: true, designSize: 16, action: save)
                 if existing?.isOpen == true {
-                    LimeCapsuleButton(title: "シフトにする", fillWidth: true, action: accept)
+                    LimeCapsuleButton(title: "シフトにする", fillWidth: true, designSize: 16, action: accept)
                     Button("希望を見送る") { decline() }
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(13, weight: .bold)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
                 }

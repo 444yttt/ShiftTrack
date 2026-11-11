@@ -50,12 +50,14 @@ struct CustomTabBar: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: tab.symbol)
-                            .font(.system(size: 16, weight: .semibold))
+                            .designFont(16, weight: .semibold)
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(selection == tab ? Theme.ink : Color.white)
                             .frame(width: 36, height: 36)
                             .background(selection == tab ? Theme.lime : Color.clear)
                             .clipShape(Circle())
+                        // The screenshot shows the label smaller than the symbol.
+                        // Root's only recovered design size is 16, used on the symbol above.
                         Text(tab.title)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(Color.white)
@@ -84,12 +86,14 @@ struct LimeCapsuleButton: View {
     var title: String
     var fillWidth = false
     var identifier: String? = nil
+    /// Design size for screens whose text goes through Dynamic Type scaling.
+    /// Screens outside that list leave this unset.
+    var designSize: CGFloat? = nil
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: fillWidth ? 15 : 13, weight: .bold))
+            label
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: fillWidth ? .infinity : nil)
                 .padding(.horizontal, 14)
@@ -99,6 +103,14 @@ struct LimeCapsuleButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier ?? title)
+    }
+
+    @ViewBuilder private var label: some View {
+        if let designSize {
+            Text(title).designFont(designSize, weight: .bold)
+        } else {
+            Text(title).font(.system(size: fillWidth ? 15 : 13, weight: .bold))
+        }
     }
 }
 

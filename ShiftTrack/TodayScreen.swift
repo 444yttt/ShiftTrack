@@ -576,9 +576,9 @@ struct UnconfirmedList: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
-                            .font(.system(size: 16, weight: .bold))
+                            .designFont(13, weight: .bold)
                         Text(shift.workplace?.name ?? "勤務先")
-                            .font(.system(size: 12))
+                            .designFont(13)
                             .foregroundStyle(Theme.muted)
                     }
                 }
@@ -586,7 +586,7 @@ struct UnconfirmedList: View {
             .navigationTitle("確認していない勤務")
             .safeAreaInset(edge: .top) {
                 Text("終わった勤務を押すと、時間・休憩を確認できます。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)

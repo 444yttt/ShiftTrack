@@ -136,7 +136,7 @@ struct GuideCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("\(page)/\(total)")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(13, weight: .bold)
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -145,12 +145,12 @@ struct GuideCard: View {
                 .accessibilityLabel("閉じる")
             }
             Text(text)
-                .font(.system(size: 15))
+                .designFont(13)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
                 if let onBack {
                     Button("戻る", action: onBack)
-                        .font(.system(size: 16, weight: .bold))
+                        .designFont(13, weight: .bold)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(Color.white)
@@ -158,7 +158,7 @@ struct GuideCard: View {
                         .overlay { Capsule().stroke(Theme.ink, lineWidth: 1.5) }
                 }
                 Button(page == total ? "おわり" : "次へ", action: onNext)
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(13, weight: .bold)
                     .foregroundStyle(Color.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)

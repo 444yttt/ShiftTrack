@@ -12,6 +12,14 @@ final class Workplace {
     var notes: String
     var genre: String
     var place: String
+    /// Read from a shop card or a maps link. Empty on older rows.
+    var phone: String = ""
+    var openingHours: String = ""
+    var officialURL: String = ""
+    /// Set only when the person asks to look up the address. 0 is not a saved pin.
+    var latitude: Double = 0
+    var longitude: Double = 0
+    var hasMapCoordinate: Bool = false
     var closingDay: Int
     var paydayMonthOffset: Int
     var paydayDay: Int
@@ -80,6 +88,12 @@ final class Workplace {
         self.notes = notes
         self.genre = ""
         self.place = ""
+        self.phone = ""
+        self.openingHours = ""
+        self.officialURL = ""
+        self.latitude = 0
+        self.longitude = 0
+        self.hasMapCoordinate = false
         self.closingDay = 0
         self.paydayMonthOffset = 0
         self.paydayDay = 0
@@ -222,6 +236,9 @@ final class WorkShift {
     /// Optional trip target. Empty means the workplace itself. Does not change pay.
     var destinationName: String = ""
     var destinationPlace: String = ""
+    /// Attendance stamps. They do not replace the scheduled start or end, and pay ignores them.
+    var clockedInAt: Date? = nil
+    var clockedOutAt: Date? = nil
     var workplace: Workplace?
 
     init(
@@ -259,6 +276,8 @@ final class WorkShift {
         self.attendanceConfirmed = attendanceConfirmed
         self.destinationName = destinationName
         self.destinationPlace = destinationPlace
+        self.clockedInAt = nil
+        self.clockedOutAt = nil
     }
 
     var todos: [ShiftTodoCodec.Item] {

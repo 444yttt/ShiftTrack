@@ -236,6 +236,31 @@ enum ShiftImageReader {
             .joined(separator: "\n")
     }
 
+    static func recognizeLines(in data: Data) throws -> [ReadLine] {
+        let prepared = resized(data) ?? data
+        guard let image = UIImage(data: prepared), let cgImage = image.cgImage else { return [] }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["ja-JP", "en-US"]
+        request.usesLanguageCorrection = true
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try handler.perform([request])
+        let observations = (request.results as? [VNRecognizedTextObservation] ?? [])
+            .sorted { $0.boundingBox.minY > $1.boundingBox.minY }
+        return observations.enumerated().compactMap { index, observation in
+            guard let text = observation.topCandidates(1).first?.string else { return nil }
+            let rect = observation.boundingBox
+            return ReadLine(
+                id: index + 1,
+                text: text,
+                x: rect.minX,
+                y: 1 - rect.maxY,
+                width: rect.width,
+                height: rect.height
+            )
+        }
+    }
+
     private static func resized(_ data: Data) -> Data? {
         guard let image = UIImage(data: data) else { return nil }
         let maxSide: CGFloat = 1600

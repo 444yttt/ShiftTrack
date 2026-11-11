@@ -57,7 +57,7 @@ struct ImportChooserView: View {
     var body: some View {
         ScreenScroll {
             Text(IntelligenceAvailability.statusText)
-                .font(.system(size: 13))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 4)
@@ -89,14 +89,14 @@ struct ImportChooserView: View {
 
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
-                    .font(.system(size: 15))
+                    .designFont(16)
                     .foregroundStyle(Theme.ink)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 160)
                     .padding(10)
                 if text.isEmpty {
                     Text(placeholder)
-                        .font(.system(size: 15))
+                        .designFont(16)
                         .foregroundStyle(Theme.muted)
                         .padding(16)
                         .allowsHitTesting(false)
@@ -108,7 +108,7 @@ struct ImportChooserView: View {
 
             if !assumption.isEmpty {
                 Text(assumption)
-                    .font(.system(size: 12))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 8)
@@ -120,7 +120,7 @@ struct ImportChooserView: View {
                 }
             } label: {
                 Text("コピーした文字を貼る")
-                    .font(.system(size: 13, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.lime)
             }
             .buttonStyle(.plain)
@@ -128,7 +128,7 @@ struct ImportChooserView: View {
 
             if !error.isEmpty {
                 Text(error)
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.behind)
                     .padding(.top, 8)
             }
@@ -139,7 +139,7 @@ struct ImportChooserView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
             } else {
-                LimeCapsuleButton(title: "読み取る", fillWidth: true) {
+                LimeCapsuleButton(title: "読み取る", fillWidth: true, designSize: 16) {
                     Task { await extract() }
                 }
                 .padding(.top, 16)
@@ -178,7 +178,7 @@ struct ImportChooserView: View {
             Image(systemName: systemImage)
             Text(title)
         }
-        .font(.system(size: 13, weight: .bold))
+        .designFont(16, weight: .bold)
         .foregroundStyle(Theme.ink)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -258,13 +258,13 @@ struct ImportReviewView: View {
     var body: some View {
         ScreenScroll {
             Text(pending.message)
-                .font(.system(size: 13))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if pending.candidates.isEmpty {
                 Text("候補がありません")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 20)
             } else {
@@ -278,12 +278,12 @@ struct ImportReviewView: View {
 
             if !savedNote.isEmpty {
                 Text(savedNote)
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.lime)
                     .padding(.top, 8)
             }
 
-            LimeCapsuleButton(title: "選択した \(selectedCount) 件を保存", fillWidth: true) {
+            LimeCapsuleButton(title: "選択した \(selectedCount) 件を保存", fillWidth: true, designSize: 16) {
                 save()
             }
             .padding(.top, 16)
@@ -294,7 +294,7 @@ struct ImportReviewView: View {
                 ImportRouter.shared.discard()
                 dismiss()
             }
-            .font(.system(size: 14, weight: .medium))
+            .designFont(16, weight: .medium)
             .foregroundStyle(Theme.behind)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
@@ -334,18 +334,18 @@ struct ImportReviewView: View {
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.wrappedValue.workplaceName.isEmpty ? "勤務先未設定" : candidate.wrappedValue.workplaceName)
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Text("\(Formatters.monthDayWeekday(candidate.wrappedValue.date))  \(Formatters.clock(candidate.wrappedValue.startMinutes))–\(Formatters.clock(candidate.wrappedValue.endMinutes))  休憩\(candidate.wrappedValue.breakMinutes)分\(candidate.wrappedValue.breakFollowsRules ? "（規則）" : "（入力）")")
-                    .font(.system(size: 12))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                 Text(candidate.wrappedValue.createWorkplace ? "新規の勤務先として追加" : "既存の勤務先")
-                    .font(.system(size: 11, weight: .medium))
+                    .designFont(13, weight: .medium)
                     .foregroundStyle(Theme.lime)
             }
             Spacer()
             Button("編集") { editingID = candidate.wrappedValue.id }
-                .font(.system(size: 12, weight: .medium))
+                .designFont(16, weight: .medium)
                 .foregroundStyle(Theme.lime)
         }
         .padding(14)
@@ -480,10 +480,10 @@ struct CandidateEditor: View {
             ScreenScroll {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("勤務先")
-                        .font(.system(size: 12, weight: .medium))
+                        .designFont(13, weight: .medium)
                         .foregroundStyle(Theme.muted)
                     TextField("勤務先の名前", text: $candidate.workplaceName)
-                        .font(.system(size: 16, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                         .focused($typing)
                     Picker("登録方法", selection: $candidate.createWorkplace) {
@@ -510,7 +510,7 @@ struct CandidateEditor: View {
                     .onChange(of: candidate.endMinutes) { _, _ in refreshCandidateBreak() }
                     if ruleWorkplace?.payIsDaily == true {
                         Text("日給の勤務先では、休憩時間は給料から引きません。")
-                            .font(.system(size: 12))
+                            .designFont(13)
                             .foregroundStyle(Theme.muted)
                     } else {
                         Toggle("休憩を規則から入れる", isOn: candidateBreakFollows)
@@ -523,7 +523,7 @@ struct CandidateEditor: View {
                         breakMinutes: candidate.breakMinutes
                     ) == 0 {
                         Text("開始と終了が同じだと、この行は保存されません。")
-                            .font(.system(size: 12))
+                            .designFont(13)
                             .foregroundStyle(Theme.behind)
                     }
                 }
@@ -597,7 +597,7 @@ struct CandidateEditor: View {
     }
 }
 
-private struct PickedPhoto: Transferable {
+struct PickedPhoto: Transferable {
     let data: Data
 
     static var transferRepresentation: some TransferRepresentation {
