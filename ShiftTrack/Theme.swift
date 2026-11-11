@@ -36,11 +36,11 @@ extension Font {
 /// number was not identified, so the choice follows the screenshot.
 struct DesignFont: ViewModifier {
     var weight: Font.Weight
-    @ScaledMetric(relativeTo: .body) private var size: CGFloat
+    @ScaledMetric(relativeTo: .body) private var size: CGFloat = 16
 
     init(_ size: CGFloat, weight: Font.Weight = .regular) {
         self.weight = weight
-        _size = ScaledMetric(wrappedValue: size, relativeTo: .body)
+        self._size = ScaledMetric(wrappedValue: size, relativeTo: .body)
     }
 
     func body(content: Content) -> some View {
