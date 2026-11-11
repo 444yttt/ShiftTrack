@@ -52,13 +52,18 @@ struct WorkplaceDirectoryScreen: View {
             Button {
                 sheet = .wizard
             } label: {
-                Label("勤務先を追加", systemImage: "plus")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Theme.lime)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Theme.ink)
-                    .clipShape(Capsule())
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.lime)
+                        .clipShape(Circle())
+                    Text("勤務先を追加")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
             .padding(.top, 12)
@@ -180,6 +185,8 @@ struct WorkplaceDirectoryScreen: View {
             Button {
                 expanded = open ? nil : workplace.uuid
             } label: {
+                // Recovered names are chevron.up / chevron.down. Which bit means open is unrecovered.
+                // A collapsed card in the screenshot shows the downward chevron.
                 Image(systemName: open ? "chevron.up" : "chevron.down")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color.white)

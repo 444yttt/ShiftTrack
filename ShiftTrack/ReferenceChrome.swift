@@ -3,21 +3,15 @@ import SwiftUI
 /// Redrawn stand-in for the reference wordmark. The IPA logo image is not bundled.
 struct InOutWordmark: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: -4) {
-            HStack(spacing: 1) {
-                Text("i")
+        VStack(alignment: .leading, spacing: -6) {
+            HStack(spacing: 0) {
                 Image(systemName: "arrow.down")
-                    .font(.system(size: 11, weight: .black))
-                Text("n")
+                    .font(.system(size: 16, weight: .black))
+                Text("in")
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 11, weight: .black))
+                    .font(.system(size: 16, weight: .black))
             }
-            HStack(spacing: 1) {
-                Text("O")
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 11, weight: .black))
-                Text("UT")
-            }
+            Text("OUT")
         }
         .font(.system(size: 22, weight: .black))
         .foregroundStyle(Theme.ink)
@@ -80,6 +74,29 @@ struct ShopPlaceholder: View {
         .frame(height: 160)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .accessibilityLabel("店舗イラストの代わり。元の画像は同梱していません。")
+    }
+}
+
+/// Wallet stand-in for step 02. Not the original SetupPay image.
+struct PayPlaceholder: View {
+    var body: some View {
+        ZStack {
+            Color(hex: 0xF7F4EE)
+            VStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Theme.ink)
+                    .frame(width: 72, height: 48)
+                Capsule()
+                    .fill(Theme.lime)
+                    .frame(width: 88, height: 10)
+                Text("財布イラストの代わり")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+            }
+        }
+        .frame(height: 140)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityLabel("財布イラストの代わり。元の画像は同梱していません。")
     }
 }
 

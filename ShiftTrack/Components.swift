@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Tab order matches the reference screenshots: 一覧, カレンダー, 勤務先, 年収, 設定.
-/// Symbols for 1...3 are the recovered `calendar`, `building.2`, and `yensign`.
-/// Index 0 is the 17-byte name `slider.horizontal`. Settings is `slider.horizontal.3`
-/// from the screenshot; that symbol was not in the recovered switch.
+/// Tab order is the screenshot: 一覧, カレンダー, 勤務先, 年収, 設定.
+/// `calendar`, `building.2`, and `yensign` are the recovered names for the
+/// middle three. `slider.horizontal` is the recovered 17-byte name and sits on
+/// 設定; `w21 == 0` is not the leftmost tab. 一覧's symbol name is not in that
+/// switch, so the glyph follows the screenshot (`archivebox.fill`).
 enum AppTab: Int, CaseIterable, Identifiable {
     case list, calendar, workplaces, income, settings
     var id: Int { rawValue }
@@ -19,11 +20,11 @@ enum AppTab: Int, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .list: "slider.horizontal"
+        case .list: "archivebox.fill"
         case .calendar: "calendar"
         case .workplaces: "building.2"
         case .income: "yensign"
-        case .settings: "slider.horizontal.3"
+        case .settings: "slider.horizontal"
         }
     }
 
@@ -57,7 +58,7 @@ struct CustomTabBar: View {
                             .clipShape(Circle())
                         Text(tab.title)
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(selection == tab ? Theme.lime : Color.white.opacity(0.72))
+                            .foregroundStyle(Color.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -107,12 +108,12 @@ struct HelpButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                Circle().fill(Theme.chip)
+                Circle().fill(Color.white)
                 Image(systemName: "questionmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.muted)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.ink)
             }
-            .frame(width: 28, height: 28)
+            .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("ヘルプ")

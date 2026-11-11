@@ -7,6 +7,8 @@ struct WallsScreen: View {
     @Query private var settingsRows: [AppSettings]
     @State private var expanded: Int?
     @State private var showHelp = false
+    @AppStorage("wall.notifyMode") private var notifyMode = "通知しない"
+    @AppStorage("wall.amount") private var amountText = ""
 
     var body: some View {
         let includeTransport = settingsRows.first?.includeTransport ?? true
@@ -33,6 +35,44 @@ struct WallsScreen: View {
                 HelpButton { showHelp = true }
             }
             .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("金額")
+                    .font(.system(size: 14, weight: .bold))
+                TextField("0", text: $amountText)
+                    .keyboardType(.numberPad)
+                    .font(.doto(28))
+                ForEach(["通知しない", "割合で通知", "残り金額で通知"], id: \.self) { mode in
+                    Button {
+                        notifyMode = mode
+                    } label: {
+                        HStack {
+                            Text(mode)
+                            Spacer()
+                            if notifyMode == mode {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(notifyMode == mode ? Theme.ink : Theme.muted)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Text("「残り金額で通知」を読む関数は遅刻の画面だけを呼びます。スクショでは壁のシートに出ているので、ここにも置いています。通知は送りません。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                Button("保存") { dismiss() }
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.lime)
+                    .clipShape(Capsule())
+            }
+            .padding(16)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.top, 12)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("今年の給料見込")

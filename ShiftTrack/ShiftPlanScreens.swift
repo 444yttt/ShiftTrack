@@ -410,6 +410,7 @@ struct RequestEditorView: View {
     @State private var breakMinutes = 60
     @State private var note = ""
     @State private var error = ""
+    @State private var showPlanner = false
 
     init(route: RequestRoute) {
         self.route = route
@@ -450,6 +451,29 @@ struct RequestEditorView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.behind)
                 }
+                Text(note.isEmpty ? "予定はありません" : note)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Text("出勤")
+                    Text("休み")
+                    Text("時間指定")
+                }
+                .font(.system(size: 13, weight: .bold))
+                Button("クリア") {
+                    note = ""
+                    startMinutes = 9 * 60
+                    endMinutes = 17 * 60
+                }
+                .font(.system(size: 14, weight: .bold))
+                Button("テキスト生成") { showPlanner = true }
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.lime)
+                    .clipShape(Capsule())
                 LimeCapsuleButton(title: "希望を保存", fillWidth: true, action: save)
                 if existing?.isOpen == true {
                     LimeCapsuleButton(title: "シフトにする", fillWidth: true, action: accept)
@@ -469,6 +493,9 @@ struct RequestEditorView: View {
                 }
             }
             .onAppear(perform: load)
+            .sheet(isPresented: $showPlanner) {
+                RequestPlannerView(month: date)
+            }
         }
     }
 

@@ -12,8 +12,10 @@ struct WorkplaceWizard: View {
     @State private var place = ""
     @State private var phone = ""
     @State private var wage = ""
+    @State private var effectiveFrom = Date()
     @State private var night = true
     @State private var overtime = true
+    @State private var legalBreak = true
     @State private var patternName = ""
     @State private var startMinute = 17 * 60
     @State private var endMinute = 22 * 60
@@ -110,6 +112,7 @@ struct WorkplaceWizard: View {
 
     private var stepTwo: some View {
         VStack(alignment: .leading, spacing: 12) {
+            PayPlaceholder()
             Text("お給料の決まり")
                 .font(.system(size: 22, weight: .black))
             Text("お給料の見込みの計算に使います。あとから勤務先の画面で直せます。")
@@ -128,8 +131,25 @@ struct WorkplaceWizard: View {
             .padding(14)
             .background(Theme.cardRaised)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            DatePicker("適用開始日", selection: $effectiveFrom, displayedComponents: .date)
+            HStack {
+                Text("締め日")
+                Spacer()
+                Text("末日")
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(14)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             toggleRow("深夜割増（22時〜5時）", isOn: $night)
+            Text(night ? "25%" : "0%")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.muted)
             toggleRow("残業割増（1日8時間超）", isOn: $overtime)
+            Text(overtime ? "25%" : "0%")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.muted)
+            toggleRow("休憩", isOn: $legalBreak)
             Text("法律で決まった休憩で計算します（6時間を超えたら45分、8時間を超えたら60分）。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
@@ -238,6 +258,9 @@ struct WorkplaceWizard: View {
         )
         workplace.place = place
         workplace.notes = phone
+        workplace.closingDay = 0
+        workplace.customBreaks = !legalBreak
+        workplace.wageHistory = [Workplace.WageHistoryEntry(at: effectiveFrom, hourlyWage: wageValue)]
         workplace.nightPayEnabled = night
         workplace.nightRatePercent = night ? 25 : 0
         workplace.overtimeEnabled = overtime

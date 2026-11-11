@@ -1,5 +1,8 @@
 import SwiftData
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SettingsScreen: View {
     @Environment(\.modelContext) private var context
@@ -10,6 +13,19 @@ struct SettingsScreen: View {
     @State private var transportText = ""
     @FocusState private var focused: Bool
     @State private var showGuide = false
+    @State private var cover: SettingsCover?
+    @AppStorage("settings.travelMinutes") private var travelMinutes = 30
+
+    private enum SettingsCover: Identifiable {
+        case messages, calendarAccess, about
+        var id: String {
+            switch self {
+            case .messages: "messages"
+            case .calendarAccess: "calendar"
+            case .about: "about"
+            }
+        }
+    }
 
     var body: some View {
         if let settings = settingsRows.first {
@@ -31,7 +47,56 @@ struct SettingsScreen: View {
             }
             .padding(.top, 8)
 
+            Button {
+                cover = .messages
+            } label: {
+                settingsRow("メッセージの文章")
+            }
+            .buttonStyle(.plain)
+
             settingsNoticeCard
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("シフトの重なり")
+                    .font(.system(size: 15, weight: .bold))
+                Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
+                Text("この分数が重なり検査の閾値であることは、命令は示していません。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(16)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("位置情報の許可")
+                    .font(.system(size: 15, weight: .bold))
+                HStack {
+                    Text("未設定")
+                    Spacer()
+                    Button("位置情報を許可する") { openSystemSettings() }
+                        .font(.system(size: 14, weight: .bold))
+                }
+            }
+            .padding(16)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.top, 8)
+
+            Button {
+                cover = .calendarAccess
+            } label: {
+                settingsRow("カレンダー・リマインダー")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                cover = .about
+            } label: {
+                settingsRow("IN/OUT について")
+            }
+            .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("広告")
@@ -183,12 +248,45 @@ struct SettingsScreen: View {
                 }
             }
         }
+        .sheet(item: $cover) { destination in
+            switch destination {
+            case .messages:
+                LateTemplateList()
+            case .calendarAccess:
+                CalendarAccessView()
+            case .about:
+                AboutSheet()
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("完了") { focused = false }
             }
         }
+    }
+
+    private func settingsRow(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, 8)
+    }
+
+    private func openSystemSettings() {
+        #if canImport(UIKit)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+        #endif
     }
 
     private var settingsNoticeCard: some View {

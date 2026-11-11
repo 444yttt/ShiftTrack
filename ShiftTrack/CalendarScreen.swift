@@ -49,9 +49,7 @@ struct CalendarScreen: View {
     var body: some View {
         ScreenScroll {
             HStack {
-                Text("カレンダー")
-                    .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(Theme.ink)
+                InOutWordmark()
                 Spacer()
                 HelpButton { cover = .help }
             }

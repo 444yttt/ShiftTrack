@@ -11,13 +11,15 @@ struct IncomeScreen: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query private var settingsRows: [AppSettings]
-    @State private var scope: IncomeScope = .month
+    @State private var scope: IncomeScope = .year
     @State private var anchor = Date()
     @State private var editGoal = false
     @State private var askApply = false
     @State private var pendingGoal = 0
     @State private var delta: Int?
     @State private var showWalls = false
+    @State private var showGuide = false
+    @State private var countByPayday = false
 
     var body: some View {
         if let settings = settingsRows.first {
@@ -54,12 +56,21 @@ struct IncomeScreen: View {
         let upper = scope == .year ? 10_000_000 : 1_000_000
 
         return ScreenScroll {
-            HStack(alignment: .center, spacing: 8) {
+            HStack {
+                InOutWordmark()
+                Spacer()
+                HelpButton { showGuide = true }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(scope == .year ? "\(year)" : Formatters.monthTitle(anchor))
                     .font(.doto(54))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                if scope == .year {
+                    Text("年")
+                        .font(.system(size: 22, weight: .bold))
+                }
                 Spacer(minLength: 4)
                 HStack(spacing: 6) {
                     chevron("chevron.left") { move(-1) }
@@ -72,7 +83,7 @@ struct IncomeScreen: View {
                         } label: {
                             Text(item.rawValue)
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(scope == item ? Theme.ink : .white)
+                                .foregroundStyle(scope == item ? Theme.ink : Theme.muted)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(scope == item ? Theme.lime : Color.clear)
@@ -86,6 +97,9 @@ struct IncomeScreen: View {
                 .clipShape(Capsule())
             }
             .padding(.top, 8)
+
+            yearForecastCard(totals)
+                .padding(.top, 12)
 
             goalHeader(title: scope == .year ? "年間目標" : "月間目標", goal: goal) {
                 pendingGoal = goal
@@ -160,6 +174,21 @@ struct IncomeScreen: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.background)
+        .overlay {
+            if showGuide, !GuideMemory.suppressed {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    GuideCard(
+                        page: 1,
+                        total: 1,
+                        text: "今日と今月のお給料の見込みです。シフトの時間と時給から計算します。",
+                        onBack: nil,
+                        onNext: { showGuide = false },
+                        onClose: { showGuide = false }
+                    )
+                }
+            }
+        }
         .sheet(isPresented: $showWalls) {
             WallsScreen()
                 .presentationBackground(Theme.background)
@@ -186,6 +215,52 @@ struct IncomeScreen: View {
             }
             Button("キャンセル", role: .cancel) {}
         }
+    }
+
+    private func yearForecastCard(_ totals: IncomeEngine.Totals) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("年収の見込み")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.white)
+            forecastLine("働いた分", totals.workedYen)
+            forecastLine(scope == .year ? "年末までのシフト分" : "この期間のシフト分", totals.scheduledYen)
+            forecastLine("合計", totals.forecastYen)
+            HStack(spacing: 8) {
+                countChip("働いた日", selected: !countByPayday) { countByPayday = false }
+                countChip("支給日", selected: countByPayday) { countByPayday = true }
+            }
+            if countByPayday {
+                Text("支給日で束ねる式は未回収です。合計は働いた日と同じです。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.75))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.ink)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func forecastLine(_ title: String, _ yen: Int) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(Color.white)
+            Spacer()
+            Text(Formatters.yen(yen))
+                .font(.doto(22))
+                .foregroundStyle(Theme.lime)
+        }
+    }
+
+    private func countChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(selected ? Theme.ink : Color.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(selected ? Theme.lime : Color.white.opacity(0.12))
+            .clipShape(Capsule())
+            .buttonStyle(.plain)
     }
 
     private func goalHeader(title: String, goal: Int, edit: @escaping () -> Void) -> some View {

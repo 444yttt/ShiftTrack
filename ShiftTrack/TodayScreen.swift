@@ -21,12 +21,14 @@ struct TodayScreen: View {
         case editor(EditorRoute)
         case part
         case unconfirmed
+        case periods
 
         var id: String {
             switch self {
             case .editor(let route): "editor-\(route.id)"
             case .part: "part"
             case .unconfirmed: "unconfirmed"
+            case .periods: "periods"
             }
         }
     }
@@ -68,20 +70,6 @@ struct TodayScreen: View {
                     .foregroundStyle(Theme.background)
                     .accessibilityIdentifier("today.clock")
                 dayList(now: now)
-                Button {
-                    sheet = .editor(EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid))
-                } label: {
-                    Text("+  シフトを追加")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Theme.ink)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("＋シフトを追加")
-                .padding(.top, 8)
                 todoLine
                 payCards(now: now)
                 ShiftPartSection(
@@ -150,7 +138,11 @@ struct TodayScreen: View {
                 ShiftPartEditor()
                     .presentationBackground(Theme.background)
             case .unconfirmed:
-                UnconfirmedList(shifts: shifts.filter { $0.hasEnded() })
+                UnconfirmedList(shifts: shifts.filter { $0.hasEnded() }) { shift in
+                    sheet = .editor(EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid))
+                }
+            case .periods:
+                PayPeriodsView()
             }
         }
     }
@@ -313,7 +305,13 @@ struct TodayScreen: View {
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
-            rowLink("今月の支給見込み", value: "\(yenBody(monthYen(now: now)))円")
+            Button {
+                sheet = .periods
+            } label: {
+                rowLink("今月の支給見込み", value: "\(yenBody(monthYen(now: now)))円")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("today.periods")
             Button {
                 sheet = .unconfirmed
             } label: {
@@ -342,6 +340,22 @@ struct TodayScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
+    private var addShiftButton: some View {
+        Button {
+            sheet = .editor(EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid))
+        } label: {
+            Text("+  シフトを追加")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(Theme.ink)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("＋シフトを追加")
+    }
+
     private func yenBody(_ value: Int) -> String {
         let body = Formatters.yen(value)
         return body.hasPrefix("¥") ? String(body.dropFirst()) : body
@@ -353,16 +367,21 @@ struct TodayScreen: View {
             .sorted { $0.startMinutes < $1.startMinutes }
         return VStack(alignment: .leading, spacing: 10) {
             if rows.isEmpty {
-                Text("この日のシフトはありません")
-                    .font(.system(size: 16, weight: .medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                VStack(spacing: 16) {
+                    Text("この日のシフトはありません")
+                        .font(.system(size: 16, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                    addShiftButton
+                        .padding(.bottom, 20)
+                }
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             } else {
                 ForEach(rows) { shift in
                     shiftCard(shift, now: now)
                 }
+                addShiftButton
             }
         }
         .padding(.top, 8)
@@ -541,19 +560,32 @@ struct TodayScreen: View {
 
 struct UnconfirmedList: View {
     var shifts: [WorkShift]
+    var onEdit: (WorkShift) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List(shifts) { shift in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(shift.workplace?.name ?? "勤務先")
-                    Text(shift.scheduleLabel)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted)
+                NavigationLink {
+                    ShiftCheckView(shift: shift) { onEdit(shift) }
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(shift.workplace?.name ?? "勤務先")
+                        Text(shift.scheduleLabel)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                    }
                 }
             }
             .navigationTitle("確認していない勤務")
+            .safeAreaInset(edge: .top) {
+                Text("終わった勤務を押すと、時間・休憩を確認できます。")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+            }
             .toolbar {
                 Button("閉じる") { dismiss() }
             }

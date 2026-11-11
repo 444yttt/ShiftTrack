@@ -1264,6 +1264,26 @@ struct WorkplaceEditorView: View {
                         }
                     }
                 }
+                NavigationLink {
+                    LocationNoteView(place: $place)
+                } label: {
+                    editorLink("住所・位置（任意）")
+                }
+                NavigationLink {
+                    LateMessageComposer()
+                } label: {
+                    editorLink("遅刻連絡の文章の型")
+                }
+                NavigationLink {
+                    PayTermsNote()
+                } label: {
+                    editorLink("締め日と支払日")
+                }
+                NavigationLink {
+                    PayScheduleNote()
+                } label: {
+                    editorLink("土日の支払日")
+                }
                 formCard {
                     sectionTitle("締めと給料日")
                     dayPicker("締日", selection: $closingDay)
@@ -1629,6 +1649,19 @@ struct WorkplaceEditorView: View {
         Text(title)
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(Theme.ink)
+    }
+
+    private func editorLink(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+            Spacer()
+            Image(systemName: "chevron.right")
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func dayPicker(_ title: String, selection: Binding<Int>) -> some View {
