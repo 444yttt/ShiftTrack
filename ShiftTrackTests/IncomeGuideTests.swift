@@ -66,7 +66,7 @@ struct IncomeGuideTests {
     func salaryAndSocialWindowsDoNotShareASum() {
         let rows = [
             (day: LocalDay(year: 2026, month: 1, day: 10), yen: 100_000),
-            (day: LocalDay(year: 2026, month: 6, day: 1), yen: 50_000),
+            (day: LocalDay(year: 2026, month: 12, day: 1), yen: 50_000),
         ]
         let salary = IncomeGuide.sum(rows, from: LocalDay(year: 2026, month: 1, day: 1), until: LocalDay(year: 2027, month: 1, day: 1))
         let social = IncomeGuide.sum(
