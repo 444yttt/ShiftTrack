@@ -90,15 +90,10 @@ enum SentenceModel {
     static func lines(from text: String) async -> String? {
         let model = SystemLanguageModel.default
         guard case .available = model.availability else { return nil }
-        guard model.supportsLocale(Locale(identifier: "ja_JP")) else { return nil }
         let session = LanguageModelSession(instructions: """
         日本語のシフト文を、日付と時刻が明示された一行に整える係です。書かれていない勤務先や時刻は足さないでください。
         """)
-        let response = try? await session.respond(
-            to: text,
-            generating: AIShiftBatch.self,
-            options: GenerationOptions(sampling: .greedy)
-        )
+        let response = try? await session.respond(to: text, generating: AIShiftBatch.self)
         guard let response else { return nil }
         let lines = response.content.shifts.map { item -> String in
             let breakText = item.breakMinutes > 0 ? " 休憩\(max(0, item.breakMinutes))分" : ""
