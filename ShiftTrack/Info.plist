@@ -25,5 +25,7 @@
 	<string>勤務先のカードやシフト表を撮影します。画像は端末内で処理し、サーバーには送信しません。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>勤務先の位置を見るときだけ、現在地を使います。位置の検索以外には使いません。</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>カレンダーへのアクセスを確認します。予定の読み書きはまだしません。</string>
 </dict>
 </plist>

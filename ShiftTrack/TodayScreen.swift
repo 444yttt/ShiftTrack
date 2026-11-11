@@ -236,20 +236,27 @@ struct TodayScreen: View {
     }
 
     private var todoLine: some View {
-        let titles = shifts
+        let items = shifts
             .filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
             .flatMap(\.todos)
-            .map(\.title)
         return VStack(alignment: .leading, spacing: 6) {
             Text("\(Formatters.monthDayWeekday(day))のやること")
                 .font(.system(size: 16, weight: .bold))
-            if titles.isEmpty {
+            if items.isEmpty {
                 Text("この日のやることはありません。シフトの「編集」から追加できます。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
             } else {
-                Text(titles.joined(separator: "、"))
-                    .font(.system(size: 14))
+                ForEach(items) { item in
+                    HStack(spacing: 8) {
+                        if let symbol = ConfirmedSymbols.todoMark(done: item.done) {
+                            Image(systemName: symbol)
+                                .foregroundStyle(Theme.ink)
+                        }
+                        Text(item.title)
+                            .font(.system(size: 14))
+                    }
+                }
             }
         }
         .padding(16)

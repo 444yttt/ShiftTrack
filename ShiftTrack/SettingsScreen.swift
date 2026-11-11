@@ -91,6 +91,13 @@ struct SettingsScreen: View {
                 settingsRow("カレンダー・リマインダー")
             }
             .buttonStyle(.plain)
+            Button("カレンダーの全件を許可する") {
+                Task { _ = await SettingsAccess.requestFullCalendar() }
+            }
+            .designFont(16, weight: .bold)
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, ScreenInsets.settingsOptional)
 
             aboutRow
 
@@ -346,9 +353,14 @@ struct SettingsScreen: View {
                 .foregroundStyle(Color.white)
             Text("シフトの前に通知")
                 .foregroundStyle(Color.white)
-            Text("通知の配信そのものは、回収した命令へ結んでいません。スイッチは見た目です。")
+            Text("許可はアラート、サウンド、バッジをまとめて求めます。通知の配信はまだ繋いでいません。")
                 .designFont(16)
                 .foregroundStyle(Color.white.opacity(0.7))
+            Button("通知を許可する") {
+                Task { _ = await SettingsAccess.requestNotifications() }
+            }
+            .designFont(16, weight: .bold)
+            .foregroundStyle(Theme.lime)
         }
         .padding(ScreenInsets.settings)
         .frame(maxWidth: .infinity, alignment: .leading)
