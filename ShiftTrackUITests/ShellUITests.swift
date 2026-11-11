@@ -8,6 +8,7 @@ final class ShellUITests: XCTestCase {
 
     func testWeekMoveTimeSheetAndTabsLeaveStoredDatesAlone() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-UITestingReset"]
         app.launch()
 
         let today = app.buttons["tab.today"]
@@ -45,7 +46,7 @@ final class ShellUITests: XCTestCase {
         }
         app.swipeUp()
         app.buttons["完了する"].tap()
-        let card = app.buttons["workplace.card"]
+        let card = app.buttons.matching(identifier: "workplace.card").firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 6))
         let saveButton = app.buttons["完了する"]
         if saveButton.exists {

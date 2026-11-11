@@ -29,7 +29,9 @@ struct ShiftTrackApp: App {
 enum AppModel {
     static let container: ModelContainer = {
         let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self, ShiftPart.self])
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: false)
+        // UI tests pass this so each launch starts empty. The on-disk store stays untouched.
+        let testing = ProcessInfo.processInfo.arguments.contains("-UITestingReset")
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: testing)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {

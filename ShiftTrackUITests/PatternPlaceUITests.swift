@@ -8,6 +8,7 @@ final class PatternPlaceUITests: XCTestCase {
 
     func testPatternRowAndDayChipPlaceSkipAndHold() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-UITestingReset"]
         app.launch()
 
         let today = app.buttons["tab.today"]
@@ -32,7 +33,7 @@ final class PatternPlaceUITests: XCTestCase {
         let days = monthDays(app)
         XCTAssertGreaterThanOrEqual(days.count, 3)
         revealGrid(app)
-        days[0].tap()
+        tapVisible(app, days[0])
 
         makePart(app, named: "朝", startHoursAfter10: 0, endHoursAfter15: 0, todo: "レジ")
         tapIdentifier(app, "calendar.pattern.朝")
@@ -54,8 +55,8 @@ final class PatternPlaceUITests: XCTestCase {
         makePart(app, named: "別", startHoursAfter10: 0, endHoursAfter15: 0, todo: "")
         tapIdentifier(app, "calendar.pick.mode")
         revealGrid(app)
-        days[0].tap()
-        days[1].tap()
+        tapVisible(app, days[0])
+        tapVisible(app, days[1])
         let picked = app.staticTexts["calendar.picked.count"]
         XCTAssertTrue(picked.waitForExistence(timeout: 3))
         XCTAssertTrue(picked.label.contains("2"))
@@ -67,12 +68,12 @@ final class PatternPlaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "確認が必要な日があります")).firstMatch.exists)
         tapIdentifier(app, "calendar.pick.mode")
         revealGrid(app)
-        days[1].tap()
+        tapVisible(app, days[1])
         XCTAssertFalse(app.buttons["calendar.shift"].exists)
         shot("13-clash-pending")
         app.buttons["pattern.pending.close"].tap()
 
-        days[1].tap()
+        tapVisible(app, days[1])
         tapIdentifier(app, "calendar.daychip.別")
         XCTAssertTrue(result.label.contains("置いた件数 1"))
         XCTAssertTrue(app.buttons["calendar.shift"].waitForExistence(timeout: 4))
@@ -80,7 +81,7 @@ final class PatternPlaceUITests: XCTestCase {
 
         makePart(app, named: "夜", startHoursAfter10: 12, endHoursAfter15: 14, todo: "")
         revealGrid(app)
-        days[2].tap()
+        tapVisible(app, days[2])
         tapIdentifier(app, "calendar.pattern.夜")
         XCTAssertTrue(result.label.contains("置いた件数 1"))
         let overnight = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "22:00")).firstMatch
@@ -89,7 +90,7 @@ final class PatternPlaceUITests: XCTestCase {
         shot("15-overnight")
 
         revealGrid(app)
-        days[0].tap()
+        tapVisible(app, days[0])
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "10:00")).firstMatch.waitForExistence(timeout: 4))
         XCTAssertEqual(app.buttons.matching(identifier: "calendar.shift").count, 1)
 
@@ -165,14 +166,27 @@ final class PatternPlaceUITests: XCTestCase {
 
     private func tapIdentifier(_ app: XCUIApplication, _ identifier: String) {
         let element = app.buttons[identifier]
-        for _ in 0..<5 {
-            if element.exists && element.isHittable {
+        XCTAssertTrue(element.waitForExistence(timeout: 6), identifier)
+        tapVisible(app, element)
+    }
+
+    /// A control under the tab bar still reports hittable, and the tap lands
+    /// on the bar. Keep the frame in the open part of the screen.
+    private func tapVisible(_ app: XCUIApplication, _ element: XCUIElement) {
+        let top: CGFloat = 90
+        let bottom = app.frame.maxY - 120
+        for _ in 0..<8 {
+            let frame = element.frame
+            if element.isHittable && frame.minY > top && frame.maxY < bottom {
                 element.tap()
                 return
             }
-            app.swipeUp()
+            if frame.minY < top {
+                app.swipeDown()
+            } else {
+                app.swipeUp()
+            }
         }
-        XCTAssertTrue(element.waitForExistence(timeout: 4), identifier)
         element.tap()
     }
 

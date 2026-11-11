@@ -168,7 +168,18 @@ final class ShiftPartPlaceTests: XCTestCase {
 
     @MainActor
     func testApplyLeavesTheStoredShiftAndSkipsLegalBreak() throws {
-        let calendar = calendar()
+        // WorkShift stores Calendar.current.startOfDay. A fixed Tokyo date
+        // moves to the previous civil day on a UTC runner, so the repeat
+        // no longer sees the part it just saved.
+        let calendar = Calendar.current
+        func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
+            var parts = DateComponents()
+            parts.year = year
+            parts.month = month
+            parts.day = day
+            parts.hour = 12
+            return calendar.date(from: parts)!
+        }
         let container = try ModelContainer(
             for: Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self, ShiftPart.self]),
             configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
@@ -238,6 +249,7 @@ final class ShiftPartPlaceTests: XCTestCase {
         XCTAssertEqual(kept.startMinutes, 9 * 60)
         XCTAssertEqual(kept.breakMinutes, 15)
         let added = try XCTUnwrap(rows.first { $0.partID == night.uuid })
+        XCTAssertTrue(calendar.isDate(added.date, inSameDayAs: day(2026, 11, 5)))
         XCTAssertEqual(added.breakMinutes, 0)
         XCTAssertFalse(added.breakFollowsRules)
         XCTAssertEqual(added.startMinutes, 22 * 60)
