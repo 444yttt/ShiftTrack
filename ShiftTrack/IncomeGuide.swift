@@ -1,70 +1,24 @@
 import Foundation
 
-/// Figures from the 2026-11-11 design consultation. They are not checked against
-/// 国税庁, 厚生労働省, or 日本年金機構. Replace this table when verified numbers arrive.
+/// Thresholds checked on 2026-11-11 against 国税庁, 財務省, 厚生労働省, and 日本年金機構.
+/// Every figure on screen is a 目安. This is not a tax or insurance decision.
 enum IncomeGuide {
     static let asOf = LocalDay(year: 2026, month: 11, day: 11)
-    static let sourceNote = "2026-11-11 の相談メモ。一次資料では未確認。画面では目安と書く。"
+    static let sourceNote = "2026年11月11日に国税庁・財務省・厚生労働省・日本年金機構の案内で確認した目安です。税や社会保険の判定ではありません。制度は変わります。"
 
     enum Basis: String, Equatable {
-        /// Pay received in the year, without commuting allowance.
-        case paydayExcludingTransport
-        /// Annualized estimate, commuting allowance included.
-        case annualizedIncludingTransport
+        /// 給与収入. Non-taxable commuting allowance is not included.
+        case salary
+        /// 今後1年間の見込収入. Commuting allowance is included.
+        case socialExpected
     }
 
-    struct Line: Equatable, Identifiable {
-        var id: String
-        var title: String
-        var yen: Int?
-        var basis: Basis
-        var note: String
+    enum Bound: String, Equatable {
+        /// 未満. The amount itself is already over.
+        case lessThan
+        /// 以下. The amount itself is still inside.
+        case atMost
     }
-
-    static let lines: [Line] = [
-        Line(
-            id: "tax-2026",
-            title: "本人の所得税",
-            yen: 1_780_000,
-            basis: .paydayExcludingTransport,
-            note: "相談メモでは、2026–2027年分は178万円。2025年分は160万円、2028年分は168万円の予定とある。103万円は現行ではない、とメモにある。"
-        ),
-        Line(
-            id: "dependent-2026",
-            title: "家族の税控除",
-            yen: 1_360_000,
-            basis: .paydayExcludingTransport,
-            note: "相談メモでは、2026年の扶養控除の線は136万円。2025年は123万円とある。19–22歳の特別控除は159万円まで満額、197万円で消える、とある。"
-        ),
-        Line(
-            id: "health-19-22",
-            title: "社会保険の扶養（19–22歳）",
-            yen: 1_500_000,
-            basis: .annualizedIncludingTransport,
-            note: "相談メモでは、2025年10月から19–22歳は150万円未満。別の資料は130万円のまま、とあり未確定。交通費を含む。"
-        ),
-        Line(
-            id: "health-130",
-            title: "社会保険の扶養",
-            yen: 1_300_000,
-            basis: .annualizedIncludingTransport,
-            note: "相談メモでは、130万円はまだ使われる。60歳以上は180万円未満、とある。交通費を含む。"
-        ),
-        Line(
-            id: "health-60",
-            title: "社会保険の扶養（60歳以上）",
-            yen: 1_800_000,
-            basis: .annualizedIncludingTransport,
-            note: "相談メモでは、60歳以上は180万円未満。交通費を含む。"
-        ),
-        Line(
-            id: "employment-106",
-            title: "短時間の社会保険",
-            yen: nil,
-            basis: .annualizedIncludingTransport,
-            note: "相談メモでは、2026年10月1日に月額8.8万円の要件は無くなった。週20時間の要件は残る、とある。金額の線は出さない。"
-        ),
-    ]
 
     enum Outlook: Equatable {
         case under
@@ -72,8 +26,180 @@ enum IncomeGuide {
         case over
     }
 
-    static func outlook(estimate: Int, line: Int) -> Outlook {
-        if estimate >= line { return .over }
+    struct Figures: Equatable {
+        var salaryYen: Int
+        var socialYen: Int
+    }
+
+    struct Line: Equatable, Identifiable {
+        var id: String
+        var title: String
+        var yen: Int?
+        var bound: Bound
+        var basis: Basis
+        var note: String
+    }
+
+    enum SpecialRelative: Equatable {
+        case dependent
+        case full
+        case phased
+        case none
+        case notThisYear
+    }
+
+    static func age(on day: LocalDay, born: LocalDay) -> Int {
+        var years = day.year - born.year
+        if (day.month, day.day) < (born.month, born.day) { years -= 1 }
+        return years
+    }
+
+    static func december31(_ year: Int) -> LocalDay {
+        LocalDay(year: year, month: 12, day: 31)
+    }
+
+    /// 19歳以上23歳未満 on 31 December. Spouses of the insured are outside the 150万円 line.
+    static func isAge19Until23(_ age: Int) -> Bool {
+        (19..<23).contains(age)
+    }
+
+    static func ownIncomeTaxYen(year: Int) -> Int {
+        switch year {
+        case ...2024: return 1_030_000
+        case 2025: return 1_600_000
+        case 2026, 2027: return 1_780_000
+        default: return 1_680_000
+        }
+    }
+
+    static func dependentSalaryYen(year: Int) -> Int {
+        switch year {
+        case ...2024: return 1_030_000
+        case 2025: return 1_230_000
+        default: return 1_360_000
+        }
+    }
+
+    /// Full amount through this salary, then a reduced amount through `phaseEnd` inclusive.
+    static func specialRelativeBand(year: Int) -> (fullThrough: Int, phaseEnd: Int)? {
+        switch year {
+        case 2025: return (1_500_000, 1_880_000)
+        case 2026...: return (1_590_000, 1_970_000)
+        default: return nil
+        }
+    }
+
+    static func specialRelative(_ salary: Int, year: Int) -> SpecialRelative {
+        guard let band = specialRelativeBand(year: year) else { return .notThisYear }
+        let dependent = dependentSalaryYen(year: year)
+        if salary <= dependent { return .dependent }
+        if salary <= band.fullThrough { return .full }
+        if salary <= band.phaseEnd { return .phased }
+        return .none
+    }
+
+    /// Nil until a birthdate is known. 150万円 is only for ages 19 up to but not including 23, and not for a spouse.
+    static func healthLine(year: Int, ageOnDecember31: Int?) -> (yen: Int, title: String)? {
+        guard let age = ageOnDecember31 else { return nil }
+        if age >= 60 { return (1_800_000, "社会保険の扶養（60歳以上）") }
+        if year >= 2025, isAge19Until23(age) { return (1_500_000, "社会保険の扶養（19歳以上23歳未満）") }
+        return (1_300_000, "社会保険の扶養")
+    }
+
+    static func lines(year: Int, ageOnDecember31: Int?) -> [Line] {
+        var rows: [Line] = []
+        let tax = ownIncomeTaxYen(year: year)
+        let taxNote: String
+        if year == 2026 || year == 2027 {
+            taxNote = "給与のみの場合、2026–2027年分は178万円まで所得税がかかりません。現行法では2028年分から168万円です。今後の改正で変わりえます。給与収入で見ます。通勤手当は含めません。"
+        } else if year >= 2028 {
+            taxNote = "現行法では2028年分以後は168万円です。財務省は、今後の改正で178万円付近に残る余地もあると説明しています。給与収入で見ます。"
+        } else if year == 2025 {
+            taxNote = "2025年分の給与のみの課税最低限は160万円です。給与収入で見ます。"
+        } else {
+            taxNote = "2024年分以前の給与のみの課税最低限は103万円です。"
+        }
+        rows.append(Line(id: "own-tax", title: "本人の所得税", yen: tax, bound: .atMost, basis: .salary, note: taxNote))
+
+        rows.append(Line(
+            id: "dependent",
+            title: "親の扶養控除",
+            yen: dependentSalaryYen(year: year),
+            bound: .atMost,
+            basis: .salary,
+            note: year >= 2026
+                ? "2026年分以後、給与のみなら136万円以下で扶養控除の対象です。2025年分は123万円以下です。"
+                : "この年分の、給与のみの場合の扶養控除の線です。"
+        ))
+
+        if let band = specialRelativeBand(year: year) {
+            rows.append(Line(
+                id: "special-relative",
+                title: "特定親族特別控除",
+                yen: band.phaseEnd,
+                bound: .atMost,
+                basis: .salary,
+                note: "19歳以上23歳未満の親族です。\(band.fullThrough / 10_000)万円以下は満額、\(band.phaseEnd / 10_000)万円以下まで段階的に残り、それを超えるとなくなります。\(band.phaseEnd / 10_000)万円ちょうどは残ります。"
+            ))
+        }
+
+        if let health = healthLine(year: year, ageOnDecember31: ageOnDecember31) {
+            let spouse = health.yen == 1_500_000 ? "被保険者の配偶者は150万円の対象外で、130万円未満です。" : ""
+            rows.append(Line(
+                id: "health",
+                title: health.title,
+                yen: health.yen,
+                bound: .lessThan,
+                basis: .socialExpected,
+                note: "\(health.yen / 10_000)万円未満です。ちょうどその金額は入りません。今後1年間の見込収入で、通勤手当を含めます。労働契約で見る場合の目安です。\(spouse)"
+            ))
+        } else {
+            rows.append(Line(
+                id: "health-unset",
+                title: "社会保険の扶養",
+                yen: nil,
+                bound: .lessThan,
+                basis: .socialExpected,
+                note: "12月31日時点の年齢で、150万円未満か130万円未満かが決まります。60歳以上は180万円未満です。生年月日を入れてください。"
+            ))
+        }
+
+        rows.append(Line(
+            id: "short-time",
+            title: "短時間の社会保険",
+            yen: nil,
+            bound: .lessThan,
+            basis: .socialExpected,
+            note: "月額8.8万円の賃金要件は2026年10月1日になくなりました。週20時間と、学生ではないことは残ります。昼間の学生は、この加入では原則対象外です。"
+        ))
+
+        rows.append(Line(
+            id: "resident-tax",
+            title: "住民税",
+            yen: nil,
+            bound: .atMost,
+            basis: .salary,
+            note: "非課税の線は自治体で違います。全国一律の金額は置きません。"
+        ))
+        return rows
+    }
+
+    static func estimate(_ basis: Basis, figures: Figures) -> Int {
+        switch basis {
+        case .salary: return figures.salaryYen
+        case .socialExpected: return figures.socialYen
+        }
+    }
+
+    static func isOver(estimate: Int, line: Int, bound: Bound) -> Bool {
+        switch bound {
+        case .lessThan: return estimate >= line
+        case .atMost: return estimate > line
+        }
+    }
+
+    static func outlook(estimate: Int, line: Int, bound: Bound) -> Outlook {
+        if isOver(estimate: estimate, line: line, bound: bound) { return .over }
         if estimate * 100 >= line * 95 { return .approaching }
         return .under
     }
@@ -85,7 +211,14 @@ enum IncomeGuide {
         case .approaching:
             return "現在の予定では、\(title)の基準に近づく見込みです。条件を確認しておくと安心です。"
         case .over:
-            return "現在の予定では、\(title)の基準を超える見込みです。扶養や税の条件を確認しておくと安心です。"
+            return "現在の予定では、\(title)の基準を超える見込みです。条件を確認しておくと安心です。"
+        }
+    }
+
+    static func sum(_ amounts: [(day: LocalDay, yen: Int)], from: LocalDay, until: LocalDay) -> Int {
+        amounts.reduce(0) { partial, row in
+            guard row.day >= from, row.day < until else { return partial }
+            return partial + row.yen
         }
     }
 }
