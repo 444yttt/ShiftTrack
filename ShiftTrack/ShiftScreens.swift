@@ -718,6 +718,11 @@ struct ShiftEditorView: View {
                             Text(clockStamp(existing))
                                 .designFont(13)
                                 .foregroundStyle(Theme.muted)
+                            if let payable = punchLine(existing) {
+                                Text(payable)
+                                    .designFont(13)
+                                    .foregroundStyle(Theme.ink)
+                            }
                         }
                         if selectedWorkplace?.payIsDaily == true {
                             Text("日給の勤務先では、休憩時間は給料から引きません。")
@@ -932,6 +937,24 @@ struct ShiftEditorView: View {
         if let start = shift.clockedInAt { parts.append("出勤 \(clock.string(from: start))") }
         if let end = shift.clockedOutAt { parts.append("退勤 \(clock.string(from: end))") }
         return parts.joined(separator: "  ") + "（予定の時刻と給料は変わりません）"
+    }
+
+    private func punchLine(_ shift: WorkShift) -> String? {
+        guard let clockIn = shift.clockedInAt, let clockOut = shift.clockedOutAt, let place = shift.workplace else { return nil }
+        let calendar = ShiftOverlap.tokyo
+        let day = calendar.startOfDay(for: shift.date)
+        let planned = calendar.date(byAdding: .minute, value: shift.startMinutes, to: day) ?? day
+        let payable = PunchPay.payable(
+            plannedStart: planned,
+            clockIn: clockIn,
+            clockOut: clockOut,
+            unitMinutes: place.roundingUnitMinutes,
+            start: InOutRecovered.RoundingDirection.resolved(place.roundingStartRaw),
+            end: InOutRecovered.RoundingDirection.resolved(place.roundingEndRaw),
+            earlyCountsFromPlan: place.earlyClockCountsFromPlan,
+            calendar: calendar
+        )
+        return PunchPay.line(clockIn: clockIn, clockOut: clockOut, payable: payable, calendar: calendar)
     }
 
     private var overlapAlert: Binding<Bool> {
@@ -1401,6 +1424,7 @@ struct WorkplaceEditorView: View {
     @State private var roundingUnit = 1
     @State private var roundingStart = 0
     @State private var roundingEnd = 0
+    @State private var earlyFromPlan = false
     @State private var nightRate = 0
     @State private var overtimeRate = 0
     @State private var holidayRates = Array(repeating: 0, count: 7)
@@ -1625,6 +1649,12 @@ struct WorkplaceEditorView: View {
                     .tint(Theme.lime)
                     roundingDirectionPicker("開始", selection: $roundingStart)
                     roundingDirectionPicker("終了", selection: $roundingEnd)
+                    Toggle("早出は予定の開始から数える", isOn: $earlyFromPlan)
+                        .tint(Theme.lime)
+                    Text("打刻そのものは変えません。予定より早い出勤を、給料では予定の開始から数えます。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(roundingPreview)
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
@@ -1790,6 +1820,7 @@ struct WorkplaceEditorView: View {
             roundingUnit = existing.roundingUnitMinutes
             roundingStart = existing.roundingStartRaw
             roundingEnd = existing.roundingEndRaw
+            earlyFromPlan = existing.earlyClockCountsFromPlan
             nightRate = existing.nightRatePercent
             overtimeRate = existing.overtimeRatePercent
             holidayRates = existing.holidayRatePercents
@@ -2002,6 +2033,7 @@ struct WorkplaceEditorView: View {
         workplace.roundingUnitMinutes = roundingUnit
         workplace.roundingStartRaw = roundingStart
         workplace.roundingEndRaw = roundingEnd
+        workplace.earlyClockCountsFromPlan = earlyFromPlan
         workplace.nightRatePercent = nightRate
         workplace.overtimeRatePercent = overtimeRate
         workplace.setHolidayRatePercents(holidayRates)
