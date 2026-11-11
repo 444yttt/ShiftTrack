@@ -10,7 +10,7 @@ enum WorkplaceImageRead {
                 return text
             }
         }
-        return (try? ShiftImageReader.recognizeText(in: data)) ?? ""
+        return (try? await ShiftImageReader.recognizeText(in: data)) ?? ""
     }
 
     static func transcript(from image: CGImage) async -> String {
