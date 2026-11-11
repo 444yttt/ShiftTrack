@@ -8,6 +8,7 @@ private enum IncomeScope: String, CaseIterable, Identifiable {
 }
 
 struct IncomeScreen: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
@@ -96,10 +97,11 @@ struct IncomeScreen: View {
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(scope == .year ? "\(year)" : Formatters.monthTitle(anchor))
-                    .font(.doto(54))
+                    .font(dynamicTypeSize.isAccessibilitySize ? .system(.largeTitle, design: .rounded, weight: .bold) : .doto(54))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .accessibilityLabel(scope == .year ? "\(year)年" : Formatters.monthTitle(anchor))
                 if scope == .year {
                     Text("年")
                         .designFont(16, weight: .bold)
@@ -499,6 +501,7 @@ struct IncomeScreen: View {
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(name == "chevron.left" ? (scope == .year ? "前の年" : "前の月") : (scope == .year ? "次の年" : "次の月"))
     }
 }
 

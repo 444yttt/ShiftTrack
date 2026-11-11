@@ -149,6 +149,11 @@ struct CalendarScreen: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("calendar.shift")
+                        .accessibilityLabel(ShiftSpeech.line(
+                            name: shift.workplace?.name ?? "勤務先なし",
+                            schedule: shift.scheduleLabel,
+                            yen: Formatters.yen(shift.estimatedYen(includeTransport: settings?.includeTransport ?? true))
+                        ))
                     }
                 }
             }
@@ -171,6 +176,7 @@ struct CalendarScreen: View {
                             requestCard(request)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("希望、\(workplaces.first { $0.uuid == request.workplaceUUID }?.name ?? "勤務先未定")、\(Formatters.monthDayWeekday(request.date))、\(Formatters.clock(request.startMinutes))から\(Formatters.clock(request.endMinutes))")
                     }
                 }
             }
@@ -526,18 +532,18 @@ struct CalendarScreen: View {
     private func requestCard(_ request: ShiftRequest) -> some View {
         let workplace = workplaces.first { $0.uuid == request.workplaceUUID }
         return HStack(spacing: 10) {
-            Text("希")
-                .font(.system(size: 12, weight: .black))
+                Text("希")
+                .designFont(12, weight: .black)
                 .foregroundStyle(Theme.ink)
                 .frame(width: 22, height: 22)
                 .background(Theme.lime)
                 .clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(workplace?.name ?? "勤務先未定")
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(14, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Text("\(Formatters.monthDayWeekday(request.date))  \(Formatters.clock(request.startMinutes))–\(Formatters.clock(request.endMinutes))")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
             }
             Spacer()

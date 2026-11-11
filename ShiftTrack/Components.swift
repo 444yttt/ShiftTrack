@@ -132,9 +132,19 @@ struct HelpButton: View {
     }
 }
 
+enum ShiftSpeech {
+    static func line(name: String, schedule: String, yen: String) -> String {
+        "\(name)、\(schedule)、\(yen)"
+    }
+}
+
 struct ShiftCard: View {
     var shift: WorkShift
     var includeTransport: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var workplaceName: String { shift.workplace?.name ?? "勤務先なし" }
+    private var yenText: String { Formatters.yen(shift.estimatedYen(includeTransport: includeTransport)) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -142,33 +152,35 @@ struct ShiftCard: View {
                 .fill(shift.workplace?.color ?? Theme.lime)
                 .frame(width: 6, height: 48)
             VStack(alignment: .leading, spacing: 4) {
-                Text(shift.workplace?.name ?? "勤務先なし")
-                    .font(.system(size: 15, weight: .bold))
+                Text(workplaceName)
+                    .designFont(15, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Text(shift.scheduleLabel)
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
                 if !shift.notes.isEmpty {
                     Text(shift.notes)
-                        .font(.system(size: 11))
+                        .designFont(11)
                         .foregroundStyle(Theme.muted)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 }
                 if !shift.todos.isEmpty {
                     Text(shift.todos.map(\.title).joined(separator: "、"))
-                        .font(.system(size: 11))
+                        .designFont(11)
                         .foregroundStyle(Theme.muted)
                         .accessibilityIdentifier("shift.todos")
                 }
             }
             Spacer(minLength: 8)
-            Text(Formatters.yen(shift.estimatedYen(includeTransport: includeTransport)))
-                .font(.system(size: 14, weight: .bold))
+            Text(yenText)
+                .designFont(14, weight: .bold)
                 .foregroundStyle(Theme.lime)
         }
         .padding(14)
         .background(Theme.card)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ShiftSpeech.line(name: workplaceName, schedule: shift.scheduleLabel, yen: yenText))
     }
 }
 
