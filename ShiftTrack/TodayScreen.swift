@@ -218,6 +218,7 @@ struct TodayScreen: View {
 
     private func shiftCard(_ shift: WorkShift, now: Date) -> some View {
         let phase = phase(for: shift, now: now)
+        let evaluation = evaluation(for: shift, now: now)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Circle()
@@ -231,7 +232,15 @@ struct TodayScreen: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.muted)
             }
-            Text(LivePay.line(phase, evaluation: evaluation(for: shift, now: now)))
+            if case .amount(let amount) = evaluation {
+                // `0x10026efb0` draws this amount with Doto-BlackRound at 36.
+                // Other Doto sizes are not tied to a view, so they are not used here.
+                Text(ScheduledPay.amountText(amount.total))
+                    .font(.custom("Doto-BlackRound", size: 36))
+                    .foregroundStyle(.white)
+                    .accessibilityIdentifier("today.doto")
+            }
+            Text(LivePay.line(phase, evaluation: evaluation))
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.lime)
             Text(LivePay.breakCaption(phase))

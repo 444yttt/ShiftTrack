@@ -2,6 +2,20 @@
 
 対象は許諾済み `com.graff.inout` 1.0 (3)。根拠は公開解析 `693072d`（macOS 検証 https://github.com/444yttt/shifttrack-inout-analysis/actions/runs/42381152178 ）と、パターン配置 `1da0252` / 検証記録 `ae6babe`（macOS 検証 https://github.com/444yttt/shifttrack-inout-analysis/actions/runs/42977835967 ）。元ソースではない。広告 SDK・識別子・秘密は写さない。7500円は式へその入力を入れた結果であり、画面で読んだ数字ではない。
 
+## カタログの色とタブ記号（2026-11-11）
+
+根拠は `notes/assets.json` と HANDOFF の `5c9423c`（macOS https://github.com/444yttt/shifttrack-inout-analysis/actions/runs/42980044157 ）。画素の一致ではない。
+
+| 項目 | 扱い |
+| --- | --- |
+| AccentColor any `#000000`、dark `#FFFFFF` | 確定。カタログのグローバルアクセント。どの図形を塗るかは命令で結べていない。自分で塗っているライムはそのまま |
+| LaunchBackground `#C3FF77`、ダーク無し | 確定。起動画面の `UIColorName` だけ。ダーク用のレコードは置かない |
+| タブ 1 `calendar`、2 `building.2`、3 `yensign` | 確定。`InOutTabBar` の `0x1000253f0`。収入は `yensign.circle` をやめた |
+| タブ 0 | 未確定。`slider.horizontal.3` とは断定できないので `sun.max` のまま |
+| 設定タブ | この切り替えには無い。`gearshape` のまま |
+| Doto-BlackRound サイズ 36 | 確定なのは金額関数 `0x10026efb0` のそのサイズだけ。公式の可変 Doto（Black＝wght 900、Roundness 最大 100）から静的フォントを作り、PostScript 名を命令の文字列にした。IPA の ttf は同梱していない。他のサイズは画面に結べていないので使わない |
+| 画像セット | バイトは解析側に無く、同梱しない |
+
 ## 選んだ日への ShiftPart（2026-11-11）
 
 公開解析の配置 `0x1001c75ec` と、衝突が空のときだけ確定する入口（日チップ `0x10003fe54`、カレンダーのパターン行 `0x10006e04c`）を製品の保存へつなぐ。`PendingPlace` は画面の状態で、衝突があるタップは1件も挿入しない。同じ `partID` の日は足さない。秒は 0。パターンの生の `start >= end`（同じ分を含む）は終了を翌日にする。`defaultTodos` は新しい id と `done = 0` で写す。

@@ -19,10 +19,13 @@ enum AppTab: Int, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        // `0x1000253f0` builds the tab symbol from w21. 1, 2, and 3 are
+        // calendar, building.2, and yensign. w21 == 0 does not confirm
+        // slider.horizontal.3, so the list symbol stays sun.max.
         case .list: "sun.max"
         case .calendar: "calendar"
         case .workplaces: "building.2"
-        case .income: "yensign.circle"
+        case .income: "yensign"
         case .settings: "gearshape"
         }
     }

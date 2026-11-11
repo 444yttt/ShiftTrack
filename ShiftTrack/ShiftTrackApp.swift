@@ -20,7 +20,6 @@ struct ShiftTrackApp: App {
             RootView()
                 .environment(\.locale, Locale(identifier: "ja_JP"))
                 .preferredColorScheme(.dark)
-                .tint(Theme.lime)
         }
         .modelContainer(AppModel.container)
     }
