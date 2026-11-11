@@ -1362,6 +1362,7 @@ struct WorkplaceEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
+    @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query private var settingsRows: [AppSettings]
 
     @State private var name = ""
@@ -1501,6 +1502,20 @@ struct WorkplaceEditorView: View {
                         }
                         .tint(Theme.lime)
                     }
+                    Text(PayScheduleMath.sentence(closingDay: closingDay, paydayDay: paydayDay, monthOffset: paydayOffset))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(nextPaydayLine)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if PayScheduleMath.breaksInShortFebruary(closingDay: closingDay, paydayDay: paydayDay, monthOffset: paydayOffset, calendar: ShiftOverlap.tokyo) {
+                        Text("2月は、給料日が締め日以前になります。")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     Text("月払いは、今までと同じ締め日と給料日です。週払いと日払いは、ここで選んだときだけ入金日が変わります。時給・日給の金額計算は変わりません。")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
@@ -1632,6 +1647,10 @@ struct WorkplaceEditorView: View {
                                 .foregroundStyle(Theme.destructive)
                         }
                     }
+                    Text(wageAppendNote)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                     Button("今の時給を履歴に足す") {
                         wageHistory.append(.init(at: .now, hourlyWage: yen(wageText)))
                     }
@@ -1996,6 +2015,36 @@ struct WorkplaceEditorView: View {
             return
         }
         dismiss()
+    }
+
+    private var nextPaydayLine: String {
+        let calendar = ShiftOverlap.tokyo
+        let today = LocalDay.from(.now, calendar: calendar)
+        let plan = PayScheduleMath.plan(
+            workday: today,
+            closingDay: closingDay,
+            paydayDay: paydayDay,
+            monthOffset: paydayOffset,
+            preferEarlier: true,
+            calendar: calendar
+        )
+        return "次に受け取る日は\(plan.payday.month)月\(plan.payday.day)日です。"
+    }
+
+    private var wageAppendNote: String {
+        let calendar = ShiftOverlap.tokyo
+        let day = LocalDay.from(.now, calendar: calendar)
+        let rows = shifts.compactMap { shift -> WageChange? in
+            guard shift.workplace?.uuid == existingID else { return nil }
+            return WageChange(
+                day: LocalDay.from(shift.date, calendar: calendar),
+                minutes: PayMath.workedMinutes(start: shift.startMinutes, end: shift.endMinutes, breakMinutes: shift.breakMinutes)
+            )
+        }
+        let history = wageHistory.map {
+            WagePoint(day: LocalDay.from($0.at, calendar: calendar), yen: $0.hourlyWage)
+        }
+        return WagePreview.note(day: day, yen: yen(wageText), shifts: rows, history: history, fallback: yen(wageText))
     }
 
     private func yen(_ text: String) -> Int {
