@@ -38,7 +38,7 @@ struct PayBreakdownScreen: View {
             row("天引・手当", yen: adjustment, signed: true)
             Text("勤務先別")
                 .designFont(17, weight: .semibold)
-                .padding(.top, 12)
+                .padding(.top, SpacingTokens.annualIncome[2])
             ForEach(workplaceTotals(slices), id: \.id) { place in
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -53,11 +53,11 @@ struct PayBreakdownScreen: View {
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
-                .padding(.vertical, 10)
+                .padding(.vertical, SpacingTokens.annualIncome[0])
             }
             Text("入金予定")
                 .designFont(17, weight: .semibold)
-                .padding(.top, 12)
+                .padding(.top, SpacingTokens.annualIncome[2])
             ForEach(PayBreakdown.groupedByPayday(slices), id: \.day.key) { group in
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(group.day.month)月\(group.day.day)日")
@@ -71,7 +71,7 @@ struct PayBreakdownScreen: View {
                             .foregroundStyle(Theme.muted)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, SpacingTokens.annualIncome[0])
             }
             live
         }
@@ -172,7 +172,7 @@ struct PayBreakdownScreen: View {
                         .designFont(13)
                         .foregroundStyle(Theme.muted)
                 }
-                .padding(.top, 16)
+                .padding(.top, SpacingTokens.annualIncome[1])
             }
         }
     }

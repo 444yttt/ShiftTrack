@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Uniform insets from each screen's own function. `EdgeInsets.init(_all:)`
-/// does not name the child, so these values are the screen's, not a named row.
+/// Uniform insets already applied. `SpacingTokens` is the full set from each
+/// screen accessor. Which child receives which value is not known.
 enum ScreenInsets {
     static let root: CGFloat = 16
     static let rootWide: CGFloat = 20
@@ -16,6 +16,37 @@ enum ScreenInsets {
     static func settingsInsets(includeOptional: Bool) -> [CGFloat] {
         includeOptional ? [settings, settingsOptional] : [settings]
     }
+}
+
+/// Uniform `EdgeInsets` values found beside each screen accessor.
+/// The child that receives each value was not identified, so none of these
+/// names a row, a card, or an edge.
+enum SpacingTokens {
+    static let root: [CGFloat] = [16, 20]
+    static let tabs: [CGFloat] = [4, 6, 9, 18]
+    static let onboarding: [CGFloat] = [8, 12, 16, 20]
+    /// Positive values run from 4 through 24. The negatives are separate immediates.
+    static let list: [CGFloat] = Array(4...24).map { CGFloat($0) } + [-8, -6, -4]
+    static let directory: [CGFloat] = [4, 8, 12, 16, 20, 24]
+    static let locationPicker: [CGFloat] = [16]
+    static let calendar: [CGFloat] = [2, 3, 5, 8, 12, 16, 20]
+    static let day: [CGFloat] = [4, 8, 12, 20, 24]
+    static let calendarPermission: [CGFloat] = [24]
+    static let annualIncome: [CGFloat] = [8, 20, 24]
+    static let incomeWalls: [CGFloat] = [10, 14]
+    static let settings: [CGFloat] = [8, 12, 20, 24]
+    static let guide: [CGFloat] = [20]
+    static let patternEditor: [CGFloat] = [4]
+    static let shiftRequest: [CGFloat] = [10]
+    static let requestPlanner: [CGFloat] = [6, 8, 10, 12, 16]
+    static let confirm: [CGFloat] = [8, 20]
+    static let templateSheet: [CGFloat] = [10]
+    static let shiftEditor: [CGFloat] = [4]
+    static let todo: [CGFloat] = [12]
+    /// Shared helpers. Not known to belong only to the hours-stock screen.
+    static let hoursStockShared: [CGFloat] = [20, 8, 12]
+    /// Shared helpers. Not known to belong only to the import screen.
+    static let importShared: [CGFloat] = [20, 12]
 }
 
 enum LateMessageSection: String, CaseIterable, Identifiable {
