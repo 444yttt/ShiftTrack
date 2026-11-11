@@ -320,13 +320,20 @@ struct OpenWorkplaceDraftIntent: OpenIntent {
 
 #if canImport(VisualIntelligence)
 import CoreImage
+import CoreVideo
 import VisualIntelligence
 
 @available(iOS 26.0, *)
 struct WorkplaceSeenQuery: IntentValueQuery {
     func values(for input: SemanticContentDescriptor) async throws -> [WorkplaceDraftEntity] {
         guard let pixelBuffer = input.pixelBuffer else { return [] }
+        // The device SDK types this buffer as read-only. The simulator SDK
+        // still exposes a CVPixelBuffer. Both paths keep the same image.
+        #if targetEnvironment(simulator)
         let image = CIImage(cvPixelBuffer: pixelBuffer)
+        #else
+        let image = pixelBuffer.withUnsafeBuffer { CIImage(cvPixelBuffer: $0) }
+        #endif
         guard let cgImage = CIContext().createCGImage(image, from: image.extent) else { return [] }
         let text = await WorkplaceImageRead.transcript(from: cgImage)
         let draft = WorkplaceRead.draft(from: text)
