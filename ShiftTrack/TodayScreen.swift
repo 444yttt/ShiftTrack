@@ -3,14 +3,30 @@ import SwiftUI
 
 struct TodayScreen: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
+    @Query(sort: \ShiftPart.createdAt) private var parts: [ShiftPart]
     @Query private var settingsRows: [AppSettings]
     @State private var day = Calendar.current.startOfDay(for: .now)
-    @State private var editor: EditorRoute?
+    @State private var sheet: TodaySheet?
+    @State private var pendingPlace: ShiftPartPlace.Pending?
+    @State private var placeNote = ""
     /// Bumped when the app becomes active. The recovered 30-second and
     /// 1-second schedules were not tied to this timeline.
     @State private var resumedAt = Date.distantPast
+
+    private enum TodaySheet: Identifiable {
+        case editor(EditorRoute)
+        case part
+
+        var id: String {
+            switch self {
+            case .editor(let route): "editor-\(route.id)"
+            case .part: "part"
+            }
+        }
+    }
 
     private var settings: AppSettings? { settingsRows.first }
     private var weekStartsOnMonday: Bool { settings?.weekStartsOnMonday ?? false }
@@ -31,9 +47,27 @@ struct TodayScreen: View {
                 summary(now: now)
                 dayList(now: now)
                 LimeCapsuleButton(title: "＋シフトを追加", fillWidth: true) {
-                    editor = EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid)
+                    sheet = .editor(EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid))
                 }
                 .padding(.top, 8)
+                ShiftPartSection(
+                    parts: parts,
+                    dayChipDay: day,
+                    patternDays: [day],
+                    note: placeNote,
+                    pending: pendingPlace,
+                    canCreate: !workplaces.isEmpty,
+                    gathering: false,
+                    pickedCount: 0,
+                    showsGathering: false,
+                    showsPatternRows: false,
+                    identifierPrefix: "today",
+                    onToggleGathering: {},
+                    onCreate: { sheet = .part },
+                    onDayChip: { place($0) },
+                    onPatternRow: { place($0) },
+                    onClosePending: { pendingPlace = nil }
+                )
             }
         }
         .background(Theme.background)
@@ -42,8 +76,40 @@ struct TodayScreen: View {
                 resumedAt = .now
             }
         }
-        .sheet(item: $editor) { route in
-            ShiftEditorView(route: route)
+        .sheet(item: $sheet) { route in
+            switch route {
+            case .editor(let editor):
+                ShiftEditorView(route: editor)
+            case .part:
+                ShiftPartEditor()
+                    .presentationBackground(Theme.background)
+            }
+        }
+    }
+
+    private func place(_ part: ShiftPart) {
+        let result = ShiftPartCommit.apply(
+            part: part,
+            days: [day],
+            shifts: shifts,
+            workplaces: workplaces,
+            context: modelContext
+        )
+        if let failure = result.failure {
+            placeNote = failure
+            pendingPlace = nil
+            return
+        }
+        switch result.outcome {
+        case .pending(let pending):
+            pendingPlace = pending
+            placeNote = "追加した件数 0"
+        case .missingWorkplace:
+            pendingPlace = nil
+            placeNote = "勤務先がないので、どの日にも置いていません。"
+        case .placed(let drafts):
+            pendingPlace = nil
+            placeNote = "置いた件数 \(drafts.count)。同じパターンの日は足していません。休憩は0分のままです。"
         }
     }
 
@@ -140,7 +206,7 @@ struct TodayScreen: View {
             } else {
                 ForEach(rows) { shift in
                     Button {
-                        editor = EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid)
+                        sheet = .editor(EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid))
                     } label: {
                         shiftCard(shift, now: now)
                     }
@@ -239,7 +305,8 @@ struct TodayScreen: View {
             end: shift.endMinutes,
             breakMinutes: shift.breakMinutes,
             workplace: workplace,
-            customPay: shift.customPay
+            customPay: shift.customPay,
+            rollsToNextDay: shift.partID == nil ? nil : shift.patternEndOnNextDay
         )
     }
 

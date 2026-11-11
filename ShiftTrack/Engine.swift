@@ -28,6 +28,7 @@ enum PayMath {
         customPay: Int?,
         adjustment: Int,
         includeTransport: Bool,
+        paidOverride: Int? = nil,
         calendar: Calendar = .current
     ) -> Int {
         let transport = includeTransport ? max(0, workplace.transportAllowance) : 0
@@ -37,7 +38,7 @@ enum PayMath {
         if workplace.payIsDaily {
             return max(0, max(0, workplace.dailyWage) + adjustment + transport)
         }
-        let paid = workedMinutes(start: start, end: end, breakMinutes: breakMinutes)
+        let paid = paidOverride ?? workedMinutes(start: start, end: end, breakMinutes: breakMinutes)
         guard paid > 0 else { return max(0, adjustment + transport) }
         let amount = timedAmount(workplace: workplace, day: day, start: start, paidMinutes: paid, calendar: calendar)
         return max(0, amount + adjustment + transport)
@@ -54,6 +55,7 @@ enum PayMath {
             customPay: shift.customPay,
             adjustment: shift.adjustmentYen,
             includeTransport: includeTransport,
+            paidOverride: shift.partID == nil ? nil : shift.workedMinutes,
             calendar: calendar
         )
     }
@@ -136,10 +138,18 @@ enum PayMath {
         return minute >= start || minute < end
     }
 
-    static func endDate(day: Date, start: Int, end: Int, calendar: Calendar = .current) -> Date {
+    static func endDate(
+        day: Date,
+        start: Int,
+        end: Int,
+        rollsToNextDay: Bool? = nil,
+        calendar: Calendar = .current
+    ) -> Date {
         let base = calendar.startOfDay(for: day)
-        var endDate = calendar.date(byAdding: .minute, value: end, to: base) ?? day
-        if end <= start {
+        let clock = ShiftDatePolicy.clockMinutes(end)
+        var endDate = calendar.date(byAdding: .minute, value: clock, to: base) ?? day
+        let roll = rollsToNextDay ?? (end <= start)
+        if roll {
             endDate = InOutRecovered.addingDays(1, to: endDate, calendar: calendar) ?? endDate
         }
         return endDate

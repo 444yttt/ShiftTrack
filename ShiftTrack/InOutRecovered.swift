@@ -114,6 +114,28 @@ enum InOutRecovered {
         return best?.breakMinutes ?? 0
     }
 
+    /// `0x1001c75ec`. Signed division by 1440 using the instruction's magic
+    /// constant, then hour = `(remainder * 0x8889) >> 21`. Second is 0 when
+    /// this pair is passed to `bySettingHour`. Not a wage formula.
+    static func clockFromPatternMinute(_ minute: Int) -> (hour: Int, minute: Int) {
+        let magic = Int(bitPattern: 0x2D82_D82D_D82D_82D3)
+        let (high, _) = minute.multipliedFullWidth(by: magic)
+        let quotient = (high >> 8) &+ (high < 0 ? 1 : 0)
+        var remainder = minute &- quotient &* 1440
+        if remainder < 0 {
+            remainder &+= 1440
+        }
+        let hour = (remainder * 0x8889) >> 21
+        return (hour, remainder - hour * 60)
+    }
+
+    /// `0x1001c80a4`. `start >= end`, including equal minutes, adds one day
+    /// before the end `bySettingHour`. The compared values are the pattern
+    /// fields, not the wrapped clocks.
+    static func patternEndAddsOneDay(startMinute: Int, endMinute: Int) -> Bool {
+        startMinute >= endMinute
+    }
+
     /// `0x1001b8770`. End minus start, positive remainder of 1440.
     /// A zero remainder, including equal minutes, is 1440.
     /// `BreakRules` does not pass that 1440 into a shift the product rejects.

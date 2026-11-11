@@ -210,6 +210,13 @@ final class WorkShift {
     /// True only after the user saves a shift with rule-based breaks.
     /// Existing rows stay false, so their stored break is left alone.
     var breakFollowsRules: Bool = false
+    /// Set only by the ShiftPart place path. Existing rows stay nil.
+    var partID: UUID? = nil
+    /// True when that path's raw `start >= end` comparison added one day.
+    /// Existing rows stay false, so their pay span is unchanged.
+    var patternEndOnNextDay: Bool = false
+    /// Copied todos. `done` stays false on the place path. Empty for older rows.
+    var todosRaw: String = ""
     var workplace: Workplace?
 
     init(
@@ -222,6 +229,9 @@ final class WorkShift {
         adjustmentYen: Int = 0,
         adjustmentNote: String = "",
         breakFollowsRules: Bool = false,
+        partID: UUID? = nil,
+        patternEndOnNextDay: Bool = false,
+        todosRaw: String = "",
         workplace: Workplace?
     ) {
         self.uuid = UUID()
@@ -234,11 +244,32 @@ final class WorkShift {
         self.adjustmentYen = adjustmentYen
         self.adjustmentNote = adjustmentNote
         self.breakFollowsRules = breakFollowsRules
+        self.partID = partID
+        self.patternEndOnNextDay = patternEndOnNextDay
+        self.todosRaw = todosRaw
         self.workplace = workplace
     }
 
+    var todos: [ShiftTodoCodec.Item] {
+        get { ShiftTodoCodec.decode(todosRaw) }
+        set { todosRaw = ShiftTodoCodec.encode(newValue) }
+    }
+
     var workedMinutes: Int {
-        PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: breakMinutes)
+        if partID == nil {
+            return PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: breakMinutes)
+        }
+        let start = ShiftDatePolicy.clockMinutes(startMinutes)
+        let end = ShiftDatePolicy.clockMinutes(endMinutes)
+        let span: Int
+        if patternEndOnNextDay {
+            span = end + 24 * 60 - start
+        } else if end > start {
+            span = end - start
+        } else {
+            span = 0
+        }
+        return max(0, span - max(0, breakMinutes))
     }
 
     func estimatedYen(includeTransport: Bool) -> Int {
@@ -247,7 +278,14 @@ final class WorkShift {
     }
 
     func hasEnded(now: Date = .now, calendar: Calendar = .current) -> Bool {
-        PayMath.endDate(day: date, start: startMinutes, end: endMinutes, calendar: calendar) <= now
+        let roll: Bool? = partID == nil ? nil : patternEndOnNextDay
+        return PayMath.endDate(
+            day: date,
+            start: startMinutes,
+            end: endMinutes,
+            rollsToNextDay: roll,
+            calendar: calendar
+        ) <= now
     }
 
     var scheduleLabel: String {

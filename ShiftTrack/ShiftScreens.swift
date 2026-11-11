@@ -831,7 +831,7 @@ struct ShiftEditorView: View {
         let storedBreak = shownBreak
         let minutes = PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: storedBreak)
         guard workplace.payIsDaily || minutes > 0 else {
-            error = "終了時刻が開始と同じにならないようにしてください"
+            error = "開始と終了を異なる時刻にしてください。"
             return
         }
         let storedDate = ShiftDatePolicy.dateToStore(
@@ -929,7 +929,7 @@ struct ShiftEditorView: View {
         if !error.isEmpty { return error }
         guard selectedWorkplace != nil else { return workplaces.isEmpty ? "" : "勤務先を選んでください" }
         if selectedWorkplace?.payIsDaily != true, draftMinutes == 0 {
-            return "終了時刻が開始と同じにならないようにしてください"
+            return "開始と終了を異なる時刻にしてください。"
         }
         return ""
     }
