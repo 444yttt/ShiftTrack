@@ -10,6 +10,7 @@ private enum IncomeScope: String, CaseIterable, Identifiable {
 struct IncomeScreen: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
+    @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query private var settingsRows: [AppSettings]
     @State private var scope: IncomeScope = .year
     @State private var anchor = Date()
@@ -20,6 +21,7 @@ struct IncomeScreen: View {
     @State private var showWalls = false
     @State private var showGuide = false
     @State private var countByPayday = false
+    @State private var forecastWorkplace: UUID?
 
     var body: some View {
         if let settings = settingsRows.first {
@@ -100,6 +102,24 @@ struct IncomeScreen: View {
 
             yearForecastCard(totals)
                 .padding(.top, 12)
+
+            ForEach(workplaces) { workplace in
+                Button {
+                    forecastWorkplace = workplace.uuid
+                } label: {
+                    HStack {
+                        Text(PayWindows.phrase(workplace))
+                            .font(.system(size: 15, weight: .medium))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .padding(16)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
 
             goalHeader(title: scope == .year ? "年間目標" : "月間目標", goal: goal) {
                 pendingGoal = goal
@@ -188,6 +208,12 @@ struct IncomeScreen: View {
                     )
                 }
             }
+        }
+        .sheet(isPresented: Binding(
+            get: { forecastWorkplace != nil },
+            set: { if !$0 { forecastWorkplace = nil } }
+        )) {
+            PayPeriodsView(workplaceID: forecastWorkplace)
         }
         .sheet(isPresented: $showWalls) {
             WallsScreen()

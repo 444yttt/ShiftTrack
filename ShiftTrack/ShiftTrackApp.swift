@@ -7,9 +7,9 @@ struct ShiftTrackApp: App {
     init() {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(red: 11 / 255, green: 11 / 255, blue: 11 / 255, alpha: 1)
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        appearance.backgroundColor = UIColor(red: 243 / 255, green: 241 / 255, blue: 236 / 255, alpha: 1)
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.black]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.black]
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
@@ -45,6 +45,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .list
     @State private var router = ImportRouter.shared
+    @State private var showLaunch = !ProcessInfo.processInfo.arguments.contains("-UITestingReset")
 
     var body: some View {
         Group {
@@ -70,7 +71,19 @@ struct RootView: View {
             ImportFlowView(startsInReview: router.startInReview, pending: router.pending)
                 .presentationBackground(Theme.background)
         }
+        .overlay {
+            if showLaunch {
+                Color("LaunchBackground")
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+        }
         .task {
+            if showLaunch {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    showLaunch = false
+                }
+            }
             AppBootstrap.ensureSettings(in: context)
             ShiftTrackShortcuts.updateAppShortcutParameters()
             router.considerPending()

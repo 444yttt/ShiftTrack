@@ -583,6 +583,27 @@ struct ShiftAddChooser: View {
     }
 }
 
+/// Same-calendar-day clock overlap. A shift with `end <= start` crosses midnight;
+/// that case, and travel time, are not part of this check.
+enum SameDayOverlap {
+    static func clocksOverlap(start: Int, end: Int, otherStart: Int, otherEnd: Int) -> Bool {
+        guard end > start, otherEnd > otherStart else { return false }
+        return start < otherEnd && otherStart < end
+    }
+
+    static func first(start: Int, end: Int, day: Date, ignoring: UUID?, shifts: [WorkShift], calendar: Calendar = .current) -> WorkShift? {
+        let dayStart = calendar.startOfDay(for: day)
+        return shifts
+            .filter { other in
+                other.uuid != ignoring
+                    && calendar.isDate(other.date, inSameDayAs: dayStart)
+                    && clocksOverlap(start: start, end: end, otherStart: other.startMinutes, otherEnd: other.endMinutes)
+            }
+            .sorted { $0.startMinutes < $1.startMinutes }
+            .first
+    }
+}
+
 struct ShiftEditorView: View {
     var route: EditorRoute
     var onSaved: ((Date) -> Void)? = nil
@@ -591,6 +612,7 @@ struct ShiftEditorView: View {
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query private var settingsRows: [AppSettings]
     @Query private var shifts: [WorkShift]
+    @Query(sort: \ShiftPart.createdAt) private var parts: [ShiftPart]
 
     @State private var workplaceID: UUID?
     @State private var date = Date()
@@ -609,6 +631,10 @@ struct ShiftEditorView: View {
     @State private var draftDate = Date()
     @State private var userEditedDate = false
     @State private var loaded = false
+    @State private var overlapID: UUID?
+    @State private var chosenPart: UUID?
+    @State private var destinationName = ""
+    @State private var destinationPlace = ""
     @FocusState private var typing: Bool
 
     private var existing: WorkShift? { shifts.first { $0.uuid == route.shiftID } }
@@ -627,6 +653,23 @@ struct ShiftEditorView: View {
                     }
                     .padding(.top, 12)
                 } else {
+                    Text("\(Formatters.monthDayWeekday(date))のシフト")
+                        .font(.system(size: 20, weight: .black))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !workplaceParts.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                patternChip("なし", selected: chosenPart == nil) { chosenPart = nil }
+                                ForEach(workplaceParts) { part in
+                                    patternChip(part.name, selected: chosenPart == part.uuid) {
+                                        chosenPart = part.uuid
+                                        startMinutes = part.startMinute
+                                        endMinutes = part.endMinute
+                                    }
+                                }
+                            }
+                        }
+                    }
                     formCard {
                         labeled("勤務先") {
                             if existing != nil {
@@ -728,6 +771,26 @@ struct ShiftEditorView: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.behind)
                     }
+                    formCard {
+                        Text("行き先")
+                            .font(.system(size: 15, weight: .bold))
+                        Text("マップで探す")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("検索結果は未回収です。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                        TextField("名前", text: $destinationName)
+                            .padding(12)
+                            .background(Theme.cardRaised)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        TextField("住所", text: $destinationPlace)
+                            .padding(12)
+                            .background(Theme.cardRaised)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        Text("空のときは勤務先に向かいます")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted)
+                    }
                     LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true) { save() }
                         .disabled(!canSave)
                         .opacity(canSave ? 1 : 0.4)
@@ -747,7 +810,12 @@ struct ShiftEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.ink)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { save() }
+                        .disabled(!canSave)
+                        .foregroundStyle(Theme.ink)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -760,6 +828,43 @@ struct ShiftEditorView: View {
             .onChange(of: workplaces.map(\.uuid)) { _, ids in
                 if let workplaceID, ids.contains(workplaceID) { return }
                 self.workplaceID = workplaces.last?.uuid
+            }
+            .overlay {
+                if let other = shifts.first(where: { $0.uuid == overlapID }) {
+                    ZStack {
+                        Color.black.opacity(0.35).ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            Text("このシフトは確認が必要です")
+                                .font(.system(size: 18, weight: .bold))
+                                .multilineTextAlignment(.center)
+                            Text("\(other.workplace?.name ?? "シフト") \(Formatters.clock(other.startMinutes))〜\(Formatters.clock(other.endMinutes)) と時間が重なっています")
+                                .font(.system(size: 15))
+                                .multilineTextAlignment(.center)
+                            HStack(spacing: 10) {
+                                Button("やめる") { overlapID = nil }
+                                    .font(.system(size: 16, weight: .bold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(Theme.cardRaised)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                Button("このまま保存") {
+                                    overlapID = nil
+                                    save(force: true)
+                                }
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(Color.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Theme.ink)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            }
+                        }
+                        .padding(20)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .padding(.horizontal, 24)
+                    }
+                }
             }
             .alert("このシフトを削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) { deleteShift() }
@@ -812,6 +917,9 @@ struct ShiftEditorView: View {
             breakFollowsRules = existing.breakFollowsRules
             breakMinutes = existing.breakMinutes
             notes = existing.notes
+            destinationName = existing.destinationName
+            destinationPlace = existing.destinationPlace
+            chosenPart = existing.partID
             customText = existing.customPay.map(String.init) ?? ""
             adjustmentText = existing.adjustmentYen == 0 ? "" : String(existing.adjustmentYen)
             adjustmentNote = existing.adjustmentNote
@@ -822,7 +930,22 @@ struct ShiftEditorView: View {
         }
     }
 
-    private func save() {
+    private var workplaceParts: [ShiftPart] {
+        parts.filter { $0.workplaceUUID == workplaceID && !$0.hidden }
+    }
+
+    private func patternChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(selected ? Color.white : Theme.ink)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(selected ? Theme.ink : Theme.cardRaised)
+            .clipShape(Capsule())
+            .buttonStyle(.plain)
+    }
+
+    private func save(force: Bool = false) {
         guard let workplace = selectedWorkplace else {
             error = "勤務先を選んでください"
             return
@@ -839,6 +962,16 @@ struct ShiftEditorView: View {
             draft: date,
             userEditedDate: userEditedDate
         )
+        if !force, let other = SameDayOverlap.first(
+            start: startMinutes,
+            end: endMinutes,
+            day: storedDate,
+            ignoring: existing?.uuid,
+            shifts: shifts
+        ) {
+            overlapID = other.uuid
+            return
+        }
         if let existing {
             existing.date = storedDate
             existing.startMinutes = startMinutes
@@ -846,6 +979,8 @@ struct ShiftEditorView: View {
             existing.breakMinutes = storedBreak
             existing.breakFollowsRules = follows
             existing.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            existing.destinationName = destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
+            existing.destinationPlace = destinationPlace.trimmingCharacters(in: .whitespacesAndNewlines)
             existing.customPay = parsedCustom
             existing.adjustmentYen = parsedAdjustment
             existing.adjustmentNote = adjustmentNote.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -860,7 +995,9 @@ struct ShiftEditorView: View {
                 adjustmentYen: parsedAdjustment,
                 adjustmentNote: adjustmentNote.trimmingCharacters(in: .whitespacesAndNewlines),
                 breakFollowsRules: follows,
-                workplace: workplace
+                workplace: workplace,
+                destinationName: destinationName.trimmingCharacters(in: .whitespacesAndNewlines),
+                destinationPlace: destinationPlace.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             context.insert(shift)
         }

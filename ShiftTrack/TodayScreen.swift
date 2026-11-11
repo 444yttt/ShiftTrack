@@ -138,7 +138,7 @@ struct TodayScreen: View {
                 ShiftPartEditor()
                     .presentationBackground(Theme.background)
             case .unconfirmed:
-                UnconfirmedList(shifts: shifts.filter { $0.hasEnded() }) { shift in
+                UnconfirmedList(shifts: shifts.filter(\.needsAttendanceCheck)) { shift in
                     sheet = .editor(EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid))
                 }
             case .periods:
@@ -219,6 +219,11 @@ struct TodayScreen: View {
                     .frame(height: 64)
                     .background(selected ? Theme.lime : (filled ? Theme.ink : Color.white))
                     .clipShape(Circle())
+                    .overlay {
+                        if selected && Calendar.current.isDateInToday(date) {
+                            Circle().stroke(Theme.ink, lineWidth: 2)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Formatters.longDay(date))
@@ -269,7 +274,7 @@ struct TodayScreen: View {
             let day = Calendar.current.startOfDay(for: shift.date)
             return day >= interval.0 && day < interval.1
         }.map { Calendar.current.startOfDay(for: $0.date) }).count
-        let ended = shifts.filter { $0.hasEnded(now: now) }.count
+        let ended = shifts.filter(\.needsAttendanceCheck).count
         return VStack(spacing: 10) {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -569,9 +574,10 @@ struct UnconfirmedList: View {
                 NavigationLink {
                     ShiftCheckView(shift: shift) { onEdit(shift) }
                 } label: {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
+                            .font(.system(size: 16, weight: .bold))
                         Text(shift.workplace?.name ?? "勤務先")
-                        Text(shift.scheduleLabel)
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.muted)
                     }

@@ -220,7 +220,7 @@ struct DarkSheetModifier: ViewModifier {
             .presentationDragIndicator(.visible)
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 
