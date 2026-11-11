@@ -26,7 +26,6 @@ struct IncomeScreen: View {
     @AppStorage("incomeGuide.birthMonth") private var birthMonth = 0
     @AppStorage("incomeGuide.birthDay") private var birthDay = 0
     @State private var showGuide = false
-    @State private var countByPayday = false
     @State private var forecastWorkplace: UUID?
 
     var body: some View {
@@ -358,15 +357,6 @@ struct IncomeScreen: View {
             forecastLine("働いた分", totals.workedYen)
             forecastLine(scope == .year ? "年末までのシフト分" : "この期間のシフト分", totals.scheduledYen)
             forecastLine("合計", totals.forecastYen)
-            HStack(spacing: 8) {
-                countChip("働いた日", selected: !countByPayday) { countByPayday = false }
-                countChip("支給日", selected: countByPayday) { countByPayday = true }
-            }
-            if countByPayday {
-                Text("支給日で束ねる式は未回収です。合計は働いた日と同じです。")
-                    .designFont(16)
-                    .foregroundStyle(Color.white.opacity(0.75))
-            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -383,17 +373,6 @@ struct IncomeScreen: View {
                 .font(.doto(22))
                 .foregroundStyle(Theme.lime)
         }
-    }
-
-    private func countChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .designFont(16, weight: .bold)
-            .foregroundStyle(selected ? Theme.ink : Color.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(selected ? Theme.lime : Color.white.opacity(0.12))
-            .clipShape(Capsule())
-            .buttonStyle(.plain)
     }
 
     private func goalHeader(title: String, goal: Int, edit: @escaping () -> Void) -> some View {

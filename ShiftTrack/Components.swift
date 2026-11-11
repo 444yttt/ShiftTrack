@@ -41,12 +41,17 @@ enum AppTab: Int, CaseIterable, Identifiable {
 
 struct CustomTabBar: View {
     @Binding var selection: AppTab
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(AppTab.allCases) { tab in
                 Button {
-                    selection = tab
+                    if reduceMotion {
+                        selection = tab
+                    } else {
+                        withAnimation(Motion.chip) { selection = tab }
+                    }
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: tab.symbol)
@@ -66,7 +71,7 @@ struct CustomTabBar: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableStyle())
                 .accessibilityLabel(tab.title)
                 .accessibilityIdentifier(tab.accessibilityID)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
@@ -79,6 +84,7 @@ struct CustomTabBar: View {
         .padding(ScreenInsets.root)
         .padding(.bottom, 8)
         .background(Theme.background)
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }
 
@@ -101,7 +107,7 @@ struct LimeCapsuleButton: View {
                 .background(Theme.lime)
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle(large: fillWidth))
         .accessibilityIdentifier(identifier ?? title)
     }
 

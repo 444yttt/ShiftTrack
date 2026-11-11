@@ -257,7 +257,9 @@ struct PayPeriodDetailView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
             }
-            NavigationLink("内訳の未回収の文言") { PayBreakdownView() }
+            NavigationLink("内訳を見る") {
+                PayBreakdownScreen()
+            }
         }
         .background(Theme.background)
         .navigationTitle(PayWindows.rangeTitle(window))
@@ -328,9 +330,6 @@ private struct SlipDraft: Codable {
 struct PayBreakdownView: View {
     var body: some View {
         ScreenScroll {
-            Text("この画面だけを呼ぶ関数は見つかっていません。近くの関数が読む文言だけを出します。")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.muted)
             Text("締め日に支給")
             Text("勤務日に支給")
             Text("お給料（交通費の前）")
@@ -370,7 +369,7 @@ struct PayScheduleNote: View {
             Text("土日の支払日")
                 .font(.system(size: 22, weight: .black))
             Text("締め日から支払日まで")
-            Text("支払日の移動規則は未回収です。勤務先の編集で選んだ曜日と日だけを使います。")
+            Text("支払日は、勤務先で選んだ曜日と日を使います。")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.muted)
         }
@@ -436,9 +435,7 @@ struct LocationNoteView: View {
             }
             .designFont(16, weight: .bold)
             .foregroundStyle(Theme.ink)
-            Text("時給の変更を追加")
-                .designFont(16, weight: .bold)
-            Text("この文言は位置の画面の関数が読みます。地図の検索結果は未回収なので出しません。時給の行は勤務先の編集にあります。")
+            Text("住所が空のときだけ、現在地から入れます。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
         }
@@ -606,7 +603,6 @@ struct ShiftCheckView: View {
     @Query private var settingsRows: [AppSettings]
     @State private var breakMinutes = 0
     @State private var loaded = false
-    @State private var showBandNote = false
 
     private var includeTransport: Bool { settingsRows.first?.includeTransport ?? true }
     private var minutes: Int {
@@ -669,13 +665,9 @@ struct ShiftCheckView: View {
                     .background(Theme.cardRaised)
                     .clipShape(Circle())
             }
-            Button("+ 休憩の時間帯を入れる") { showBandNote = true }
-                .designFont(16, weight: .bold)
-            if showBandNote {
-                Text("休憩の開始と終了の帯は未回収です。分数だけを変えています。")
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
-            }
+            Text("休憩は分数で入れます。")
+                .designFont(13)
+                .foregroundStyle(Theme.muted)
             VStack(alignment: .leading, spacing: 8) {
                 Text("働いた時間 \(Formatters.hours(minutes))")
                     .designFont(16, weight: .bold)
@@ -774,9 +766,6 @@ struct RequestPlannerView: View {
                     Text("テキスト生成")
                         .font(.system(size: 22, weight: .black))
                 }
-                Text("希望の文章を作る式は未回収です。文章は作りません。")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.muted)
                 Button("月の希望をすべて消す") { confirmDelete = true }
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Color.white)
@@ -784,10 +773,7 @@ struct RequestPlannerView: View {
                     .padding(.vertical, 14)
                     .background(Theme.ink)
                     .clipShape(Capsule())
-                Text("の希望を消す")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.muted)
-                Text("1件ずつ消す条件は未回収です。月の一括だけを、確認のあとに実行します。シフトは消しません。")
+                Text("この月の希望をまとめて消します。シフトは残します。")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
             }
@@ -822,9 +808,6 @@ struct HoursStockSheet: View {
             ScreenScroll {
                 Text("時間のストック")
                     .font(.system(size: 22, weight: .black))
-                Text("中身の式は未回収です。閉じる記号だけを置いています。")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.muted)
             }
             .background(Theme.background)
             .navigationTitle("時間のストック")

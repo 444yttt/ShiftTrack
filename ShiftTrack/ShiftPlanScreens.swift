@@ -538,8 +538,6 @@ struct RequestEditorView: View {
     @State private var note = ""
     @State private var kind = ShiftRequestKind.hopedAttendance
     @State private var error = ""
-    @State private var showPlanner = false
-    @State private var showStock = false
 
     init(route: RequestRoute) {
         self.route = route
@@ -602,16 +600,6 @@ struct RequestEditorView: View {
                     endMinutes = 17 * 60
                 }
                 .designFont(13, weight: .bold)
-                Button("ストックして入れる") { showStock = true }
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.ink)
-                Button("テキスト生成") { showPlanner = true }
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.ink)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Theme.lime)
-                    .clipShape(Capsule())
                 LimeCapsuleButton(title: "希望を保存", fillWidth: true, designSize: 16, action: save)
                 if existing?.isOpen == true {
                     LimeCapsuleButton(title: "シフトにする", fillWidth: true, designSize: 16, action: accept)
@@ -631,12 +619,6 @@ struct RequestEditorView: View {
                 }
             }
             .onAppear(perform: load)
-            .sheet(isPresented: $showPlanner) {
-                RequestPlannerView(month: date)
-            }
-            .sheet(isPresented: $showStock) {
-                HoursStockSheet()
-            }
         }
     }
 
@@ -665,7 +647,7 @@ struct RequestEditorView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text("この月の出勤希望 \(pair.attendance.count)件")
             Text("この月の休み希望 \(pair.rest.count)件")
-            Text("0を出勤希望、1を休み希望にしています。どちらがどちらかは未確定です。")
+            Text("出勤希望と休み希望は、シフトではありません。")
                 .designFont(12)
                 .foregroundStyle(Theme.muted)
         }

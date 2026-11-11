@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct TodayScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
@@ -64,6 +65,8 @@ struct TodayScreen: View {
                 Text(clock(now).replacingOccurrences(of: ":", with: "∶"))
                     .font(.doto(64))
                     .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                    .animation(Motion.allowed(Motion.chip, reduce: reduceMotion), value: clock(now))
                     .accessibilityIdentifier("today.time")
                 Text(Formatters.longDay(Date()))
                     .font(.system(size: 1))
@@ -200,7 +203,11 @@ struct TodayScreen: View {
                 let hasShift = shifts.contains { Calendar.current.isDate($0.date, inSameDayAs: date) }
                 let filled = hasShift && !selected
                 Button {
-                    day = date
+                    if reduceMotion {
+                        day = date
+                    } else {
+                        withAnimation(Motion.chip) { day = date }
+                    }
                 } label: {
                     VStack(spacing: 4) {
                         Text("\(Calendar.current.component(.day, from: date))")
@@ -220,12 +227,14 @@ struct TodayScreen: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableStyle())
                 .accessibilityLabel(Formatters.longDay(date))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
         .padding(.top, 8)
+        .animation(Motion.allowed(Motion.chip, reduce: reduceMotion), value: day)
+        .sensoryFeedback(.selection, trigger: day)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.week")
     }
@@ -286,6 +295,7 @@ struct TodayScreen: View {
                     Text(yenBody(todayYen) + " 円")
                         .font(.doto(28))
                         .foregroundStyle(Theme.lime)
+                        .contentTransition(.numericText())
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
                     Text("見込み")
@@ -387,11 +397,13 @@ struct TodayScreen: View {
             } else {
                 ForEach(rows) { shift in
                     shiftCard(shift, now: now)
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.98).combined(with: .opacity))
                 }
                 addShiftButton
             }
         }
         .padding(.top, 8)
+        .animation(Motion.allowed(Motion.settle, reduce: reduceMotion), value: day)
     }
 
     private func shiftCard(_ shift: WorkShift, now: Date) -> some View {

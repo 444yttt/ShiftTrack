@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct CalendarScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
@@ -64,11 +65,14 @@ struct CalendarScreen: View {
                 Text(Formatters.monthTitle(month))
                     .font(.doto(40))
                     .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                    .animation(Motion.allowed(Motion.settle, reduce: reduceMotion), value: month)
                 Spacer()
                 monthButton("chevron.left", label: "前の月", identifier: "calendar.previousMonth") { moveMonth(-1) }
                 monthButton("chevron.right", label: "次の月", identifier: "calendar.nextMonth") { moveMonth(1) }
             }
             .padding(.top, 16)
+            .sensoryFeedback(.selection, trigger: month)
             if !Calendar.current.isDate(month, equalTo: .now, toGranularity: .month) {
                 Button("今月に戻ります") {
                     month = Date()
@@ -259,7 +263,7 @@ struct CalendarScreen: View {
                         "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
                         "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
                         "シフトパターンは、選んだ日へ開始・終了・勤務先を置きます。同じパターンの日は足しません。別のシフトがある日は保留して、そのタップでは追加しません。休憩は写しません。曜日のひな形は別の「パターン」です。",
-                        "日付を押すと、その日の予定が下に出ます。選ぶモードのときだけ、その日をまとめて置く相手に加えます。赤い「！」は、時間の重なりや移動時間の不足がある日、と元の文にあります。印の出し方は未回収なので、この画面には出していません。保存の前の確認はシフト編集で出します。",
+                        "日付を押すと、その日のシフトを下に出します。時間が重なるときは、保存の前に確認します。",
                         "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                     ]
                 )
@@ -573,20 +577,27 @@ struct CalendarScreen: View {
 
     private func moveMonth(_ delta: Int) {
         guard let next = Calendar.current.date(byAdding: .month, value: delta, to: month) else { return }
-        month = next
-        selectedDay = ShiftDatePolicy.selectedDayAfterMonthChange(selected: selectedDay, visibleMonth: next)
+        let apply = {
+            month = next
+            selectedDay = ShiftDatePolicy.selectedDayAfterMonthChange(selected: selectedDay, visibleMonth: next)
+        }
+        if reduceMotion {
+            apply()
+        } else {
+            withAnimation(Motion.settle, apply)
+        }
     }
 
     private func monthButton(_ systemName: String, label: String, identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Color.white)
                 .frame(width: 32, height: 32)
                 .background(Theme.dayFilled)
                 .clipShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
         .accessibilityLabel(label)
         .accessibilityIdentifier(identifier)
     }

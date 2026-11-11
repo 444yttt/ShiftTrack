@@ -85,9 +85,9 @@ enum LivePay {
         case .amount(let amount):
             return "予定全体の時給分 \(ScheduledPay.amountText(amount.total))（交通費の前）。今まで稼いだ金額ではありません。\(suffix)"
         case .historyOpen:
-            return "給与の目安：時給の履歴がすべてシフト日より後で、そのときの時給は未確定です。\(suffix)"
+            return "この日の時給はまだ決まっていません。\(suffix)"
         case .notThisFormula, nil:
-            return "給与の目安：日給の未確定な条件、または入力した金額のため、予定全体の時給分は出していません。\(suffix)"
+            return "この日の見込みは出していません。\(suffix)"
         }
     }
 
@@ -96,7 +96,7 @@ enum LivePay {
         case .notAShift:
             return "休憩は計算していません"
         case .beforeStart:
-            return "開始前です。負の休憩按分は画面で未確認のため出していません"
+            return "開始前です。"
         case .during(let scaled, let scheduled, _):
             guard let scaled else { return "休憩の目安は出していません" }
             return "休憩の目安 \(scaled)分（予定\(scheduled)分を経過の割合で按分。開始と終了は予定のまま）"

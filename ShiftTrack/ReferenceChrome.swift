@@ -47,7 +47,7 @@ struct DayIllustration: View {
         }
         .frame(height: 112)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .accessibilityLabel("時間帯のイラストの代わり。元の画像は同梱していません。")
+        .accessibilityLabel("時間帯")
     }
 }
 
@@ -66,14 +66,11 @@ struct ShopPlaceholder: View {
                     .overlay(alignment: .leading) {
                         Circle().fill(Color(hex: 0x3E8F4A)).frame(width: 16, height: 16).padding(10)
                     }
-                Text("店舗イラストの代わり")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.muted)
             }
         }
         .frame(height: 160)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityLabel("店舗イラストの代わり。元の画像は同梱していません。")
+        .accessibilityLabel("店舗")
     }
 }
 
@@ -89,14 +86,11 @@ struct PayPlaceholder: View {
                 Capsule()
                     .fill(Theme.lime)
                     .frame(width: 88, height: 10)
-                Text("財布イラストの代わり")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.muted)
             }
         }
         .frame(height: 140)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityLabel("財布イラストの代わり。元の画像は同梱していません。")
+        .accessibilityLabel("給与")
     }
 }
 
@@ -120,7 +114,7 @@ struct CalendarPlaceholder: View {
         }
         .frame(height: 150)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityLabel("カレンダーイラストの代わり。元の画像は同梱していません。")
+        .accessibilityLabel("カレンダー")
     }
 }
 

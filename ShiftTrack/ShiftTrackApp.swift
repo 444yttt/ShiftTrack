@@ -30,7 +30,8 @@ enum AppModel {
     static let container: ModelContainer = {
         let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self, ShiftPart.self])
         // UI tests pass this so each launch starts empty. The on-disk store stays untouched.
-        let testing = ProcessInfo.processInfo.arguments.contains("-UITestingReset")
+        let arguments = ProcessInfo.processInfo.arguments
+        let testing = arguments.contains("-UITestingReset") || arguments.contains("-UITestingSample")
         let configuration = ModelConfiguration(isStoredInMemoryOnly: testing)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
@@ -44,24 +45,27 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tab: AppTab = .list
+    @State private var showOnboarding = false
     @State private var router = ImportRouter.shared
     @State private var draftRouter = WorkplaceDraftRouter.shared
     @State private var showLaunch = !ProcessInfo.processInfo.arguments.contains("-UITestingReset")
+        && !ProcessInfo.processInfo.arguments.contains("-UITestingSample")
 
     var body: some View {
-        Group {
+        ZStack {
             switch tab {
             case .list:
-                TodayScreen()
+                TodayScreen().transition(.opacity)
             case .calendar:
-                CalendarScreen()
+                CalendarScreen().transition(.opacity)
             case .workplaces:
-                WorkplaceDirectoryScreen()
+                WorkplaceDirectoryScreen().transition(.opacity)
             case .income:
-                IncomeScreen()
+                IncomeScreen().transition(.opacity)
             case .settings:
-                SettingsScreen()
+                SettingsScreen().transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -110,8 +114,24 @@ struct RootView: View {
                 }
             }
             AppBootstrap.ensureSettings(in: context)
+            SampleContent.install(in: context)
             ShiftTrackShortcuts.updateAppShortcutParameters()
             router.considerPending()
+        }
+        .animation(Motion.allowed(Motion.layout, reduce: reduceMotion), value: tab)
+        .overlay {
+            if showOnboarding {
+                OnboardingScreen {
+                    FirstRun.finish()
+                    showOnboarding = false
+                }
+                .transition(reduceMotion ? .opacity : .scale(scale: 0.98).combined(with: .opacity))
+            }
+        }
+        .task {
+            let placeCount = ((try? context.fetch(FetchDescriptor<Workplace>())) ?? []).count
+            let shiftCount = ((try? context.fetch(FetchDescriptor<WorkShift>())) ?? []).count
+            showOnboarding = FirstRun.shouldShow(hasContent: placeCount + shiftCount > 0)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {

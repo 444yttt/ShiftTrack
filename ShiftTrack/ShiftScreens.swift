@@ -876,11 +876,6 @@ struct ShiftEditorView: View {
                     formCard {
                         Text("行き先")
                             .designFont(16, weight: .bold)
-                        Text("マップで探す")
-                            .designFont(16, weight: .bold)
-                        Text("検索結果は未回収です。")
-                            .designFont(13)
-                            .foregroundStyle(Theme.muted)
                         TextField("名前", text: $destinationName)
                             .padding(12)
                             .background(Theme.cardRaised)
@@ -1695,7 +1690,7 @@ struct WorkplaceEditorView: View {
                                 Text("割増 \(overtimeRate)%")
                                     .foregroundStyle(Theme.ink)
                             }
-                            Text("予定全体の時給分では、しきい値を超えた分にこの割合を足します。このシフトより前の分数は未確定なので足しません。今の見込の追加金額とは別です。")
+                            Text("しきい値を超えた分に、この割合を足します。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -1726,7 +1721,7 @@ struct WorkplaceEditorView: View {
                 }
                 formCard {
                     sectionTitle("開始と終了の丸め")
-                    Text("保存したシフトの時刻も、入っている給料の見込も、この設定だけでは変わりません。単位が2分未満か、向きがそのままのときは、その時刻を動かしません。参考アプリの丸めの再構成で、金額の式ではありません。")
+                    Text("保存したシフトの時刻と、入っている給料の見込は、この設定だけでは変わりません。単位が2分未満のときは、その時刻を動かしません。")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1751,7 +1746,7 @@ struct WorkplaceEditorView: View {
                 }
                 formCard {
                     sectionTitle("時給の履歴と時間帯")
-                    Text("予定全体の時給分は、履歴の末尾から適用日がシフトの日以前の行を使います。空なら0です。全部がシフト日より後のときは未確定で、円を出しません。並び順は検査していないので、日付で並べ替えません。時間帯の境界はまだ合計へ入れていません。上の時給欄は、今月の見込みだけが使います。")
+                    Text("適用日がシフトの日以前の時給を使います。まだその日が来ていないときは、見込みを出しません。上の時給欄は、今月の見込みに使います。")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
