@@ -2,9 +2,11 @@ import SwiftUI
 import SwiftData
 
 struct CalendarScreen: View {
+    @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query(sort: \ShiftRequest.date) private var requests: [ShiftRequest]
+    @Query(sort: \ShiftPart.createdAt) private var parts: [ShiftPart]
     @Query private var settingsRows: [AppSettings]
 
     @State private var month = Date()
@@ -13,12 +15,17 @@ struct CalendarScreen: View {
     @State private var calendarDragging = false
     @State private var cover: CalendarCover?
     @State private var router = ImportRouter.shared
+    @State private var gathering = false
+    @State private var pickedDays: [Date] = []
+    @State private var pendingPlace: ShiftPartPlace.Pending?
+    @State private var placeNote = ""
 
     private enum CalendarCover: Identifiable {
         case workplace
         case add(Date)
         case editor(EditorRoute)
         case patterns
+        case partEditor
         case request(RequestRoute)
         case help
 
@@ -28,6 +35,7 @@ struct CalendarScreen: View {
             case .add(let date): "add-\(date.timeIntervalSinceReferenceDate)"
             case .editor(let route): "editor-\(route.id)"
             case .patterns: "patterns"
+            case .partEditor: "part-editor"
             case .request(let route): "request-\(route.id)"
             case .help: "help"
             }
@@ -102,6 +110,8 @@ struct CalendarScreen: View {
                     }
             )
 
+            patternSection
+
             HStack {
                 Text(listTitle)
                     .font(.system(size: 15, weight: .bold))
@@ -139,6 +149,7 @@ struct CalendarScreen: View {
                             ShiftCard(shift: shift, includeTransport: settings?.includeTransport ?? true)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("calendar.shift")
                     }
                 }
             }
@@ -207,6 +218,9 @@ struct CalendarScreen: View {
             case .patterns:
                 PatternListView()
                     .presentationBackground(Theme.background)
+            case .partEditor:
+                ShiftPartEditor()
+                    .presentationBackground(Theme.background)
             case .request(let route):
                 RequestEditorView(route: route)
                     .presentationBackground(Theme.background)
@@ -218,7 +232,8 @@ struct CalendarScreen: View {
                         "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
                         "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
                         "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
-                        "パターンは曜日のひな形です。入れるとき、同じ勤務先のシフトが既にある日は作りません。",
+                        "シフトパターンは、選んだ日へ開始・終了・勤務先を置きます。同じパターンの日は足しません。別のシフトがある日は保留して、そのタップでは追加しません。休憩は写しません。曜日のひな形は別の「パターン」です。",
+                        "日付を押すと、その日の予定が下に出ます。選ぶモードのときだけ、その日をまとめて置く相手に加えます。赤い「！」は、時間の重なりや移動時間の不足がある日、と元の文にあります。その条件は未回収なので、この画面には出していません。",
                         "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                     ]
                 )
@@ -260,9 +275,14 @@ struct CalendarScreen: View {
         let selected = selectedDay.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false
         let isToday = Calendar.current.isDateInToday(day)
         let colors = uniqueColors(dayShifts)
+        let picked = pickedDays.contains { Calendar.current.isDate($0, inSameDayAs: day) }
         return Button {
             guard !calendarDragging else { return }
-            selectedDay = Calendar.current.startOfDay(for: day)
+            let start = Calendar.current.startOfDay(for: day)
+            selectedDay = start
+            if gathering {
+                togglePicked(start)
+            }
         } label: {
             VStack(spacing: 4) {
                 Text("\(Calendar.current.component(.day, from: day))")
@@ -289,6 +309,9 @@ struct CalendarScreen: View {
                 if isToday && !selected {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(Theme.lime, lineWidth: 1.5)
+                } else if picked && !selected {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Theme.lime, lineWidth: 1.5)
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -309,6 +332,98 @@ struct CalendarScreen: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(isToday ? "calendar.day.today" : dayIdentifier(day))
+        .accessibilityAddTraits(picked ? .isSelected : [])
+    }
+
+    private func dayIdentifier(_ day: Date) -> String {
+        let calendar = Calendar.current
+        return String(
+            format: "calendar.day.%04d-%02d-%02d",
+            calendar.component(.year, from: day),
+            calendar.component(.month, from: day),
+            calendar.component(.day, from: day)
+        )
+    }
+
+    private var patternSection: some View {
+        ShiftPartSection(
+            parts: parts,
+            dayChipDay: shownDay,
+            patternDays: patternDays,
+            note: placeNote,
+            pending: pendingPlace,
+            canCreate: !workplaces.isEmpty,
+            gathering: gathering,
+            pickedCount: pickedDays.count,
+            onToggleGathering: {
+                gathering.toggle()
+                if !gathering {
+                    pickedDays = []
+                }
+            },
+            onCreate: { cover = .partEditor },
+            onDayChip: { place($0, days: [shownDay]) },
+            onPatternRow: { part in
+                let days = patternDays
+                guard !days.isEmpty else {
+                    placeNote = "日付を選んでください"
+                    pendingPlace = nil
+                    return
+                }
+                place(part, days: days)
+            },
+            onClosePending: { pendingPlace = nil }
+        )
+    }
+
+    private var shownDay: Date {
+        selectedDay ?? addDay
+    }
+
+    private var patternDays: [Date] {
+        if gathering {
+            return pickedDays
+        }
+        return [shownDay]
+    }
+
+    private func togglePicked(_ day: Date) {
+        if let index = pickedDays.firstIndex(where: { Calendar.current.isDate($0, inSameDayAs: day) }) {
+            pickedDays.remove(at: index)
+        } else {
+            pickedDays.append(day)
+        }
+    }
+
+    private func place(_ part: ShiftPart, days: [Date]) {
+        let result = ShiftPartCommit.apply(
+            part: part,
+            days: days,
+            shifts: shifts,
+            workplaces: workplaces,
+            context: context
+        )
+        if let failure = result.failure {
+            placeNote = failure
+            pendingPlace = nil
+            return
+        }
+        switch result.outcome {
+        case .pending(let pending):
+            pendingPlace = pending
+            placeNote = "追加した件数 0"
+        case .missingWorkplace:
+            pendingPlace = nil
+            placeNote = "勤務先がないので、どの日にも置いていません。"
+        case .placed(let drafts):
+            pendingPlace = nil
+            placeNote = "置いた件数 \(drafts.count)。同じパターンの日は足していません。休憩は0分のままです。"
+            if drafts.count == 1 {
+                selectedDay = drafts[0].day
+                month = drafts[0].day
+            }
+        }
     }
 
     private var listedShifts: [WorkShift] {
@@ -422,7 +537,13 @@ struct CalendarScreen: View {
         var seen = Set<String>()
         var colors: [String] = []
         for shift in dayShifts.sorted(by: { $0.startMinutes < $1.startMinutes }) {
-            guard let hex = shift.workplace?.colorHex, seen.insert(hex).inserted else { continue }
+            let hex: String?
+            if let partID = shift.partID, let part = parts.first(where: { $0.uuid == partID }) {
+                hex = part.colorHex
+            } else {
+                hex = shift.workplace?.colorHex
+            }
+            guard let hex, seen.insert(hex).inserted else { continue }
             colors.append(hex)
         }
         return colors

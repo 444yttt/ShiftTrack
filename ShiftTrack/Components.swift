@@ -76,6 +76,7 @@ struct CustomTabBar: View {
 struct LimeCapsuleButton: View {
     var title: String
     var fillWidth = false
+    var identifier: String? = nil
     var action: () -> Void
 
     var body: some View {
@@ -90,6 +91,7 @@ struct LimeCapsuleButton: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier ?? title)
     }
 }
 
@@ -132,6 +134,12 @@ struct ShiftCard: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(2)
+                }
+                if !shift.todos.isEmpty {
+                    Text(shift.todos.map(\.title).joined(separator: "、"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityIdentifier("shift.todos")
                 }
             }
             Spacer(minLength: 8)

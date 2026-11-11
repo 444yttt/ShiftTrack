@@ -26,18 +26,27 @@ enum LivePay {
         breakMinutes: Int,
         workplace: Workplace,
         customPay: Int? = nil,
+        rollsToNextDay: Bool? = nil,
         calendar: Calendar = .current
     ) -> Phase {
         _ = workplace
         _ = customPay
         let span = BreakRules.selectionMinutes(start: start, end: end)
-        guard span > 0 else { return .notAShift }
+        // A ShiftPart with equal minutes ends the next day. The editor still
+        // rejects that pair; this flag is set only by the place path.
+        guard span > 0 || rollsToNextDay == true else { return .notAShift }
         let startDate = calendar.date(
             byAdding: .minute,
             value: ShiftDatePolicy.clockMinutes(start),
             to: calendar.startOfDay(for: day)
         ) ?? day
-        let endDate = PayMath.endDate(day: day, start: start, end: end, calendar: calendar)
+        let endDate = PayMath.endDate(
+            day: day,
+            start: start,
+            end: end,
+            rollsToNextDay: rollsToNextDay,
+            calendar: calendar
+        )
         if now < startDate {
             return .beforeStart(remainingMinutes: remainingMinutes(until: startDate, from: now))
         }

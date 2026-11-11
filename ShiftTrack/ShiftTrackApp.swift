@@ -28,7 +28,7 @@ struct ShiftTrackApp: App {
 
 enum AppModel {
     static let container: ModelContainer = {
-        let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self])
+        let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self, ShiftPart.self])
         let configuration = ModelConfiguration(isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
@@ -93,7 +93,7 @@ enum AppBootstrap {
 
 enum PreviewStore {
     @MainActor static let container: ModelContainer = {
-        let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self])
+        let schema = Schema([Workplace.self, WorkShift.self, AppSettings.self, ShiftPattern.self, ShiftRequest.self, ShiftPart.self])
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: [configuration])
         AppBootstrap.ensureSettings(in: container.mainContext)

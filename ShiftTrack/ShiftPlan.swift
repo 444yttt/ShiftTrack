@@ -106,6 +106,51 @@ final class ShiftPattern {
     }
 }
 
+/// Recovered `ShiftPart` (`0x10044075c`). Stored like `AppData.shiftParts`.
+/// `breakMinutes` is kept on the part and is not copied by the place path.
+/// Weekday repetition stays on `ShiftPattern` and is not this record.
+@Model
+final class ShiftPart {
+    var uuid: UUID
+    var name: String
+    var workplaceUUID: UUID
+    var startMinute: Int
+    var endMinute: Int
+    var breakMinutes: Int
+    var defaultTodosRaw: String
+    var hidden: Bool
+    var colorHex: String
+    var createdAt: Date
+
+    init(
+        name: String,
+        workplaceUUID: UUID,
+        startMinute: Int,
+        endMinute: Int,
+        breakMinutes: Int = 0,
+        defaultTodosRaw: String = "",
+        hidden: Bool = false,
+        colorHex: String = "C8FF00",
+        createdAt: Date = .now
+    ) {
+        self.uuid = UUID()
+        self.name = name
+        self.workplaceUUID = workplaceUUID
+        self.startMinute = startMinute
+        self.endMinute = endMinute
+        self.breakMinutes = breakMinutes
+        self.defaultTodosRaw = defaultTodosRaw
+        self.hidden = hidden
+        self.colorHex = colorHex
+        self.createdAt = createdAt
+    }
+
+    var defaultTodos: [ShiftTodoCodec.Item] {
+        get { ShiftTodoCodec.decode(defaultTodosRaw) }
+        set { defaultTodosRaw = ShiftTodoCodec.encode(newValue) }
+    }
+}
+
 /// A hoped-for shift. It is not a `WorkShift` and is not passed to pay or the today card.
 @Model
 final class ShiftRequest {
