@@ -11,14 +11,16 @@ final class SampleShotUITests: XCTestCase {
             shot(app, "guide")
             app.buttons["閉じる"].tap()
         }
+        let name = app.staticTexts["架空茶房 北窓"]
+        show(name)
         shot(app, "today")
-        XCTAssertTrue(app.staticTexts["架空茶房 北窓"].waitForExistence(timeout: 6))
 
         app.buttons["tab.calendar"].tap()
+        show(app.buttons["calendar.nextMonth"])
         shot(app, "calendar")
-        XCTAssertTrue(app.buttons["calendar.nextMonth"].waitForExistence(timeout: 4))
 
         app.buttons["tab.workplaces"].tap()
+        show(app.buttons["workplace.add"])
         shot(app, "workplaces")
 
         app.buttons["tab.settings"].tap()
@@ -26,8 +28,22 @@ final class SampleShotUITests: XCTestCase {
             shot(app, "settings-guide")
             app.buttons["おわり"].tap()
         }
+        show(app.buttons["settings.messages"])
         shot(app, "settings")
-        XCTAssertTrue(app.buttons["settings.messages"].waitForExistence(timeout: 4))
+        var reminders = app.switches["settings.reminders"]
+        for _ in 0..<4 where !reminders.isHittable {
+            app.swipeUp()
+            reminders = app.switches["settings.reminders"]
+        }
+        show(reminders)
+        shot(app, "settings-permissions")
+    }
+
+    private func show(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.waitForExistence(timeout: 8), file: file, line: line)
+        if element.isHittable { return }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: element)
+        wait(for: [ready], timeout: 8)
     }
 
     private func shot(_ app: XCUIApplication, _ name: String) {
