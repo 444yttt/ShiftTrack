@@ -20,6 +20,9 @@ struct IncomeScreen: View {
     @State private var delta: Int?
     @State private var showWalls = false
     @State private var showGuideTable = false
+    @AppStorage("incomeGuide.birthYear") private var birthYear = 0
+    @AppStorage("incomeGuide.birthMonth") private var birthMonth = 0
+    @AppStorage("incomeGuide.birthDay") private var birthDay = 0
     @State private var showGuide = false
     @State private var countByPayday = false
     @State private var forecastWorkplace: UUID?
@@ -42,6 +45,32 @@ struct IncomeScreen: View {
             return "次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))。押すと内容を見られます。"
         }
         return "表示している壁はすべて超えています。押すと内容を見られます。"
+    }
+
+    private func guideFigures(year: Int) -> IncomeGuide.Figures {
+        let calendar = ShiftOverlap.tokyo
+        let salarySnapshots = ShiftMapping.snapshots(shifts, includeTransport: false)
+        let salary: Int
+        if let interval = IncomeEngine.yearInterval(year, calendar: calendar) {
+            salary = IncomeEngine.totals(
+                shifts: salarySnapshots,
+                from: interval.0,
+                until: interval.1,
+                now: .now,
+                calendar: calendar
+            ).forecastYen
+        } else {
+            salary = 0
+        }
+        let socialSnapshots = ShiftMapping.snapshots(shifts, includeTransport: true)
+        let today = LocalDay.from(.now, calendar: calendar)
+        let next = LocalDay.from(calendar.date(byAdding: .year, value: 1, to: .now) ?? .now, calendar: calendar)
+        let social = IncomeGuide.sum(
+            socialSnapshots.map { (day: LocalDay.from($0.payDate, calendar: calendar), yen: $0.yen) },
+            from: today,
+            until: next
+        )
+        return IncomeGuide.Figures(salaryYen: salary, socialYen: social)
     }
 
     private func content(_ settings: AppSettings) -> some View {
@@ -196,7 +225,7 @@ struct IncomeScreen: View {
                     Text("年収の目安")
                         .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.ink)
-                    Text("2026-11-11 の相談メモです。一次資料では未確認です。")
+                    Text("2026年11月11日時点の目安です。税と社会保険は別の合計です。")
                         .designFont(16)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,8 +270,14 @@ struct IncomeScreen: View {
                 .presentationBackground(Theme.background)
         }
         .sheet(isPresented: $showGuideTable) {
-            IncomeGuideScreen(estimate: totals.forecastYen)
-                .presentationBackground(Theme.background)
+            IncomeGuideScreen(
+                year: year,
+                figures: guideFigures(year: year),
+                birthYear: $birthYear,
+                birthMonth: $birthMonth,
+                birthDay: $birthDay
+            )
+            .presentationBackground(Theme.background)
         }
         .onAppear { refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
         .onChange(of: scope) { _, _ in refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }

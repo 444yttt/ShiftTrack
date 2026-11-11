@@ -1,8 +1,22 @@
 import SwiftUI
 
 struct IncomeGuideScreen: View {
-    var estimate: Int
+    var year: Int
+    var figures: IncomeGuide.Figures
+    @Binding var birthYear: Int
+    @Binding var birthMonth: Int
+    @Binding var birthDay: Int
     @Environment(\.dismiss) private var dismiss
+
+    private var birth: LocalDay? {
+        guard birthYear > 1900, (1...12).contains(birthMonth), (1...31).contains(birthDay) else { return nil }
+        return LocalDay(year: birthYear, month: birthMonth, day: birthDay)
+    }
+
+    private var age: Int? {
+        guard let birth else { return nil }
+        return IncomeGuide.age(on: IncomeGuide.december31(year), born: birth)
+    }
 
     var body: some View {
         ScreenScroll {
@@ -16,46 +30,120 @@ struct IncomeGuideScreen: View {
                     .foregroundStyle(Theme.lime)
             }
             .padding(.top, 8)
-            Text("\(IncomeGuide.asOf.year)年\(IncomeGuide.asOf.month)月\(IncomeGuide.asOf.day)日の相談メモです。一次資料では未確認です。")
+            Text("\(IncomeGuide.asOf.year)年\(IncomeGuide.asOf.month)月\(IncomeGuide.asOf.day)日時点の目安です。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
-            Text("今年の見込 \(Formatters.yen(estimate))")
+            Text("給与収入 \(Formatters.yen(figures.salaryYen))")
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(Theme.ink)
-            Text("交通費を除く集計は、まだ分けていません。制度ごとの数え方は各行に書いてあります。")
+                .accessibilityIdentifier("income.guide.salary")
+            Text("社会保険の見込 \(Formatters.yen(figures.socialYen))")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Theme.ink)
+                .accessibilityIdentifier("income.guide.social")
+            Text("所得税は通勤手当を除いた給与収入、社会保険は通勤手当を含めた今後の見込です。同じ合計は使いません。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
-            ForEach(IncomeGuide.lines) { line in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(line.title)
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.ink)
-                    if let yen = line.yen {
-                        let outlook = IncomeGuide.outlook(estimate: estimate, line: yen)
-                        Text(Formatters.yen(yen))
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                        Text(IncomeGuide.message(title: line.title, outlook: outlook))
-                            .designFont(13)
-                            .foregroundStyle(Theme.ink)
-                    } else {
-                        Text("金額の線はありません")
-                            .designFont(16, weight: .bold)
-                    }
-                    Text(line.note)
-                        .designFont(13)
-                        .foregroundStyle(Theme.muted)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            birthRow
+            ForEach(IncomeGuide.lines(year: year, ageOnDecember31: age)) { line in
+                lineCard(line)
             }
             Text(IncomeGuide.sourceNote)
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
         }
         .background(Theme.background)
+    }
+
+    private var birthRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("12月31日時点の年齢")
+                .designFont(16, weight: .bold)
+                .foregroundStyle(Theme.ink)
+            if let age {
+                Text("\(year)年12月31日で\(age)歳")
+                    .designFont(16, weight: .bold)
+                DatePicker(
+                    "生年月日",
+                    selection: birthBinding,
+                    displayedComponents: .date
+                )
+                .environment(\.locale, Locale(identifier: "ja_JP"))
+                .accessibilityIdentifier("income.guide.birth")
+                Button("生年月日を消す") {
+                    birthYear = 0
+                    birthMonth = 0
+                    birthDay = 0
+                }
+                .designFont(13, weight: .bold)
+                .foregroundStyle(Theme.lime)
+            } else {
+                Text("生年月日がないと、150万円と130万円のどちらを見るか決まりません。")
+                    .designFont(13)
+                    .foregroundStyle(Theme.muted)
+                Button("生年月日を入れる") {
+                    birthYear = 2006
+                    birthMonth = 1
+                    birthDay = 1
+                }
+                .designFont(16, weight: .bold)
+                .foregroundStyle(Theme.lime)
+                .accessibilityIdentifier("income.guide.birth")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private var birthBinding: Binding<Date> {
+        Binding(
+            get: {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+                let year = birthYear > 1900 ? birthYear : 2006
+                let month = (1...12).contains(birthMonth) ? birthMonth : 1
+                let day = (1...31).contains(birthDay) ? birthDay : 1
+                return calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .now
+            },
+            set: { date in
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+                birthYear = calendar.component(.year, from: date)
+                birthMonth = calendar.component(.month, from: date)
+                birthDay = calendar.component(.day, from: date)
+            }
+        )
+    }
+
+    private func lineCard(_ line: IncomeGuide.Line) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(line.title)
+                .designFont(16, weight: .bold)
+                .foregroundStyle(Theme.ink)
+            if let yen = line.yen {
+                let estimate = IncomeGuide.estimate(line.basis, figures: figures)
+                let outlook = IncomeGuide.outlook(estimate: estimate, line: yen, bound: line.bound)
+                Text(line.bound == .lessThan ? "\(Formatters.yen(yen))未満" : "\(Formatters.yen(yen))以下")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                Text(IncomeGuide.message(title: line.title, outlook: outlook))
+                    .designFont(13)
+                    .foregroundStyle(Theme.ink)
+            } else {
+                Text("金額の線はありません")
+                    .designFont(16, weight: .bold)
+            }
+            Text(line.note)
+                .designFont(13)
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
