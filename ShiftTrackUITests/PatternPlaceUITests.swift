@@ -194,7 +194,7 @@ final class PatternPlaceUITests: XCTestCase {
     }
 
     private func revealGrid(_ app: XCUIApplication) {
-        for _ in 0..<4 {
+        for _ in 0..<8 {
             app.swipeDown()
         }
     }
