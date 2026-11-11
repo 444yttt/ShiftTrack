@@ -226,6 +226,13 @@ struct WorkplaceReadResult: View {
         }
         .darkSheet()
         .task {
+            if ImportReverseGeocode.shouldFill(current: draft.address, edited: draft.addressNote.edited),
+               draft.hasCoordinate,
+               let line = await ImportReverseGeocode.line(latitude: draft.latitude, longitude: draft.longitude) {
+                draft.address = line
+                draft.addressNote.origin = .map
+                draft.addressNote.confidence = .review
+            }
             if draft.locateFromAddress, !draft.hasCoordinate {
                 await locate()
             }

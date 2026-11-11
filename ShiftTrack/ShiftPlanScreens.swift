@@ -539,6 +539,7 @@ struct RequestEditorView: View {
     @State private var kind = ShiftRequestKind.hopedAttendance
     @State private var error = ""
     @State private var showPlanner = false
+    @State private var showStock = false
 
     init(route: RequestRoute) {
         self.route = route
@@ -601,6 +602,9 @@ struct RequestEditorView: View {
                     endMinutes = 17 * 60
                 }
                 .designFont(13, weight: .bold)
+                Button("ストックして入れる") { showStock = true }
+                    .designFont(16, weight: .bold)
+                    .foregroundStyle(Theme.ink)
                 Button("テキスト生成") { showPlanner = true }
                     .designFont(16, weight: .bold)
                     .foregroundStyle(Theme.ink)
@@ -629,6 +633,9 @@ struct RequestEditorView: View {
             .onAppear(perform: load)
             .sheet(isPresented: $showPlanner) {
                 RequestPlannerView(month: date)
+            }
+            .sheet(isPresented: $showStock) {
+                HoursStockSheet()
             }
         }
     }

@@ -458,10 +458,20 @@ struct AboutSheet: View {
             ScreenScroll {
                 Text("IN/OUT について")
                     .font(.system(size: 22, weight: .black))
-                Text("しふとらっく")
-                Text("App Store を開く")
-                    .font(.system(size: 15, weight: .bold))
-                Text("この文言は概要の専用関数の外にあります。ストアのページへは繋いでいません。")
+                HStack {
+                    Text("しふとらっく")
+                    Spacer()
+                    Image(systemName: ConfirmedSymbols.aboutChevron)
+                        .foregroundStyle(Theme.muted)
+                }
+                HStack {
+                    Text("App Store を開く")
+                        .font(.system(size: 15, weight: .bold))
+                    Spacer()
+                    Image(systemName: ConfirmedSymbols.aboutArrow)
+                        .foregroundStyle(Theme.muted)
+                }
+                Text("どちらの記号がどちらの行かは未確定です。ストアのページへは繋いでいません。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
             }
@@ -771,8 +781,12 @@ struct RequestPlannerView: View {
     var body: some View {
         NavigationStack {
             ScreenScroll {
-                Text("テキスト生成")
-                    .font(.system(size: 22, weight: .black))
+                HStack(spacing: 8) {
+                    Image(systemName: ConfirmedSymbols.planner)
+                        .foregroundStyle(Theme.ink)
+                    Text("テキスト生成")
+                        .font(.system(size: 22, weight: .black))
+                }
                 Text("希望の文章を作る式は未回収です。文章は作りません。")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
@@ -810,5 +824,34 @@ struct RequestPlannerView: View {
             context.delete(request)
         }
         try? context.save()
+    }
+}
+
+struct HoursStockSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScreenScroll {
+                Text("時間のストック")
+                    .font(.system(size: 22, weight: .black))
+                Text("中身の式は未回収です。閉じる記号だけを置いています。")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+            }
+            .background(Theme.background)
+            .navigationTitle("時間のストック")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: ConfirmedSymbols.hoursStockClose)
+                    }
+                    .accessibilityLabel("閉じる")
+                }
+            }
+        }
     }
 }
