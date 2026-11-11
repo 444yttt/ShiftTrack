@@ -219,8 +219,25 @@ struct ShiftAddChooser: View {
         return workplaces.count == 1 ? workplaces.first : nil
     }
 
+    private var typedReading: TypedShiftEntry.Reading? {
+        TypedShiftEntry.read(
+            text: tableText,
+            now: Date(),
+            calendar: ShiftOverlap.tokyo,
+            knownNames: workplaces.map(\.name),
+            fallbackDate: day,
+            defaultWorkplace: assumedWorkplace?.name ?? ""
+        )
+    }
+
     private var drafts: [ShiftTextParser.Draft] {
-        ShiftTextParser.parse(
+        if let typedReading, typedReading.canSave, let draft = typedReading.draft() {
+            return [draft]
+        }
+        if typedReading?.repeatsWeekly == true {
+            return []
+        }
+        return ShiftTextParser.parse(
             text: tableText,
             knownNames: workplaces.map(\.name),
             fallbackDate: day,
@@ -312,7 +329,18 @@ struct ShiftAddChooser: View {
             .background(Theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .onChange(of: tableText) { _, _ in tableError = "" }
-            if !tableProblem.isEmpty {
+            if let typedReading, typedReading.repeatsWeekly {
+                Text(TypedShiftEntry.weeklyLine(typedReading))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let typedReading, typedReading.canSave, typedReading.alternativeNoted {
+                Text(TypedShiftEntry.alternativeLine())
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !tableProblem.isEmpty, typedReading?.repeatsWeekly != true {
                 Text(tableProblem)
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.behind)
@@ -499,7 +527,10 @@ struct ShiftAddChooser: View {
         var created: [String: Workplace] = [:]
         var dates: [Date] = []
         for draft in parsed {
-            guard let date = draft.date() else { continue }
+            let date = typedReading?.canSave == true
+                ? draft.date(calendar: ShiftOverlap.tokyo)
+                : draft.date()
+            guard let date else { continue }
             guard let workplace = workplace(
                 named: draft.workplaceName,
                 wage: wage,
@@ -523,7 +554,7 @@ struct ShiftAddChooser: View {
             dates.append(date)
             let duplicate = shifts.contains { shift in
                 shift.workplace?.uuid == workplace.uuid
-                    && Calendar.current.isDate(shift.date, inSameDayAs: date)
+                    && (typedReading?.canSave == true ? ShiftOverlap.tokyo : Calendar.current).isDate(shift.date, inSameDayAs: date)
                     && shift.startMinutes == draft.startMinutes
                     && shift.endMinutes == draft.endMinutes
             }
