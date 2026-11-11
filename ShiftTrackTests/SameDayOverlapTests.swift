@@ -51,11 +51,20 @@ final class ShiftOverlapTests: XCTestCase {
         )
     }
 
-    func testSameWorkplaceOnTheSameDayWithoutAClockOverlap() {
-        XCTAssertEqual(
-            kind(start: 9 * 60, end: 12 * 60, place: placeA, otherStart: 14 * 60, otherEnd: 18 * 60, otherDay: day, otherPlace: placeA, travel: 30),
-            .existingShift
-        )
+    func testSplitShiftAtTheSameWorkplaceIsClear() {
+        XCTAssertNil(kind(
+            start: 9 * 60, end: 12 * 60, place: placeA,
+            otherStart: 14 * 60, otherEnd: 18 * 60, otherDay: day, otherPlace: placeA,
+            travel: 30
+        ))
+    }
+
+    func testShortGapAtTheSameWorkplaceIsNotTravel() {
+        XCTAssertNil(kind(
+            start: 9 * 60, end: 12 * 60, place: placeA,
+            otherStart: 12 * 60 + 10, otherEnd: 15 * 60, otherDay: day, otherPlace: placeA,
+            travel: 30
+        ))
     }
 
     func testShortGapBetweenDifferentWorkplaces() {
@@ -105,7 +114,7 @@ final class ShiftOverlapTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(found.count, 2)
-        XCTAssertTrue(found.contains { $0.kind == .time || $0.kind == .existingShift })
+        XCTAssertTrue(found.contains { $0.kind == .time })
         XCTAssertTrue(found.contains { if case .travel(let minutes) = $0.kind { return minutes == 10 } else { return false } })
     }
 

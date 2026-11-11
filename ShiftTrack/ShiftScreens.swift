@@ -583,14 +583,15 @@ struct ShiftAddChooser: View {
     }
 }
 
-/// Overlap before save, from `0x100016734` / `0x1001b4e08` at analysis `87f3027`.
+/// Overlap before save. A second shift at the same workplace on the same day
+/// is allowed (a split shift). The only hits are a clock overlap, and a gap
+/// between different workplaces that is shorter than the travel setting.
 /// `start >= end` adds one day to the end, then the instants are compared.
-/// Touching endpoints do not overlap. Travel uses the settings stepper; the
-/// binary's threshold field is still unnamed.
+/// Touching endpoints do not overlap. Travel is stored in minutes and compared
+/// in seconds; 0 or less skips the gap. The shown minutes floor those seconds.
 enum ShiftOverlap {
     enum Kind: Equatable {
         case time
-        case existingShift
         case travel(minutes: Int)
     }
 
@@ -622,9 +623,6 @@ enum ShiftOverlap {
         let existing = bounds(day: otherDay, start: otherStart, end: otherEnd, calendar: calendar)
         if existing.0 < proposed.1 && proposed.0 < existing.1 {
             return .time
-        }
-        if workplace == otherWorkplace && calendar.isDate(day, inSameDayAs: otherDay) {
-            return .existingShift
         }
         guard workplace != otherWorkplace, travelMinutes > 0 else { return nil }
         let gap = separation(proposed, existing)
@@ -671,8 +669,6 @@ enum ShiftOverlap {
         switch kind {
         case .time:
             return "\(otherName) \(clocks) と時間が重なっています"
-        case .existingShift:
-            return "\(otherName) \(clocks) のシフトがあります"
         case .travel(let minutes):
             return "\(minutes)分しかありません（移動に"
         }
