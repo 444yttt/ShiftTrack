@@ -90,7 +90,7 @@ struct ImportChooserView: View {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
                     .font(.system(size: 15))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 160)
                     .padding(10)
@@ -179,7 +179,7 @@ struct ImportChooserView: View {
             Text(title)
         }
         .font(.system(size: 13, weight: .bold))
-        .foregroundStyle(.white)
+        .foregroundStyle(Theme.ink)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(Theme.card)
@@ -265,7 +265,7 @@ struct ImportReviewView: View {
             if pending.candidates.isEmpty {
                 Text("候補がありません")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .padding(.top, 20)
             } else {
                 VStack(spacing: 10) {
@@ -335,7 +335,7 @@ struct ImportReviewView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.wrappedValue.workplaceName.isEmpty ? "勤務先未設定" : candidate.wrappedValue.workplaceName)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text("\(Formatters.monthDayWeekday(candidate.wrappedValue.date))  \(Formatters.clock(candidate.wrappedValue.startMinutes))–\(Formatters.clock(candidate.wrappedValue.endMinutes))  休憩\(candidate.wrappedValue.breakMinutes)分\(candidate.wrappedValue.breakFollowsRules ? "（規則）" : "（入力）")")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
@@ -484,7 +484,7 @@ struct CandidateEditor: View {
                         .foregroundStyle(Theme.muted)
                     TextField("勤務先の名前", text: $candidate.workplaceName)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                         .focused($typing)
                     Picker("登録方法", selection: $candidate.createWorkplace) {
                         Text("この名前で追加").tag(true)
@@ -530,7 +530,7 @@ struct CandidateEditor: View {
                 .padding(14)
                 .background(Theme.card)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             }
             .background(Theme.background)
             .navigationTitle("候補を編集")

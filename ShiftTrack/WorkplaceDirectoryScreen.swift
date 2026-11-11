@@ -1,112 +1,211 @@
 import SwiftData
 import SwiftUI
 
-/// Workplace cards. The reference help string says a card opens that workplace's
-/// shift patterns. There is no screenshot of this screen.
+/// Workplace cards follow the reference screenshots: a black card, wage in Doto,
+/// and an expanding pattern list. Creating a workplace opens the 3-step wizard.
 struct WorkplaceDirectoryScreen: View {
     private enum Sheet: Identifiable {
-        case create
+        case wizard
         case edit(UUID)
-        case patterns(UUID)
 
         var id: String {
             switch self {
-            case .create:
-                "create"
-            case .edit(let id):
-                "edit-\(id.uuidString)"
-            case .patterns(let id):
-                "patterns-\(id.uuidString)"
+            case .wizard: "wizard"
+            case .edit(let id): "edit-\(id.uuidString)"
             }
         }
     }
 
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
+    @Query(sort: \ShiftPart.createdAt) private var parts: [ShiftPart]
     @State private var sheet: Sheet?
+    @State private var expanded: UUID?
+    @State private var showGuide = false
 
     var body: some View {
         ScreenScroll {
-            Text("勤務先")
-                .font(.system(size: 28, weight: .black))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
-                .accessibilityIdentifier("workplaces.title")
-            Text("カードを押すと、その勤務先のシフトパターンが開きます。パターンを保存しても、入っているシフトは変わりません。")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+            HStack {
+                InOutWordmark()
+                Spacer()
+                HelpButton { showGuide = true }
+            }
             if workplaces.isEmpty {
                 Text("勤務先はまだ登録されていません")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("workplaces.title")
             } else {
                 VStack(spacing: 12) {
                     ForEach(workplaces) { workplace in
-                        workplaceRow(workplace)
+                        workplaceCard(workplace)
                     }
                 }
-                .padding(.top, 8)
+                .padding(.top, 12)
+                Text("勤務先")
+                    .font(.system(size: 1))
+                    .foregroundStyle(Theme.background)
+                    .accessibilityIdentifier("workplaces.title")
             }
 
-            LimeCapsuleButton(title: "勤務先を追加", fillWidth: true) {
-                sheet = .create
+            Button {
+                sheet = .wizard
+            } label: {
+                Label("勤務先を追加", systemImage: "plus")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.lime)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Theme.ink)
+                    .clipShape(Capsule())
             }
-            .padding(.top, 8)
+            .buttonStyle(.plain)
+            .padding(.top, 12)
             .accessibilityIdentifier("workplace.add")
-
+            .accessibilityLabel("勤務先を追加")
         }
         .background(Theme.background)
+        .onAppear {
+            if !GuideMemory.suppressed && !GuideMemory.seen("workplaces") {
+                showGuide = true
+            }
+        }
         .sheet(item: $sheet) { destination in
             switch destination {
-            case .create:
-                WorkplaceEditorView(existingID: nil)
+            case .wizard:
+                WorkplaceWizard()
             case .edit(let id):
                 WorkplaceEditorView(existingID: id)
-            case .patterns(let id):
-                PatternListView(onlyWorkplaceID: id)
-                    .presentationBackground(Theme.background)
-                    .presentationDetents([.large])
+            }
+        }
+        .overlay {
+            if showGuide {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    GuideCard(
+                        page: 1,
+                        total: GuideCopy.workplaces.count,
+                        text: GuideCopy.workplaces[0],
+                        onBack: nil,
+                        onNext: {
+                            GuideMemory.mark("workplaces")
+                            showGuide = false
+                        },
+                        onClose: {
+                            GuideMemory.mark("workplaces")
+                            showGuide = false
+                        }
+                    )
+                }
             }
         }
     }
 
-    private func workplaceRow(_ workplace: Workplace) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                sheet = .patterns(workplace.uuid)
-            } label: {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(workplace.color)
-                        .frame(width: 14, height: 14)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(workplace.name)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
-                        Text(workplace.payIsDaily ? "日給 \(Formatters.yen(workplace.dailyWage))" : "時給 \(Formatters.yen(workplace.hourlyWage))")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.muted)
+    private func workplaceCard(_ workplace: Workplace) -> some View {
+        let open = expanded == workplace.uuid
+        let mine = parts.filter { $0.workplaceUUID == workplace.uuid && !$0.hidden }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Circle()
+                    .fill(workplace.color)
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Text(String(workplace.name.prefix(1)))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Theme.ink)
                     }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(Theme.muted)
+                Text(workplace.name)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white)
+                Spacer()
+                Menu {
+                    Button("編集") { sheet = .edit(workplace.uuid) }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(Color.white)
+                        .frame(width: 32, height: 32)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("時給")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.8))
+                Text(yenBody(workplace.hourlyWage))
+                    .font(.doto(28))
+                    .foregroundStyle(Theme.lime)
+                Text("円")
+                    .foregroundStyle(Color.white)
+            }
+            if !workplace.place.isEmpty {
+                Label(workplace.place, systemImage: "mappin")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .lineLimit(2)
+            }
+            HStack(spacing: 8) {
+                capsule("MAP")
+                capsule("電話")
+                capsule("メッセージ")
+            }
+            if open {
+                Text("シフトパターン")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.8))
+                    .accessibilityIdentifier("patterns.heading")
+                ForEach(mine) { part in
+                    HStack {
+                        Text("\(Formatters.clock(part.startMinute))〜\(Formatters.clock(part.endMinute))  \(part.name)")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.ink)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .padding(14)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                Button {
+                    sheet = .edit(workplace.uuid)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.lime)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            Button {
+                expanded = open ? nil : workplace.uuid
+            } label: {
+                Image(systemName: open ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(open ? "patterns.close" : "workplace.card")
             .accessibilityLabel("\(workplace.name)のパターン")
-            .accessibilityIdentifier("workplace.card")
-            Button("編集") { sheet = .edit(workplace.uuid) }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.lime)
         }
-        .padding(14)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(16)
+        .background(Theme.ink)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    private func capsule(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.white)
+            .clipShape(Capsule())
+    }
+
+    private func yenBody(_ value: Int) -> String {
+        let body = Formatters.yen(value)
+        return body.hasPrefix("¥") ? String(body.dropFirst()) : body
     }
 }

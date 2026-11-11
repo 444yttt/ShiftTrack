@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @State private var wageText = ""
     @State private var transportText = ""
     @FocusState private var focused: Bool
+    @State private var showGuide = false
 
     var body: some View {
         if let settings = settingsRows.first {
@@ -21,11 +22,35 @@ struct SettingsScreen: View {
     private func form(_ settings: AppSettings) -> some View {
         @Bindable var settings = settings
         return ScreenScroll {
-            Text("設定")
-                .font(.system(size: 28, weight: .black))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
+            HStack {
+                Text("設定")
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                HelpButton { showGuide = true }
+            }
+            .padding(.top, 8)
+
+            settingsNoticeCard
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("広告")
+                    .font(.system(size: 15, weight: .bold))
+                HStack {
+                    Text("広告")
+                    Spacer()
+                    Text("非表示")
+                        .foregroundStyle(Theme.muted)
+                }
+                Text("このアプリに広告 SDK はありません。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.top, 8)
 
             Text("勤務先の追加とパターンは「勤務先」タブです。")
                 .font(.system(size: 13))
@@ -35,7 +60,7 @@ struct SettingsScreen: View {
 
             Text("給料の目標")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
@@ -86,7 +111,7 @@ struct SettingsScreen: View {
 
             Text("カレンダーの設定")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
 
@@ -94,7 +119,7 @@ struct SettingsScreen: View {
                 Toggle(isOn: $settings.weekStartsOnMonday) {
                     Text("週の始まりを月曜にする")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
@@ -102,7 +127,7 @@ struct SettingsScreen: View {
                 Toggle(isOn: $settings.showPaydayOnCalendar) {
                     Text("給料日の表示")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
@@ -110,7 +135,7 @@ struct SettingsScreen: View {
                 Toggle(isOn: $settings.includeTransport) {
                     Text("交通費を給料に含める")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 .tint(Theme.lime)
                 .padding(.vertical, 14)
@@ -122,7 +147,7 @@ struct SettingsScreen: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Siri / ショートカット")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text("「しふとらっくでシフト表を取り込む」と言うと、読み上げた内容から候補を作り、保存前に確認できます。画像はショートカットの「シフト表の画像を取り込む」に渡せます。どちらも端末内で処理します。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
@@ -132,12 +157,58 @@ struct SettingsScreen: View {
         }
         .background(Theme.background)
         .focused($focused)
+        .onAppear {
+            if !GuideMemory.suppressed && !GuideMemory.seen("settings") {
+                showGuide = true
+            }
+        }
+        .overlay {
+            if showGuide {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    GuideCard(
+                        page: 1,
+                        total: GuideCopy.settings.count,
+                        text: GuideCopy.settings[0],
+                        onBack: nil,
+                        onNext: {
+                            GuideMemory.mark("settings")
+                            showGuide = false
+                        },
+                        onClose: {
+                            GuideMemory.mark("settings")
+                            showGuide = false
+                        }
+                    )
+                }
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("完了") { focused = false }
             }
         }
+    }
+
+    private var settingsNoticeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("通知")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.white)
+            Text("勤務の終わりに確認")
+                .foregroundStyle(Color.white)
+            Text("シフトの前に通知")
+                .foregroundStyle(Color.white)
+            Text("通知の配信そのものは、回収した命令へ結んでいません。スイッチは見た目です。")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.7))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.ink)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, 8)
     }
 
     private var line: some View {
@@ -148,7 +219,7 @@ struct SettingsScreen: View {
         HStack {
             Text(title)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             Spacer()
             Text("¥")
                 .foregroundStyle(Theme.muted)

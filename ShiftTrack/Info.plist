@@ -8,15 +8,19 @@
 	<string>ja</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/Doto-BlackRound.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
 	<key>UIUserInterfaceStyle</key>
-	<string>Dark</string>
+	<string>Light</string>
 	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleLightContent</string>
+	<string>UIStatusBarStyleDarkContent</string>
 	<key>NSCameraUsageDescription</key>
 	<string>シフト表を撮影して勤務の候補を読み取ります。画像は端末内で処理し、サーバーには送信しません。</string>
 </dict>

@@ -15,7 +15,7 @@ struct ShiftListScreen: View {
             HStack(alignment: .center) {
                 Text("シフト")
                     .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 LimeCapsuleButton(title: "+ 追加") {
                     editor = EditorRoute(shiftID: nil, date: Date(), workplaceID: nil)
@@ -288,7 +288,7 @@ struct ShiftAddChooser: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("シフト表")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
             Text(tableHint)
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
@@ -296,7 +296,7 @@ struct ShiftAddChooser: View {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $tableText)
                     .font(.system(size: 15))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 120)
                     .padding(8)
@@ -359,7 +359,7 @@ struct ShiftAddChooser: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("1件ずつ入力")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                     Text("勤務先と時刻を画面で選びます")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
@@ -381,7 +381,7 @@ struct ShiftAddChooser: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("履歴から追加")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if history.isEmpty {
                 Text("まだ履歴がありません。追加すると、次から同じ時間を選べます。")
@@ -399,7 +399,7 @@ struct ShiftAddChooser: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(shift.workplace?.name ?? "勤務先")
                                     .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.ink)
                                 Text("\(Formatters.clock(shift.startMinutes))–\(Formatters.clock(shift.endMinutes))  休憩\(shift.breakMinutes)分")
                                     .font(.system(size: 12))
                                     .foregroundStyle(Theme.muted)
@@ -425,7 +425,7 @@ struct ShiftAddChooser: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(draft.workplaceName)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text(draftCaption(draft))
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
@@ -652,7 +652,7 @@ struct ShiftEditorView: View {
                                     .foregroundStyle(Theme.muted)
                                 Text(Formatters.longDay(date))
                                     .font(.title3.weight(.bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.ink)
                             }
                             .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                             .padding(.horizontal, 14)
@@ -704,7 +704,7 @@ struct ShiftEditorView: View {
                         divider
                         TextField("メモ", text: $notes, axis: .vertical)
                             .font(.system(size: 15))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.ink)
                             .focused($typing)
                     }
                     if let workplace = selectedWorkplace {
@@ -993,7 +993,7 @@ struct ShiftEditorView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.muted)
             content()
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1016,7 +1016,7 @@ struct MinutesTimePicker: View {
                     .foregroundStyle(Theme.muted)
                 Text(Formatters.clock(minutes))
                     .font(.title.weight(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
             }
@@ -1061,7 +1061,7 @@ struct TimeAdjustSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(Formatters.clock(minutes))
                     .font(.largeTitle.weight(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .accessibilityLabel(title)
                     .accessibilityValue(Formatters.clock(minutes))
@@ -1145,7 +1145,7 @@ struct BreakMinutesControl: View {
                 .foregroundStyle(Theme.muted)
             Text(Formatters.hours(minutes))
                 .font(.title3.weight(.black))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .accessibilityLabel("休憩")
                 .accessibilityValue(Formatters.hours(minutes))
             VStack(spacing: 8) {
@@ -1329,7 +1329,7 @@ struct WorkplaceEditorView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Stepper(value: $overtimeHours, in: 1...16) {
                                 Text("適応時間 \(overtimeHours)時間")
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.ink)
                             }
                             Picker("金額の単位", selection: $overtimePerHour) {
                                 Text("1時間あたり").tag(true)
@@ -1339,7 +1339,7 @@ struct WorkplaceEditorView: View {
                             field("追加金額", text: $overtimeText, number: true)
                             Stepper(value: $overtimeRate, in: 0...100) {
                                 Text("割増 \(overtimeRate)%")
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.ink)
                             }
                             Text("予定全体の時給分では、しきい値を超えた分にこの割合を足します。このシフトより前の分数は未確定なので足しません。今の見込の追加金額とは別です。")
                                 .font(.system(size: 12))
@@ -1399,7 +1399,7 @@ struct WorkplaceEditorView: View {
                         HStack {
                             Text("\(Formatters.longDay(entry.at))  \(Formatters.yen(entry.hourlyWage))")
                                 .font(.system(size: 13))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Theme.ink)
                             Spacer()
                             Button("削除") { wageHistory.remove(at: index) }
                                 .font(.system(size: 12, weight: .bold))
@@ -1415,7 +1415,7 @@ struct WorkplaceEditorView: View {
                         HStack {
                             Text("\(Formatters.clock(band.startMinutes))–\(Formatters.clock(band.endMinutes)) \(Formatters.yen(band.hourlyWage))")
                                 .font(.system(size: 13))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Theme.ink)
                             Spacer()
                             Button("削除") { wageBands.remove(at: index) }
                                 .font(.system(size: 12, weight: .bold))
@@ -1442,7 +1442,7 @@ struct WorkplaceEditorView: View {
                     ForEach(0..<7, id: \.self) { index in
                         Stepper(value: $holidayRates[index], in: 0...100) {
                             Text("\(names[index])の休日割増 \(holidayRates[index])%")
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Theme.ink)
                         }
                     }
                     Text("休日の割合は曜日番号から1を引いた位置です。0%はその曜日に足しません。")
@@ -1562,7 +1562,7 @@ struct WorkplaceEditorView: View {
                 field("深夜給料", text: $nightText, number: true)
                 Stepper(value: $nightRate, in: 0...100) {
                     Text("深夜の割増 \(nightRate)%")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
                 Text("予定全体の時給分では、深夜の時間の基本給にこの割合を足します。0%なら足しません。上の深夜給料は、今の見込が時給を置き換える金額です。")
                     .font(.system(size: 12))
@@ -1628,7 +1628,7 @@ struct WorkplaceEditorView: View {
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.ink)
     }
 
     private func dayPicker(_ title: String, selection: Binding<Int>) -> some View {
@@ -1784,7 +1784,7 @@ struct WorkplaceEditorView: View {
                     .keyboardType(number ? .numberPad : .default)
                     .accessibilityIdentifier("field.\(title)")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .focused($typing)
             }
         }

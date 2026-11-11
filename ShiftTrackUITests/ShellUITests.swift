@@ -45,7 +45,9 @@ final class ShellUITests: XCTestCase {
             app.buttons["完了"].tap()
         }
         app.swipeUp()
-        app.buttons["完了する"].tap()
+        app.buttons["追加して次へ"].tap()
+        app.buttons["次へ"].tap()
+        app.buttons["はじめる"].tap()
         let card = app.buttons.matching(identifier: "workplace.card").firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 6))
         let saveButton = app.buttons["完了する"]

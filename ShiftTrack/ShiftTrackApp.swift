@@ -19,7 +19,7 @@ struct ShiftTrackApp: App {
         WindowGroup {
             RootView()
                 .environment(\.locale, Locale(identifier: "ja_JP"))
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
                 .tint(Theme.lime)
         }
         .modelContainer(AppModel.container)
@@ -107,5 +107,5 @@ enum PreviewStore {
     RootView()
         .modelContainer(PreviewStore.container)
         .environment(\.locale, Locale(identifier: "ja_JP"))
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
 }

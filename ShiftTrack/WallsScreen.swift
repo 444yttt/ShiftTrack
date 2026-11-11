@@ -23,7 +23,7 @@ struct WallsScreen: View {
             HStack {
                 Text("年収の壁")
                     .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                     .accessibilityIdentifier("walls.title")
                 Spacer()
                 Button("閉じる") { dismiss() }
@@ -46,11 +46,11 @@ struct WallsScreen: View {
                 if let next {
                     Text("次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 } else {
                     Text("表示している壁はすべて超えています")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                 }
             }
             .padding(16)
@@ -93,7 +93,7 @@ struct WallsScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(wall.title)
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.ink)
                         Text(wall.subtitle)
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.muted)
@@ -141,7 +141,7 @@ struct HelpSheet: View {
                     ForEach(paragraphs, id: \.self) { paragraph in
                         Text(paragraph)
                             .font(.system(size: 15))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

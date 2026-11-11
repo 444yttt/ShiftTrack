@@ -55,9 +55,9 @@ struct IncomeScreen: View {
 
         return ScreenScroll {
             HStack(alignment: .center, spacing: 8) {
-                Text(scope == .year ? "\(year)年" : Formatters.monthTitle(anchor))
-                    .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                Text(scope == .year ? "\(year)" : Formatters.monthTitle(anchor))
+                    .font(.doto(54))
+                    .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Spacer(minLength: 4)
@@ -98,7 +98,7 @@ struct IncomeScreen: View {
 
             Text("勤務先ごと")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 4)
 
@@ -117,7 +117,7 @@ struct IncomeScreen: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.name)
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.ink)
                                 Text(Formatters.hours(row.minutes))
                                     .font(.system(size: 11))
                                     .foregroundStyle(Theme.muted)
@@ -140,7 +140,7 @@ struct IncomeScreen: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("年収の壁")
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                     Text(wallLine)
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted)
@@ -215,11 +215,11 @@ struct IncomeScreen: View {
             HStack {
                 Text(goal > 0 ? Formatters.percent(ratio, decimals: true) : "—")
                     .font(.system(size: 22, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 Text(remainingLabel(remaining))
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -247,7 +247,7 @@ struct IncomeScreen: View {
                 .foregroundStyle(Theme.muted)
             Text(value)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
@@ -307,7 +307,7 @@ struct IncomeScreen: View {
         Button(action: action) {
             Image(systemName: name)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(width: 28, height: 28)
                 .background(Theme.dayFilled)
                 .clipShape(Circle())
@@ -395,7 +395,7 @@ struct GoalEditorSheet: View {
                     TextField("0", text: $text)
                         .keyboardType(.numberPad)
                         .font(.system(size: 36, weight: .black))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.ink)
                         .focused($typing)
                 }
                 Text("\(Formatters.yen(minimum))〜\(Formatters.yen(upper - 1))")

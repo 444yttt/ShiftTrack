@@ -1,22 +1,33 @@
 import SwiftUI
 
 enum Theme {
-    static let background = Color(hex: 0x0B0B0B)
-    static let card = Color(hex: 0x161616)
-    static let cardRaised = Color(hex: 0x1C1C1C)
-    static let chip = Color(hex: 0x2A2A2A)
-    static let dayFilled = Color(hex: 0x1A1A1A)
-    static let tabBar = Color(hex: 0x111111)
-    static let lime = Color(hex: 0xC8FF00)
-    static let ink = Color(hex: 0x0B0B0B)
-    static let muted = Color(hex: 0x8A8A8A)
-    static let line = Color(hex: 0x2A2A2A)
-    static let border = Color(hex: 0x3A3A3A)
-    static let track = Color(hex: 0x2A2A2A)
+    /// Paper, white cards, and black pills follow the reference screenshots.
+    /// Stacking distances were not recovered from the binary.
+    static let background = Color(hex: 0xF3F1EC)
+    static let card = Color(hex: 0xFFFFFF)
+    static let cardRaised = Color(hex: 0xE6E3DC)
+    static let chip = Color(hex: 0xF7F6F2)
+    static let dayFilled = Color(hex: 0x111111)
+    static let tabBar = Color(hex: 0x1C1C1E)
+    static let lime = Color(hex: 0xC6F24E)
+    static let ink = Color(hex: 0x111111)
+    static let onDark = Color.white
+    static let muted = Color(hex: 0x8E8E93)
+    static let line = Color(hex: 0xE4E1DA)
+    static let border = Color(hex: 0xD5D2CB)
+    static let track = Color(hex: 0xE6E3DC)
     static let behind = Color(hex: 0xFF6B9A)
     static let destructive = Color(hex: 0xFF5A5A)
 
-    static let palette = ["C8FF00", "5B8CFF", "FF6B9A", "FFB020", "C084FC", "FFFFFF"]
+    static let palette = ["C6F24E", "111111", "F4A7A0", "B7D7C5", "F3C1D3", "A9C7F5", "C7B6E4", "F3D98A"]
+}
+
+extension Font {
+    /// Official Google Fonts Doto, instantiated at Black and maximum roundness.
+    /// The reference calls this face `Doto-BlackRound`. The file is not from the IPA.
+    static func doto(_ size: CGFloat) -> Font {
+        .custom("Doto-BlackRound", size: size)
+    }
 }
 
 extension Color {
