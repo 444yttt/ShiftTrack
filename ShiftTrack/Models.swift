@@ -65,6 +65,9 @@ final class Workplace {
     var roundingUnitMinutes: Int = 1
     var roundingStartRaw: Int = 0
     var roundingEndRaw: Int = 0
+    /// When true, a punch earlier than the planned start is paid from the plan.
+    /// The stored punch stays the raw time. Existing rows stay false.
+    var earlyClockCountsFromPlan: Bool = false
     /// Independent deposit cycle. `month` keeps the existing payday.
     /// `week` and `day` apply only after the user chooses them.
     var payCycleRaw: String = "month"
@@ -127,6 +130,7 @@ final class Workplace {
         self.roundingUnitMinutes = 1
         self.roundingStartRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
         self.roundingEndRaw = Int(InOutRecovered.RoundingDirection.exact.rawValue)
+        self.earlyClockCountsFromPlan = false
         self.payCycleRaw = PayCycle.month.rawValue
         self.payWeekday = 0
         self.createdAt = createdAt
