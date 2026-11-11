@@ -20,7 +20,7 @@ struct WorkplaceWizard: View {
     @State private var startMinute = 17 * 60
     @State private var endMinute = 22 * 60
     @State private var weekdays: Set<Int> = []
-    @State private var notify = true
+    @AppStorage(ShiftNoticeRefresh.beforeKey) private var notify = false
     @State private var hours = ""
     @State private var officialURL = ""
     @State private var latitude = 0.0
@@ -314,6 +314,9 @@ struct WorkplaceWizard: View {
             }
         }
         try? context.save()
+        if notify {
+            Task { _ = await SettingsAccess.requestNotifications() }
+        }
         dismiss()
     }
 }

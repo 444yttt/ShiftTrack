@@ -43,6 +43,7 @@ enum AppModel {
 struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @State private var tab: AppTab = .list
     @State private var router = ImportRouter.shared
     @State private var draftRouter = WorkplaceDraftRouter.shared
@@ -118,8 +119,26 @@ struct RootView: View {
             }
             if phase == .active {
                 router.considerPending()
+                let current = shifts
+                Task {
+                    await ShiftNoticeRefresh.apply(shifts: current)
+                    await ShiftMirrorRefresh.apply(shifts: current)
+                }
             }
         }
+        .onChange(of: shiftFingerprint) { _, _ in
+            let current = shifts
+            Task {
+                await ShiftNoticeRefresh.apply(shifts: current)
+                await ShiftMirrorRefresh.apply(shifts: current)
+            }
+        }
+    }
+
+    private var shiftFingerprint: String {
+        shifts.map {
+            "\($0.uuid.uuidString)-\($0.startMinutes)-\($0.endMinutes)-\($0.date.timeIntervalSince1970)-\($0.todosRaw)"
+        }.joined(separator: "|")
     }
 
     private var draftPresented: Binding<Bool> {

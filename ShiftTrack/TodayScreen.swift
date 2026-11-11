@@ -93,11 +93,6 @@ struct TodayScreen: View {
             }
         }
         .background(Theme.background)
-        .onAppear {
-            if !GuideMemory.suppressed && !GuideMemory.seen("today") {
-                showGuide = true
-            }
-        }
         .overlay {
             if showGuide {
                 ZStack {

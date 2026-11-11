@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftData
 import SwiftUI
 #if canImport(UIKit)
@@ -5,8 +6,10 @@ import UIKit
 #endif
 
 struct SettingsScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var context
     @Query private var settingsRows: [AppSettings]
+    @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @State private var goalText = ""
     @State private var monthGoalText = ""
     @State private var wageText = ""
@@ -15,14 +18,19 @@ struct SettingsScreen: View {
     @State private var showGuide = false
     @State private var showAboutBubble = false
     @State private var cover: SettingsCover?
+    @State private var locationStatus = LocationPrompt.label(LocationPrompt.shared.status)
+    @State private var settingsNote = ""
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
+    @AppStorage(ShiftNoticeRefresh.beforeKey) private var notifyBefore = false
+    @AppStorage(ShiftNoticeRefresh.endKey) private var notifyAtEnd = false
+    @AppStorage(ShiftMirrorRefresh.calendarKey) private var mirrorCalendar = false
+    @AppStorage(ShiftMirrorRefresh.reminderKey) private var mirrorReminders = false
 
     private enum SettingsCover: Identifiable {
-        case messages, calendarAccess, about
+        case messages, about
         var id: String {
             switch self {
             case .messages: "messages"
-            case .calendarAccess: "calendar"
             case .about: "about"
             }
         }
@@ -53,14 +61,16 @@ struct SettingsScreen: View {
             } label: {
                 settingsRow("メッセージの文章")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SettingsPressStyle())
+            .accessibilityIdentifier("settings.messages")
 
-            settingsNoticeCard
+            noticeCard
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("シフトの重なり")
                     .designFont(16, weight: .bold)
                 Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
+                    .accessibilityIdentifier("settings.travel")
                 Text("シフトの時間が重なったときや、違う勤務先の間がこの時間より短いときに、保存の前に確認します。0分にすると、間隔は見ません。")
                     .designFont(16)
                     .foregroundStyle(Theme.muted)
@@ -69,56 +79,19 @@ struct SettingsScreen: View {
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .padding(.top, ScreenInsets.settingsOptional)
+            .sensoryFeedback(.selection, trigger: travelMinutes)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("位置情報の許可")
-                    .designFont(16, weight: .bold)
-                HStack {
-                    Text("未設定")
-                    Spacer()
-                    Button("位置情報を許可する") { openSystemSettings() }
-                        .designFont(16, weight: .bold)
-                }
+            locationCard
+            mirrorCard
+            if !settingsNote.isEmpty {
+                Text(settingsNote)
+                    .designFont(16)
+                    .foregroundStyle(Theme.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, ScreenInsets.settingsOptional)
             }
-            .padding(ScreenInsets.settings)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(.top, ScreenInsets.settingsOptional)
-
-            Button {
-                cover = .calendarAccess
-            } label: {
-                settingsRow("カレンダー・リマインダー")
-            }
-            .buttonStyle(.plain)
-            Button("カレンダーの全件を許可する") {
-                Task { _ = await SettingsAccess.requestFullCalendar() }
-            }
-            .designFont(16, weight: .bold)
-            .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, ScreenInsets.settingsOptional)
 
             aboutRow
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("広告")
-                    .designFont(16, weight: .bold)
-                HStack {
-                    Text("広告")
-                    Spacer()
-                    Text("非表示")
-                        .foregroundStyle(Theme.muted)
-                }
-                Text("このアプリに広告 SDK はありません。")
-                    .designFont(16)
-                    .foregroundStyle(Theme.muted)
-            }
-            .padding(ScreenInsets.settings)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(.top, ScreenInsets.settingsOptional)
 
             Text("勤務先の追加とパターンは「勤務先」タブです。")
                 .designFont(16)
@@ -226,10 +199,13 @@ struct SettingsScreen: View {
         .background(Theme.background)
         .focused($focused)
         .onAppear {
-            if !GuideMemory.suppressed && !GuideMemory.seen("settings") {
-                showGuide = true
-            }
+            locationStatus = LocationPrompt.label(LocationPrompt.shared.status)
         }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: cover?.id)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: notifyBefore)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: notifyAtEnd)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorCalendar)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorReminders)
         .overlay {
             if showGuide {
                 ZStack {
@@ -255,8 +231,6 @@ struct SettingsScreen: View {
             switch destination {
             case .messages:
                 LateTemplateList()
-            case .calendarAccess:
-                CalendarAccessView()
             case .about:
                 AboutSheet()
             }
@@ -344,29 +318,178 @@ struct SettingsScreen: View {
         #endif
     }
 
-    private var settingsNoticeCard: some View {
+    private var noticeCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("通知")
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
-            Text("勤務の終わりに確認")
-                .foregroundStyle(Color.white)
-            Text("シフトの前に通知")
-                .foregroundStyle(Color.white)
-            Text("許可はアラート、サウンド、バッジをまとめて求めます。通知の配信はまだ繋いでいません。")
+            Toggle("勤務の終わりに確認", isOn: $notifyAtEnd)
+                .tint(Theme.lime)
+                .accessibilityIdentifier("settings.notifyEnd")
+            Text("終了時刻に、この端末から知らせます。")
                 .designFont(16)
                 .foregroundStyle(Color.white.opacity(0.7))
-            Button("通知を許可する") {
-                Task { _ = await SettingsAccess.requestNotifications() }
-            }
-            .designFont(16, weight: .bold)
-            .foregroundStyle(Theme.lime)
+            Toggle("シフトの前に通知", isOn: $notifyBefore)
+                .tint(Theme.lime)
+                .accessibilityIdentifier("settings.notifyBefore")
+            Text("開始の30分前に知らせます。")
+                .designFont(16)
+                .foregroundStyle(Color.white.opacity(0.7))
         }
         .padding(ScreenInsets.settings)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.ink)
+        .foregroundStyle(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .padding(.top, ScreenInsets.settingsOptional)
+        .onChange(of: notifyAtEnd) { _, _ in Task { await updateNotices() } }
+        .onChange(of: notifyBefore) { _, _ in Task { await updateNotices() } }
+        .sensoryFeedback(.selection, trigger: notifyAtEnd)
+        .sensoryFeedback(.selection, trigger: notifyBefore)
+    }
+
+    private var locationCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("位置情報の許可")
+                .designFont(16, weight: .bold)
+            Text(locationStatus)
+                .foregroundStyle(Theme.muted)
+            Text("勤務先の住所を、今いる場所から入れるときに使います。")
+                .designFont(16)
+                .foregroundStyle(Theme.muted)
+            Button(locationStatus == "未設定" ? "位置情報を許可する" : "設定を開く") {
+                if locationStatus == "未設定" {
+                    LocationPrompt.shared.onChange = {
+                        locationStatus = LocationPrompt.label(LocationPrompt.shared.status)
+                    }
+                    LocationPrompt.shared.request()
+                } else {
+                    openSystemSettings()
+                }
+            }
+            .buttonStyle(SettingsPressStyle())
+            .accessibilityIdentifier("settings.location")
+        }
+        .padding(ScreenInsets.settings)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, ScreenInsets.settingsOptional)
+    }
+
+    private var mirrorCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("カレンダーとリマインダー")
+                .designFont(16, weight: .bold)
+            Toggle("シフトをカレンダーに入れる", isOn: $mirrorCalendar)
+                .tint(Theme.lime)
+                .accessibilityIdentifier("settings.calendar")
+            Toggle("やることをリマインダーに入れる", isOn: $mirrorReminders)
+                .tint(Theme.lime)
+                .accessibilityIdentifier("settings.reminders")
+            Text("オンにすると「しふとらっく」というカレンダーとリマインダーだけを更新します。")
+                .designFont(16)
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(ScreenInsets.settings)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.top, ScreenInsets.settingsOptional)
+        .onChange(of: mirrorCalendar) { _, on in Task { await updateCalendar(on) } }
+        .onChange(of: mirrorReminders) { _, on in Task { await updateReminders(on) } }
+        .sensoryFeedback(.selection, trigger: mirrorCalendar)
+        .sensoryFeedback(.selection, trigger: mirrorReminders)
+    }
+
+    private func updateNotices() async {
+        if notifyBefore || notifyAtEnd {
+            let allowed = await SettingsAccess.requestNotifications()
+            if !allowed {
+                notifyBefore = false
+                notifyAtEnd = false
+                settingsNote = "通知が許可されていません。設定アプリから変更できます。"
+                await ShiftNoticeRefresh.apply(shifts: shifts)
+                return
+            }
+        }
+        settingsNote = ""
+        await ShiftNoticeRefresh.apply(shifts: shifts)
+    }
+
+    private func updateCalendar(_ on: Bool) async {
+        if on {
+            let allowed = await ExternalMirror.shared.requestEvents()
+            guard allowed else {
+                mirrorCalendar = false
+                settingsNote = "カレンダーが許可されていません。設定アプリから変更できます。"
+                return
+            }
+            do {
+                try ExternalMirror.shared.syncEvents(mirrorEvents())
+                settingsNote = ""
+            } catch {
+                mirrorCalendar = false
+                settingsNote = "この端末にはカレンダーを追加できませんでした。"
+            }
+        } else {
+            try? ExternalMirror.shared.clearEvents()
+            settingsNote = ""
+        }
+    }
+
+    private func updateReminders(_ on: Bool) async {
+        if on {
+            let allowed = await ExternalMirror.shared.requestReminders()
+            guard allowed else {
+                mirrorReminders = false
+                settingsNote = "リマインダーが許可されていません。設定アプリから変更できます。"
+                return
+            }
+            do {
+                try await ExternalMirror.shared.syncReminders(mirrorRemindersList())
+                settingsNote = ""
+            } catch {
+                mirrorReminders = false
+                settingsNote = "この端末にはリマインダーを追加できませんでした。"
+            }
+        } else {
+            try? await ExternalMirror.shared.clearReminders()
+            settingsNote = ""
+        }
+    }
+
+    private func mirrorEvents() -> [ShiftMirrorPlan.Event] {
+        let rows = shifts.map { shift -> (ShiftNotice.Input, String) in
+            let span = ShiftNotices.interval(
+                day: shift.date,
+                startMinutes: shift.startMinutes,
+                endMinutes: shift.endMinutes,
+                calendar: .current
+            )
+            return (
+                ShiftNotice.Input(id: shift.uuid, name: shift.workplace?.name ?? "勤務", start: span.start, end: span.end),
+                shift.workplace?.place ?? ""
+            )
+        }
+        return ShiftMirrorPlan.events(
+            rows.map(\.0),
+            places: Dictionary(uniqueKeysWithValues: rows.map { ($0.0.id, $0.1) }),
+            now: .now
+        )
+    }
+
+    private func mirrorRemindersList() -> [ShiftMirrorPlan.Reminder] {
+        let items = shifts.flatMap { shift in
+            let span = ShiftNotices.interval(
+                day: shift.date,
+                startMinutes: shift.startMinutes,
+                endMinutes: shift.endMinutes,
+                calendar: .current
+            )
+            return shift.todos.map { (id: $0.id, title: $0.title, due: span.start, done: $0.done) }
+        }
+        return ShiftMirrorPlan.reminders(items, now: .now)
     }
 
     private var line: some View {
@@ -415,5 +538,15 @@ struct SettingsScreen: View {
         if current != value {
             text.wrappedValue = String(value)
         }
+    }
+}
+
+private struct SettingsPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(!reduce && configuration.isPressed ? 0.98 : 1)
+            .animation(reduce ? nil : .smooth(duration: 0.16), value: configuration.isPressed)
     }
 }

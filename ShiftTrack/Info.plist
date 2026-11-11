@@ -26,6 +26,8 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>勤務先の位置を見るときだけ、現在地を使います。位置の検索以外には使いません。</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>カレンダーへのアクセスを確認します。予定の読み書きはまだしません。</string>
+	<string>シフトを「しふとらっく」のカレンダーに入れます。ほかのカレンダーは変更しません。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>シフトのやることを「しふとらっく」のリマインダーに入れます。</string>
 </dict>
 </plist>

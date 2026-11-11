@@ -99,6 +99,18 @@ final class ShellUITests: XCTestCase {
         app.buttons["tab.settings"].tap()
         shot("08-settings")
         XCTAssertFalse(app.staticTexts["勤務先の設定"].exists)
+        XCTAssertFalse(app.otherElements["guide.card"].exists)
+        let messages = app.buttons["settings.messages"]
+        XCTAssertTrue(messages.waitForExistence(timeout: 6))
+        messages.tap()
+        let messageTitle = app.navigationBars["メッセージの文章"]
+        XCTAssertTrue(messageTitle.waitForExistence(timeout: 6))
+        app.buttons["閉じる"].tap()
+        XCTAssertTrue(app.switches["settings.notifyEnd"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.switches["settings.notifyBefore"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["settings.location"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.switches["settings.calendar"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.switches["settings.reminders"].waitForExistence(timeout: 4))
         app.buttons["tab.today"].tap()
         XCTAssertEqual(clock.label, clockBefore)
     }

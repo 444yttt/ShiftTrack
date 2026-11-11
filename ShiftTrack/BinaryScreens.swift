@@ -386,7 +386,7 @@ struct CalendarAccessView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("カレンダーの許可")
                 .designFont(20, weight: .black)
-            Text("許可の分岐は未回収です。予定の読み取りはまだ繋いでいません。")
+            Text("カレンダーへの追加は、設定のスイッチから行います。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
             Button("入力を続ける") { dismiss() }
@@ -458,21 +458,8 @@ struct AboutSheet: View {
             ScreenScroll {
                 Text("IN/OUT について")
                     .font(.system(size: 22, weight: .black))
-                HStack {
-                    Text("しふとらっく")
-                    Spacer()
-                    Image(systemName: ConfirmedSymbols.aboutChevron)
-                        .foregroundStyle(Theme.muted)
-                }
-                HStack {
-                    Text("App Store を開く")
-                        .font(.system(size: 15, weight: .bold))
-                    Spacer()
-                    Image(systemName: ConfirmedSymbols.aboutArrow)
-                        .foregroundStyle(Theme.muted)
-                }
-                Text("どちらの記号がどちらの行かは未確定です。ストアのページへは繋いでいません。")
-                    .font(.system(size: 13))
+                Text("シフトと給与の見込みを、この端末に残します。")
+                    .font(.system(size: 15))
                     .foregroundStyle(Theme.muted)
             }
             .background(Theme.background)
@@ -573,7 +560,7 @@ struct LateMessageComposer: View {
                 .padding(14)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            Text("選び方の式は未回収です。上の文は、選んだ文言を並べただけです。")
+            Text("選んだ理由と分数を、この文章にします。送信はしません。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
             Button("保存") {

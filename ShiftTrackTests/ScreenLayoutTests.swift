@@ -71,7 +71,7 @@ final class ScreenLayoutTests: XCTestCase {
     }
 
     func testAboutBubbleUsesTheSentenceReadAfterTheTitle() {
-        XCTAssertTrue(AboutBubble.body.hasPrefix("シフトはカレンダーアプリに、やることはリマインダーに保存します。"))
+        XCTAssertTrue(AboutBubble.body.hasPrefix("設定でオンにしたときだけ、シフトをカレンダーに、やることをリマインダーに入れます。"))
         XCTAssertTrue(AboutBubble.body.hasSuffix("金額はすべて概算です。"))
         XCTAssertFalse(AboutBubble.body.contains("IN/OUT について"))
     }

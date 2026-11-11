@@ -14,3 +14,35 @@ enum WhenInUseLocation {
         manager.requestWhenInUseAuthorization()
     }
 }
+
+/// Kept for the life of the process so the system permission dialog can appear.
+final class LocationPrompt: NSObject, CLLocationManagerDelegate {
+    static let shared = LocationPrompt()
+    private let manager = CLLocationManager()
+    var onChange: (@MainActor () -> Void)?
+
+    var status: CLAuthorizationStatus { manager.authorizationStatus }
+
+    func request() {
+        manager.delegate = self
+        manager.requestWhenInUseAuthorization()
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let change = onChange
+        Task { @MainActor in change?() }
+    }
+
+    static func label(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return "許可済み"
+        case .denied, .restricted:
+            return "拒否されています"
+        case .notDetermined:
+            return "未設定"
+        @unknown default:
+            return "未設定"
+        }
+    }
+}

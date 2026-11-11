@@ -212,11 +212,6 @@ struct CalendarScreen: View {
             guard let request else { return }
             reveal(request.dates)
         }
-        .onAppear {
-            if !GuideMemory.suppressed && !GuideMemory.seen("calendar") {
-                showGuide = true
-            }
-        }
         .overlay {
             if showGuide {
                 ZStack {

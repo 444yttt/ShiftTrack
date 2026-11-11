@@ -71,11 +71,6 @@ struct WorkplaceDirectoryScreen: View {
             .accessibilityLabel("勤務先を追加")
         }
         .background(Theme.background)
-        .onAppear {
-            if !GuideMemory.suppressed && !GuideMemory.seen("workplaces") {
-                showGuide = true
-            }
-        }
         .sheet(item: $sheet) { destination in
             switch destination {
             case .wizard:

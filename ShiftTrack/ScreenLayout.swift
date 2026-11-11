@@ -80,7 +80,7 @@ enum ImportSectionLayout {
 
 enum AboutBubble {
     /// Read by the settings function immediately after 「IN/OUT について」.
-    static let body = "シフトはカレンダーアプリに、やることはリマインダーに保存します。iCloud を使っていれば、Apple がほかの端末と同期します。勤務先や設定はこの端末の中だけに保存し、サーバーへは送りません。広告の表示、地図の表示、所要時間の計算（現在地と勤務先の位置を Apple のマップサービスに送ります）、新しいバージョンの確認（App Store の公開情報を読みます）、Google マップのリンクからの勤務先の読み込み（リンク先と Apple のマップサービスに店名と位置を問い合わせます）では通信します。金額はすべて概算です。"
+    static let body = "設定でオンにしたときだけ、シフトをカレンダーに、やることをリマインダーに入れます。勤務先や設定はこの端末の中だけに保存します。金額はすべて概算です。"
 }
 
 struct SpeechTail: Shape {
