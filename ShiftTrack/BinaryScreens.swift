@@ -160,9 +160,44 @@ struct PayPeriodDetailView: View {
         shifts.filter { $0.workplace?.uuid == workplaceID && $0.date >= window.start && $0.date < window.end }
     }
     private var includeTransport: Bool { settingsRows.first?.includeTransport ?? true }
-    private var wageYen: Int { mine.reduce(0) { $0 + $1.estimatedYen(includeTransport: false) } }
-    private var withTransport: Int { mine.reduce(0) { $0 + $1.estimatedYen(includeTransport: true) } }
-    private var forecast: Int { includeTransport ? withTransport : wageYen }
+    private var parts: (base: Int, premium: Int, allowance: Int, transport: Int) {
+        var base = 0
+        var premium = 0
+        var allowance = 0
+        var transport = 0
+        for shift in mine {
+            guard let workplace = shift.workplace else { continue }
+            switch ScheduledPay.evaluate(
+                day: shift.date,
+                start: shift.startMinutes,
+                end: shift.endMinutes,
+                breakMinutes: shift.breakMinutes,
+                workplace: workplace,
+                customPay: shift.customPay
+            ) {
+            case .amount(let amount):
+                base += Int(amount.base.rounded())
+                premium += Int(amount.premium.rounded())
+            default:
+                base += PayMath.quote(
+                    workplace: workplace,
+                    day: shift.date,
+                    start: shift.startMinutes,
+                    end: shift.endMinutes,
+                    breakMinutes: shift.breakMinutes,
+                    customPay: shift.customPay,
+                    adjustment: 0,
+                    includeTransport: false
+                )
+            }
+            allowance += max(0, shift.adjustmentYen)
+            if includeTransport {
+                transport += max(0, workplace.transportAllowance)
+            }
+        }
+        return (base, premium, allowance, transport)
+    }
+    private var forecast: Int { parts.base + parts.premium + parts.allowance + parts.transport }
     private var minutes: Int { mine.reduce(0) { $0 + $1.workedMinutes } }
     private var storageKey: String { "slip.\(workplaceID.uuidString).\(window.start.timeIntervalSince1970)" }
 
@@ -176,10 +211,11 @@ struct PayPeriodDetailView: View {
             Text("内訳")
                 .font(.system(size: 15, weight: .bold))
                 .padding(.top, 8)
-            Text("時給 \(Formatters.yen(wageYen))（\(Formatters.hours(minutes))）")
-            Text("交通費 \(Formatters.yen(max(0, withTransport - wageYen)))")
-            Text("働いた時間 \(Formatters.hours(minutes))")
-            Text("お給料（交通費の前） \(Formatters.yen(wageYen))")
+            Text("基本給 \(Formatters.yen(parts.base))（\(Formatters.hours(minutes))）")
+            Text("割増 \(Formatters.yen(parts.premium))")
+            Text("手当 \(Formatters.yen(parts.allowance))")
+            Text("交通費 \(Formatters.yen(parts.transport))")
+            Text("お給料（交通費の前） \(Formatters.yen(parts.base + parts.premium + parts.allowance))")
             Text("支給の見込み \(Formatters.yen(forecast))")
             Text("税金・社会保険は計算していません。")
                 .font(.system(size: 12))
@@ -199,13 +235,13 @@ struct PayPeriodDetailView: View {
                 .padding(12)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            if let grossValue = Int(gross.filter(\.isNumber)), !gross.isEmpty {
-                Text("見込みとの差 \(Formatters.yen(grossValue - forecast))")
+            if let grossValue = yen(gross) {
+                Text("総支給額の差 \(Formatters.yen(grossValue - forecast))（明細 − 見込み）")
             }
-            if let grossValue = Int(gross.filter(\.isNumber)), let netValue = Int(net.filter(\.isNumber)), !gross.isEmpty, !net.isEmpty {
-                Text("差引支給額の差 \(Formatters.yen(grossValue - netValue))")
+            if let netValue = yen(net) {
+                Text("差引支給額の差 \(Formatters.yen(netValue - forecast))（明細 − 見込み）")
             }
-            Text("明細の金額を入れると、見込みとの差を出します。シフトの見込は書き換えません。")
+            Text("差は明細 − 見込みです。税金・社会保険は計算しません。未入力では保存できません。シフトは書き換えません。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
             Button("明細の金額を保存") { storeSlip() }
@@ -229,7 +265,13 @@ struct PayPeriodDetailView: View {
     }
 
     private var canStore: Bool {
-        !gross.filter(\.isNumber).isEmpty || !net.filter(\.isNumber).isEmpty
+        yen(gross) != nil && yen(net) != nil
+    }
+
+    private func yen(_ text: String) -> Int? {
+        let digits = text.filter(\.isNumber)
+        guard !digits.isEmpty else { return nil }
+        return Int(digits)
     }
 
     private func group(_ title: String, _ rows: [WorkShift]) -> some View {
@@ -585,6 +627,8 @@ struct ShiftCheckView: View {
             Text("おつかれさまでした")
                 .font(.system(size: 28, weight: .black))
                 .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(shift.workplace?.name ?? "勤務先") の勤務時間はこのとおりでしたか？違っていたら押して直せます。")
+                .font(.system(size: 15))
             Text("\(shift.workplace?.name ?? "勤務先") - \(Formatters.longDay(shift.date))")
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.muted)
@@ -680,6 +724,8 @@ struct ShiftCheckView: View {
     }
 
     private func confirm() {
+        // ShiftCheckView's recovered function does not write a confirmed flag.
+        // This mark is ShiftTrack's own, so the row can leave the unconfirmed list.
         shift.breakMinutes = breakMinutes
         shift.breakFollowsRules = false
         shift.attendanceConfirmed = true

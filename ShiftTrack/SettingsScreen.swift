@@ -60,7 +60,7 @@ struct SettingsScreen: View {
                 Text("シフトの重なり")
                     .font(.system(size: 15, weight: .bold))
                 Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
-                Text("この分数が重なり検査の閾値であることは、命令は示していません。")
+                Text("違う勤務先の間がこの時間より短いと、保存の前に確認します。バイナリの閾値が設定のどの値かは未確定で、この画面の分数を使っています。")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
             }

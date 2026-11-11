@@ -583,24 +583,89 @@ struct ShiftAddChooser: View {
     }
 }
 
-/// Same-calendar-day clock overlap. A shift with `end <= start` crosses midnight;
-/// that case, and travel time, are not part of this check.
-enum SameDayOverlap {
-    static func clocksOverlap(start: Int, end: Int, otherStart: Int, otherEnd: Int) -> Bool {
-        guard end > start, otherEnd > otherStart else { return false }
-        return start < otherEnd && otherStart < end
+/// Overlap before save, from `0x100016734` / `0x1001b4e08` at analysis `87f3027`.
+/// `start >= end` adds one day to the end, then the instants are compared.
+/// Touching endpoints do not overlap. Travel uses the settings stepper; the
+/// binary's threshold field is still unnamed.
+enum ShiftOverlap {
+    enum Kind: Equatable {
+        case time
+        case existingShift
+        case travel(minutes: Int)
     }
 
-    static func first(start: Int, end: Int, day: Date, ignoring: UUID?, shifts: [WorkShift], calendar: Calendar = .current) -> WorkShift? {
-        let dayStart = calendar.startOfDay(for: day)
-        return shifts
-            .filter { other in
-                other.uuid != ignoring
-                    && calendar.isDate(other.date, inSameDayAs: dayStart)
-                    && clocksOverlap(start: start, end: end, otherStart: other.startMinutes, otherEnd: other.endMinutes)
-            }
-            .sorted { $0.startMinutes < $1.startMinutes }
-            .first
+    struct Hit: Equatable {
+        var otherID: UUID
+        var kind: Kind
+    }
+
+    static func bounds(day: Date, start: Int, end: Int, calendar: Calendar = .current) -> (Date, Date) {
+        let base = calendar.startOfDay(for: day)
+        let startDate = calendar.date(byAdding: .minute, value: ShiftDatePolicy.clockMinutes(start), to: base) ?? base
+        let endDate = PayMath.endDate(day: day, start: start, end: end, calendar: calendar)
+        return (startDate, endDate)
+    }
+
+    static func classify(
+        start: Int,
+        end: Int,
+        day: Date,
+        workplace: UUID,
+        otherStart: Int,
+        otherEnd: Int,
+        otherDay: Date,
+        otherWorkplace: UUID,
+        travelMinutes: Int,
+        calendar: Calendar = .current
+    ) -> Kind? {
+        let proposed = bounds(day: day, start: start, end: end, calendar: calendar)
+        let existing = bounds(day: otherDay, start: otherStart, end: otherEnd, calendar: calendar)
+        if existing.0 < proposed.1 && proposed.0 < existing.1 {
+            return .time
+        }
+        if workplace == otherWorkplace && calendar.isDate(day, inSameDayAs: otherDay) {
+            return .existingShift
+        }
+        guard workplace != otherWorkplace, travelMinutes > 0 else { return nil }
+        let gap = separation(proposed, existing)
+        guard gap < TimeInterval(travelMinutes * 60) else { return nil }
+        return .travel(minutes: max(0, Int(gap / 60)))
+    }
+
+    static func first(
+        start: Int,
+        end: Int,
+        day: Date,
+        workplace: UUID,
+        ignoring: UUID?,
+        shifts: [WorkShift],
+        travelMinutes: Int,
+        calendar: Calendar = .current
+    ) -> Hit? {
+        for other in shifts.sorted(by: { $0.startMinutes < $1.startMinutes }) {
+            if other.uuid == ignoring { continue }
+            guard let otherWorkplace = other.workplace?.uuid else { continue }
+            guard let kind = classify(
+                start: start,
+                end: end,
+                day: day,
+                workplace: workplace,
+                otherStart: other.startMinutes,
+                otherEnd: other.endMinutes,
+                otherDay: other.date,
+                otherWorkplace: otherWorkplace,
+                travelMinutes: travelMinutes,
+                calendar: calendar
+            ) else { continue }
+            return Hit(otherID: other.uuid, kind: kind)
+        }
+        return nil
+    }
+
+    private static func separation(_ a: (Date, Date), _ b: (Date, Date)) -> TimeInterval {
+        if a.1 <= b.0 { return b.0.timeIntervalSince(a.1) }
+        if b.1 <= a.0 { return a.0.timeIntervalSince(b.1) }
+        return 0
     }
 }
 
@@ -631,7 +696,8 @@ struct ShiftEditorView: View {
     @State private var draftDate = Date()
     @State private var userEditedDate = false
     @State private var loaded = false
-    @State private var overlapID: UUID?
+    @State private var overlap: ShiftOverlap.Hit?
+    @AppStorage("settings.travelMinutes") private var travelMinutes = 30
     @State private var chosenPart: UUID?
     @State private var destinationName = ""
     @State private var destinationPlace = ""
@@ -830,25 +896,25 @@ struct ShiftEditorView: View {
                 self.workplaceID = workplaces.last?.uuid
             }
             .overlay {
-                if let other = shifts.first(where: { $0.uuid == overlapID }) {
+                if let overlap, let other = shifts.first(where: { $0.uuid == overlap.otherID }) {
                     ZStack {
                         Color.black.opacity(0.35).ignoresSafeArea()
                         VStack(spacing: 14) {
                             Text("このシフトは確認が必要です")
                                 .font(.system(size: 18, weight: .bold))
                                 .multilineTextAlignment(.center)
-                            Text("\(other.workplace?.name ?? "シフト") \(Formatters.clock(other.startMinutes))〜\(Formatters.clock(other.endMinutes)) と時間が重なっています")
+                            Text(overlapMessage(overlap.kind, other: other))
                                 .font(.system(size: 15))
                                 .multilineTextAlignment(.center)
                             HStack(spacing: 10) {
-                                Button("やめる") { overlapID = nil }
+                                Button("やめる") { self.overlap = nil }
                                     .font(.system(size: 16, weight: .bold))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
                                     .background(Theme.cardRaised)
                                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 Button("このまま保存") {
-                                    overlapID = nil
+                                    self.overlap = nil
                                     save(force: true)
                                 }
                                 .font(.system(size: 16, weight: .bold))
@@ -930,6 +996,19 @@ struct ShiftEditorView: View {
         }
     }
 
+    private func overlapMessage(_ kind: ShiftOverlap.Kind, other: WorkShift) -> String {
+        let name = other.workplace?.name ?? "シフト"
+        let clocks = "\(Formatters.clock(other.startMinutes))〜\(Formatters.clock(other.endMinutes))"
+        switch kind {
+        case .time:
+            return "\(name) \(clocks) と時間が重なっています"
+        case .existingShift:
+            return "\(name) \(clocks) のシフトがあります"
+        case .travel(let minutes):
+            return "\(minutes)分しかありません（移動に"
+        }
+    }
+
     private var workplaceParts: [ShiftPart] {
         parts.filter { $0.workplaceUUID == workplaceID && !$0.hidden }
     }
@@ -962,14 +1041,16 @@ struct ShiftEditorView: View {
             draft: date,
             userEditedDate: userEditedDate
         )
-        if !force, let other = SameDayOverlap.first(
+        if !force, let hit = ShiftOverlap.first(
             start: startMinutes,
             end: endMinutes,
             day: storedDate,
+            workplace: workplace.uuid,
             ignoring: existing?.uuid,
-            shifts: shifts
+            shifts: shifts,
+            travelMinutes: travelMinutes
         ) {
-            overlapID = other.uuid
+            overlap = hit
             return
         }
         if let existing {
