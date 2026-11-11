@@ -197,6 +197,9 @@ struct ShiftAddChooser: View {
     @State private var editor: EditorRoute?
     @State private var tableText = ""
     @State private var tableError = ""
+    @State private var modelReading: TypedShiftEntry.Reading?
+    @State private var modelNote = ""
+    @State private var modelBusy = false
     @FocusState private var tableFocused: Bool
 
     private var history: [WorkShift] {
@@ -237,12 +240,44 @@ struct ShiftAddChooser: View {
         if typedReading?.repeatsWeekly == true {
             return []
         }
+        if let modelReading, modelReading.canSave, let draft = modelReading.draft() {
+            return [draft]
+        }
         return ShiftTextParser.parse(
             text: tableText,
             knownNames: workplaces.map(\.name),
             fallbackDate: day,
             defaultWorkplace: assumedWorkplace?.name ?? ""
         )
+    }
+
+    private func askModel() async {
+        let source = tableText
+        modelBusy = true
+        defer { modelBusy = false }
+        let reading = await ShiftEntryGate.resolve(
+            text: source,
+            now: Date(),
+            calendar: ShiftOverlap.tokyo,
+            knownNames: workplaces.map(\.name),
+            fallbackDate: day,
+            defaultWorkplace: assumedWorkplace?.name ?? "",
+            filler: LiveSentenceFiller(
+                now: Date(),
+                calendar: ShiftOverlap.tokyo,
+                knownNames: workplaces.map(\.name),
+                fallbackDate: day,
+                defaultWorkplace: assumedWorkplace?.name ?? ""
+            )
+        )
+        guard source == tableText else { return }
+        if reading?.canSave == true, typedReading?.canSave != true {
+            modelReading = reading
+            modelNote = "端末内で整理した候補です。追加する前に内容を確認できます。"
+        } else {
+            modelReading = nil
+            modelNote = "規則でも端末内のモデルでも、追加できる形にはなりませんでした。"
+        }
     }
 
     private var tableHint: String {
@@ -328,7 +363,30 @@ struct ShiftAddChooser: View {
             }
             .background(Theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .onChange(of: tableText) { _, _ in tableError = "" }
+            .onChange(of: tableText) { _, _ in
+                tableError = ""
+                modelReading = nil
+                modelNote = ""
+            }
+            if typedReading?.canSave != true, typedReading?.repeatsWeekly != true,
+               !tableText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button(modelBusy ? "整理しています" : "読めない文だけ端末内で整理") {
+                    Task { await askModel() }
+                }
+                .disabled(modelBusy)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.lime)
+                Text("規則で読めた文はそのままです。モデルは確認用で、追加はボタンを押したときだけです。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !modelNote.isEmpty {
+                    Text(modelNote)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if let typedReading, typedReading.repeatsWeekly {
                 Text(TypedShiftEntry.weeklyLine(typedReading))
                     .font(.system(size: 12))
