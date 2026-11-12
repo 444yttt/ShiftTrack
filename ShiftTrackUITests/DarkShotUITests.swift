@@ -13,7 +13,7 @@ final class DarkShotUITests: XCTestCase {
 
     func testDarkScreens() {
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestingSample"]
+        app.launchArguments = ["-UITestingSample", "-UITestingDark"]
         app.launch()
 
         XCTAssertTrue(app.tab("ホーム").waitForExistence(timeout: 15))

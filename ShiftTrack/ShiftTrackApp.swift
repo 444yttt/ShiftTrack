@@ -132,6 +132,7 @@ struct RootView: View {
         .background {
             ShiftEndPulse()
         }
+        .modifier(UITestColorScheme())
         .sheet(isPresented: $router.isPresented) {
             ImportFlowView(startsInReview: router.startInReview, pending: router.pending)
                 .presentationBackground(Theme.background)
@@ -205,6 +206,17 @@ struct RootView: View {
             Task {
                 await ShiftNoticeRefresh.apply(shifts: current)
                 await ShiftMirrorRefresh.apply(shifts: current)
+            }
+        }
+    }
+
+    /// The dark-mode screenshot test passes this. Production follows the system.
+    private struct UITestColorScheme: ViewModifier {
+        func body(content: Content) -> some View {
+            if ProcessInfo.processInfo.arguments.contains("-UITestingDark") {
+                content.preferredColorScheme(.dark)
+            } else {
+                content
             }
         }
     }
