@@ -701,10 +701,10 @@ struct QuickActionTile: View {
         }
         .buttonStyle(PressableStyle())
         .disabled(!enabled)
-        .accessibilityElement(children: .ignore)
+        // Keep the button's own element so the disabled state reaches VoiceOver
+        // (“dimmed”) and UI tests; the label replaces the reason text inside.
         .accessibilityLabel(title)
         .accessibilityHint(disabledReason ?? "")
-        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(identifier)
     }
 }
