@@ -65,9 +65,11 @@ final class ShellUITests: XCTestCase {
         shot("04-patterns")
         app.buttons["patterns.close"].tap()
 
-        app.tab("ホーム").tap()
+        today.tap()
         XCTAssertEqual(clock.label, clockBefore)
-        app.buttons["＋シフトを追加"].tap()
+        let addShift = app.buttons["＋シフトを追加"]
+        XCTAssertTrue(addShift.waitForExistence(timeout: 6))
+        tapVisible(app, addShift)
         let start = app.buttons["開始"]
         require(start, timeout: 8, shotName: "05-editor-missing", app: app)
         start.tap()
@@ -103,15 +105,16 @@ final class ShellUITests: XCTestCase {
         let messages = app.buttons["settings.messages"]
         XCTAssertTrue(messages.waitForExistence(timeout: 6))
         tapVisible(app, messages)
-        let messageTitle = app.navigationBars["連絡メッセージのひな形"]
-        XCTAssertTrue(messageTitle.waitForExistence(timeout: 6))
+        // 設定 → 連絡メッセージ → メッセージのひな形 opens the template editor.
+        require(app.navigationBars["連絡メッセージのひな形"], timeout: 6, shotName: "09-messages-missing", app: app)
+        shot("09-messages")
         app.buttons["閉じる"].tap()
         XCTAssertTrue(app.switches["settings.notifyEnd"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.notifyBefore"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["settings.location"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.calendar"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.reminders"].waitForExistence(timeout: 4))
-        app.tab("ホーム").tap()
+        today.tap()
         XCTAssertEqual(clock.label, clockBefore)
     }
 
@@ -121,6 +124,8 @@ final class ShellUITests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
+    /// Scrolls until the element sits in the open part of the screen, clear of
+    /// the status bar and the tab bar, then taps it.
     private func tapVisible(_ app: XCUIApplication, _ element: XCUIElement) {
         let top: CGFloat = 90
         let bottom = app.frame.maxY - 120

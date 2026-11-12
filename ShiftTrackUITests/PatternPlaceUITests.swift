@@ -97,7 +97,7 @@ final class PatternPlaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "10:00")).firstMatch.waitForExistence(timeout: 4))
         XCTAssertEqual(app.buttons.matching(identifier: "calendar.shift").count, 1)
 
-        app.tab("ホーム").tap()
+        today.tap()
         XCTAssertEqual(clock.label, clockBefore)
         tapIdentifier(app, "today.daychip.朝")
         shot("16-today-daychip")
@@ -107,16 +107,13 @@ final class PatternPlaceUITests: XCTestCase {
         shot("17-week-still")
     }
 
+    /// Day cells other than today, in grid order. Cells are `calendar.day.YYYY-MM-DD`
+    /// (today is `calendar.day.today`); matching on the year keeps any other
+    /// `calendar.day…` control, such as an add button, out of the list.
     private func monthDays(_ app: XCUIApplication) -> [XCUIElement] {
-        let query = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'calendar.day.'"))
+        let query = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'calendar.day.2'"))
         XCTAssertTrue(query.firstMatch.waitForExistence(timeout: 6))
-        var days: [XCUIElement] = []
-        for index in 0..<query.count {
-            let element = query.element(boundBy: index)
-            if element.identifier == "calendar.day.today" { continue }
-            days.append(element)
-        }
-        return days
+        return (0..<query.count).map { query.element(boundBy: $0) }
     }
 
     private func makePart(
@@ -173,7 +170,7 @@ final class PatternPlaceUITests: XCTestCase {
         tapVisible(app, element)
     }
 
-    /// A control under the tab bar still reports hittable, and the tap lands
+    /// A control under the tab bar can still report hittable, and the tap lands
     /// on the bar. Keep the frame in the open part of the screen.
     private func tapVisible(_ app: XCUIApplication, _ element: XCUIElement) {
         let top: CGFloat = 90
