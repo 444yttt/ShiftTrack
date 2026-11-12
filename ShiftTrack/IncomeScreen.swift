@@ -211,7 +211,7 @@ struct IncomeScreen: View {
                             Spacer()
                             Text(Formatters.yen(row.yen))
                                 .designFont(16, weight: .bold)
-                                .foregroundStyle(Theme.lime)
+                                .foregroundStyle(Theme.accentText)
                         }
                         .padding(14)
                         .background(Theme.card)
@@ -286,6 +286,9 @@ struct IncomeScreen: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.background)
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
+        }
         .overlay {
             if showGuide, !GuideMemory.suppressed {
                 ZStack {
@@ -388,7 +391,7 @@ struct IncomeScreen: View {
                     Image(systemName: "pencil")
                         .designFont(16, weight: .bold)
                 }
-                .foregroundStyle(Theme.lime)
+                .foregroundStyle(Theme.accentText)
             }
             .buttonStyle(.plain)
         }
@@ -495,7 +498,7 @@ struct IncomeScreen: View {
             Image(systemName: name)
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
-                .frame(width: 28, height: 28)
+                .frame(width: 44, height: 44)
                 .background(Theme.dayFilled)
                 .clipShape(Circle())
         }
@@ -545,7 +548,7 @@ private struct SalaryDonut: View {
                     .foregroundStyle(Theme.muted)
                 Text(center)
                     .designFont(16, weight: .black)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 if let delta, delta != 0 {
@@ -579,7 +582,7 @@ struct GoalEditorSheet: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("¥")
                         .designFont(16, weight: .black)
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                     TextField("0", text: $text)
                         .keyboardType(.numberPad)
                         .designFont(16, weight: .black)
@@ -604,12 +607,12 @@ struct GoalEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("完了") { typing = false }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()

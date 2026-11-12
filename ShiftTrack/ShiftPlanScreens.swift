@@ -17,20 +17,20 @@ struct PatternListView: View {
     var body: some View {
         NavigationStack {
             ScreenScroll {
-                Text("パターン")
-                    .font(.system(size: 28, weight: .black))
+                Text("曜日のパターン")
+                    .designFont(28, weight: .black)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 8)
                     .accessibilityIdentifier("patterns.heading")
                 Text("パターンは曜日のひな形です。ここを保存してもシフトは増えません。入れると、空いている日だけシフトになります。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if visiblePatterns.isEmpty {
                     Text("パターンはまだありません。")
-                        .font(.system(size: 14))
+                        .designFont(14)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 8)
@@ -50,17 +50,17 @@ struct PatternListView: View {
                 .disabled(workplaces.isEmpty)
                 if workplaces.isEmpty {
                     Text("先に勤務先を1件追加してください。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                 }
             }
             .background(Theme.background)
-            .navigationTitle("パターン")
+            .navigationTitle("曜日のパターン")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                         .accessibilityIdentifier("patterns.close")
                 }
             }
@@ -83,21 +83,23 @@ struct PatternListView: View {
                     .fill(workplace?.color ?? Theme.lime)
                     .frame(width: 10, height: 10)
                 Text(pattern.name)
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(15, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Spacer()
             }
-            Text("\(workplace?.name ?? "勤務先なし")  \(ShiftPatternPlan.weekdayLabel(pattern.weekdays))  \(Formatters.clock(pattern.startMinutes))–\(Formatters.clock(pattern.endMinutes))")
-                .font(.system(size: 12))
+            Text("\(workplace?.name ?? "勤務先なし")  \(ShiftPatternPlan.weekdayLabel(pattern.weekdays))  \(Formatters.clock(pattern.startMinutes))–\(Formatters.clock(pattern.endMinutes))  \(PatternBreak.summary(modeRaw: pattern.breakModeRaw, fixedMinutes: pattern.breakMinutes, customRulesRaw: pattern.breakRulesRaw))")
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
             HStack(spacing: 16) {
                 Button("編集") { editor = PatternRoute(patternID: pattern.uuid) }
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
+                    .frame(minHeight: 44)
                 Button("この曜日に入れる") { apply = PatternRoute(patternID: pattern.uuid) }
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
+                    .frame(minHeight: 44)
                     .disabled(workplace == nil)
             }
-            .font(.system(size: 13, weight: .bold))
+            .designFont(13, weight: .bold)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -124,6 +126,8 @@ struct PatternEditorView: View {
     @State private var startMinutes = 9 * 60
     @State private var endMinutes = 18 * 60
     @State private var breakMinutes = 60
+    @State private var breakModeRaw = PatternBreakMode.fixed.rawValue
+    @State private var breakRules: [InOutRecovered.BreakRule] = []
     @State private var weekdays: Set<Int> = [2, 3, 4, 5, 6]
     @State private var error = ""
     @State private var confirmDelete = false
@@ -137,7 +141,7 @@ struct PatternEditorView: View {
         NavigationStack {
             ScreenScroll {
                 Text("これはひな形です。保存しても、入っているシフトの時間と休憩は変わりません。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 field
@@ -147,38 +151,36 @@ struct PatternEditorView: View {
                         Text(workplace.name).tag(Optional(workplace.uuid))
                     }
                 }
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 HStack(alignment: .top, spacing: 10) {
                     MinutesTimePicker(title: "開始", minutes: $startMinutes)
                     MinutesTimePicker(title: "終了", minutes: $endMinutes)
                 }
-                Stepper(value: $breakMinutes, in: 0...300) {
-                    Text("休憩 \(breakMinutes)分")
-                        .foregroundStyle(Theme.ink)
-                }
+                PatternBreakEditor(modeRaw: $breakModeRaw, fixedMinutes: $breakMinutes, rules: $breakRules)
+                    .surfaceCard()
                 Text("入れる曜日")
-                    .font(.system(size: 12, weight: .medium))
+                    .designFont(12, weight: .medium)
                     .foregroundStyle(Theme.muted)
                 WeekdaySelector(days: $weekdays)
                 ForEach(liveOverlap) { hit in
                     Text(ShiftOverlap.row(hit))
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if !error.isEmpty {
                     Text(error)
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.behind)
                 }
                 LimeCapsuleButton(title: existing == nil ? "パターンを保存" : "変更を保存", fillWidth: true) { save() }
                 if existing != nil {
                     Button("パターンを削除") { confirmDelete = true }
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                         .foregroundStyle(Theme.destructive)
                         .frame(maxWidth: .infinity)
                     Text("削除しても、すでに入っているシフトは残ります。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                 }
             }
@@ -188,7 +190,7 @@ struct PatternEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .onAppear(perform: load)
@@ -248,10 +250,10 @@ struct PatternEditorView: View {
     private var field: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("名前")
-                .font(.system(size: 12, weight: .medium))
+                .designFont(12, weight: .medium)
                 .foregroundStyle(Theme.muted)
             TextField("早番", text: $name)
-                .font(.system(size: 16, weight: .medium))
+                .designFont(16, weight: .medium)
                 .foregroundStyle(Theme.ink)
         }
     }
@@ -266,6 +268,8 @@ struct PatternEditorView: View {
         startMinutes = existing.startMinutes
         endMinutes = existing.endMinutes
         breakMinutes = existing.breakMinutes
+        breakModeRaw = existing.breakModeRaw
+        breakRules = BreakRules.decode(existing.breakRulesRaw)
         weekdays = existing.weekdays
     }
 
@@ -308,6 +312,8 @@ struct PatternEditorView: View {
             existing.startMinutes = startMinutes
             existing.endMinutes = endMinutes
             existing.breakMinutes = breakMinutes
+            existing.breakModeRaw = breakModeRaw
+            existing.breakRulesRaw = BreakRules.encode(breakRules)
             existing.weekdays = weekdays
         } else {
             context.insert(ShiftPattern(
@@ -316,7 +322,9 @@ struct PatternEditorView: View {
                 startMinutes: startMinutes,
                 endMinutes: endMinutes,
                 breakMinutes: breakMinutes,
-                weekdays: weekdays
+                weekdays: weekdays,
+                breakModeRaw: breakModeRaw,
+                breakRulesRaw: BreakRules.encode(breakRules)
             ))
         }
         do {
@@ -363,33 +371,33 @@ struct PatternApplyView: View {
         NavigationStack {
             ScreenScroll {
                 Text(pattern?.name ?? "パターン")
-                    .font(.system(size: 22, weight: .black))
+                    .designFont(22, weight: .black)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("選んだ期間の、パターンの曜日だけを見ます。同じ勤務先のシフトが既にある日は作りません。時間も休憩も書き換えません。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 DatePicker("開始日", selection: $start, displayedComponents: .date)
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                 DatePicker("終了日", selection: $end, displayedComponents: .date)
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                 Text(summary(result))
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(14, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("作ったシフトは給料の見込に入ります。希望ではありません。")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
                 if !message.isEmpty {
                     Text(message)
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.behind)
                 }
                 if let savedCount {
                     Text("\(savedCount)件入れました。")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.lime)
+                        .designFont(14, weight: .bold)
+                        .foregroundStyle(Theme.accentText)
                 }
                 LimeCapsuleButton(title: "空いている日に入れる", fillWidth: true) {
                     apply(result)
@@ -423,7 +431,7 @@ struct PatternApplyView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
         }
@@ -441,12 +449,24 @@ struct PatternApplyView: View {
             workplaceID: workplace.uuid,
             startMinutes: pattern.startMinutes,
             endMinutes: pattern.endMinutes,
-            breakMinutes: pattern.breakMinutes,
+            breakMinutes: resolvedBreak?.minutes ?? pattern.breakMinutes,
             from: start,
             through: end,
             weekdays: pattern.weekdays,
             occupied: occupied,
             allowEqualClock: workplace.payIsDaily
+        )
+    }
+
+    private var resolvedBreak: PatternBreak.Result? {
+        guard let pattern else { return nil }
+        return PatternBreak.resolve(
+            modeRaw: pattern.breakModeRaw,
+            fixedMinutes: pattern.breakMinutes,
+            customRulesRaw: pattern.breakRulesRaw,
+            startMinutes: pattern.startMinutes,
+            endMinutes: pattern.endMinutes,
+            workplace: workplace
         )
     }
 
@@ -501,7 +521,7 @@ struct PatternApplyView: View {
                 startMinutes: proposal.startMinutes,
                 endMinutes: proposal.endMinutes,
                 breakMinutes: proposal.breakMinutes,
-                breakFollowsRules: false,
+                breakFollowsRules: resolvedBreak?.followsRules ?? false,
                 workplace: workplace
             ))
         }
@@ -554,14 +574,14 @@ struct RequestEditorView: View {
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 DatePicker("日付", selection: $date, displayedComponents: .date)
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                 Picker("勤務先", selection: $workplaceID) {
                     Text("未定").tag(UUID?.none)
                     ForEach(workplaces) { workplace in
                         Text(workplace.name).tag(Optional(workplace.uuid))
                     }
                 }
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 HStack(alignment: .top, spacing: 10) {
                     MinutesTimePicker(title: "開始", minutes: $startMinutes)
                     MinutesTimePicker(title: "終了", minutes: $endMinutes)
@@ -615,7 +635,7 @@ struct RequestEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .onAppear(perform: load)
@@ -761,7 +781,7 @@ struct WeekdaySelector: View {
                     if on { days.remove(day) } else { days.insert(day) }
                 } label: {
                     Text(names[day])
-                        .font(.system(size: 12, weight: .bold))
+                        .designFont(12, weight: .bold)
                         .foregroundStyle(on ? Theme.ink : .white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)

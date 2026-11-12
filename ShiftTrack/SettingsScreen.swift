@@ -162,7 +162,7 @@ struct SettingsScreen: View {
                         .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .padding(.vertical, 14)
                 Rectangle().fill(Theme.line).frame(height: 1)
                 Toggle(isOn: $settings.showPaydayOnCalendar) {
@@ -170,7 +170,7 @@ struct SettingsScreen: View {
                         .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .padding(.vertical, 14)
                 Rectangle().fill(Theme.line).frame(height: 1)
                 Toggle(isOn: $settings.includeTransport) {
@@ -178,7 +178,7 @@ struct SettingsScreen: View {
                         .designFont(16, weight: .medium)
                         .foregroundStyle(Theme.ink)
                 }
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .padding(.vertical, 14)
             }
             .padding(.horizontal, 14)
@@ -206,6 +206,9 @@ struct SettingsScreen: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: notifyAtEnd)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorCalendar)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorReminders)
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
+        }
         .overlay {
             if showGuide {
                 ZStack {
@@ -261,18 +264,18 @@ struct SettingsScreen: View {
 
     private var aboutRow: some View {
         HStack(spacing: 8) {
-            Text("IN/OUT について")
+            Text("しふとらっくについて")
                 .designFont(16, weight: .bold)
             Button {
                 showAboutBubble.toggle()
             } label: {
                 Text("?")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(Theme.lime)
-                    .frame(width: 28, height: 28)
+                    .designFont(18, weight: .black)
+                    .foregroundStyle(Theme.accentText)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("IN/OUT についての説明")
+            .accessibilityLabel("しふとらっくについての説明")
             Spacer()
             Button {
                 cover = .about
@@ -282,7 +285,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.muted)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("IN/OUT について")
+            .accessibilityLabel("しふとらっくについて")
         }
         .padding(ScreenInsets.settings)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -324,13 +327,13 @@ struct SettingsScreen: View {
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
             Toggle("勤務の終わりに確認", isOn: $notifyAtEnd)
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .accessibilityIdentifier("settings.notifyEnd")
             Text("終了時刻に、この端末から知らせます。")
                 .designFont(16)
                 .foregroundStyle(Color.white.opacity(0.7))
             Toggle("シフトの前に通知", isOn: $notifyBefore)
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .accessibilityIdentifier("settings.notifyBefore")
             Text("開始の30分前に知らせます。")
                 .designFont(16)
@@ -382,10 +385,10 @@ struct SettingsScreen: View {
             Text("カレンダーとリマインダー")
                 .designFont(16, weight: .bold)
             Toggle("シフトをカレンダーに入れる", isOn: $mirrorCalendar)
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .accessibilityIdentifier("settings.calendar")
             Toggle("やることをリマインダーに入れる", isOn: $mirrorReminders)
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .accessibilityIdentifier("settings.reminders")
             Text("オンにすると「しふとらっく」というカレンダーとリマインダーだけを更新します。")
                 .designFont(16)
@@ -508,7 +511,7 @@ struct SettingsScreen: View {
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.trailing)
                 .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.lime)
+                .foregroundStyle(Theme.accentText)
                 .frame(width: 110)
                 .focused($focused)
         }

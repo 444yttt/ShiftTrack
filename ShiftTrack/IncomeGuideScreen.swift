@@ -27,20 +27,18 @@ struct IncomeGuideScreen: View {
                 Spacer()
                 Button("閉じる") { dismiss() }
                     .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
             }
             .padding(.top, 8)
             Text("\(IncomeGuide.asOf.year)年\(IncomeGuide.asOf.month)月\(IncomeGuide.asOf.day)日時点の目安です。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
             Text("給与収入 \(Formatters.yen(figures.salaryYen))")
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                .designFont(28, weight: .semibold, design: .rounded, digits: true)
                 .foregroundStyle(Theme.ink)
                 .accessibilityIdentifier("income.guide.salary")
             Text("社会保険の見込 \(Formatters.yen(figures.socialYen))")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                .designFont(22, weight: .semibold, design: .rounded, digits: true)
                 .foregroundStyle(Theme.ink)
                 .accessibilityIdentifier("income.guide.social")
             Text("所得税は通勤手当を除いた給与収入、社会保険は通勤手当を含めた今後の見込です。同じ合計は使いません。")
@@ -78,7 +76,7 @@ struct IncomeGuideScreen: View {
                     birthDay = 0
                 }
                 .designFont(13, weight: .bold)
-                .foregroundStyle(Theme.lime)
+                .foregroundStyle(Theme.accentText)
             } else {
                 Text("生年月日がないと、150万円と130万円のどちらを見るか決まりません。")
                     .designFont(13)
@@ -89,7 +87,7 @@ struct IncomeGuideScreen: View {
                     birthDay = 1
                 }
                 .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.lime)
+                .foregroundStyle(Theme.accentText)
                 .accessibilityIdentifier("income.guide.birth")
             }
         }
@@ -128,8 +126,7 @@ struct IncomeGuideScreen: View {
                 let estimate = IncomeGuide.estimate(line.basis, figures: figures)
                 let outlook = IncomeGuide.outlook(estimate: estimate, line: yen, bound: line.bound)
                 Text(line.bound == .lessThan ? "\(Formatters.yen(yen))未満" : "\(Formatters.yen(yen))以下")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
+                    .designFont(20, weight: .semibold, design: .rounded, digits: true)
                 Text(IncomeGuide.message(title: line.title, outlook: outlook))
                     .designFont(13)
                     .foregroundStyle(Theme.ink)

@@ -7,11 +7,15 @@ struct WorkplaceDirectoryScreen: View {
     private enum Sheet: Identifiable {
         case wizard
         case edit(UUID)
+        case partNew
+        case partEdit(UUID)
 
         var id: String {
             switch self {
             case .wizard: "wizard"
             case .edit(let id): "edit-\(id.uuidString)"
+            case .partNew: "part-new"
+            case .partEdit(let id): "part-\(id.uuidString)"
             }
         }
     }
@@ -30,8 +34,8 @@ struct WorkplaceDirectoryScreen: View {
                 HelpButton { showGuide = true }
             }
             if workplaces.isEmpty {
-                Text("勤務先はまだ登録されていません")
-                    .font(.system(size: 14))
+                Text("勤務先はまだありません。1件追加すると、シフトと収入の見込みが使えます。")
+                    .designFont(14)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 12)
@@ -49,26 +53,10 @@ struct WorkplaceDirectoryScreen: View {
                     .accessibilityIdentifier("workplaces.title")
             }
 
-            Button {
+            LimeCapsuleButton(title: "勤務先を追加", fillWidth: true, identifier: "workplace.add") {
                 sheet = .wizard
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 36, height: 36)
-                        .background(Theme.lime)
-                        .clipShape(Circle())
-                    Text("勤務先を追加")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.plain)
             .padding(.top, 12)
-            .accessibilityIdentifier("workplace.add")
-            .accessibilityLabel("勤務先を追加")
         }
         .background(Theme.background)
         .sheet(item: $sheet) { destination in
@@ -77,7 +65,16 @@ struct WorkplaceDirectoryScreen: View {
                 WorkplaceWizard()
             case .edit(let id):
                 WorkplaceEditorView(existingID: id)
+            case .partNew:
+                ShiftPartEditor()
+                    .presentationBackground(Theme.background)
+            case .partEdit(let id):
+                ShiftPartEditor(partID: id)
+                    .presentationBackground(Theme.background)
             }
+        }
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
         }
         .overlay {
             if showGuide {
@@ -112,11 +109,11 @@ struct WorkplaceDirectoryScreen: View {
                     .frame(width: 44, height: 44)
                     .overlay {
                         Text(String(workplace.name.prefix(1)))
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(Theme.ink)
+                            .designFont(18, weight: .bold)
+                            .foregroundStyle(Color.readable(onHex: workplace.colorHex))
                     }
                 Text(workplace.name)
-                    .font(.system(size: 18, weight: .bold))
+                    .designFont(18, weight: .bold)
                     .foregroundStyle(Color.white)
                 Spacer()
                 Menu {
@@ -124,12 +121,12 @@ struct WorkplaceDirectoryScreen: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .foregroundStyle(Color.white)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 44, height: 44)
                 }
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("時給")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Color.white.opacity(0.8))
                 Text(yenBody(workplace.hourlyWage))
                     .font(.doto(28))
@@ -139,7 +136,7 @@ struct WorkplaceDirectoryScreen: View {
             }
             if !workplace.place.isEmpty {
                 Label(workplace.place, systemImage: "mappin")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Color.white.opacity(0.85))
                     .lineLimit(2)
             }
@@ -150,32 +147,47 @@ struct WorkplaceDirectoryScreen: View {
             }
             if open {
                 Text("シフトパターン")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Color.white.opacity(0.8))
                     .accessibilityIdentifier("patterns.heading")
                 ForEach(mine) { part in
-                    HStack {
-                        Text("\(Formatters.clock(part.startMinute))〜\(Formatters.clock(part.endMinute))  \(part.name)")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Theme.ink)
-                        Spacer()
-                        Image(systemName: "chevron.right")
+                    Button {
+                        sheet = .partEdit(part.uuid)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(Formatters.clock(part.startMinute))〜\(Formatters.clock(part.endMinute))  \(part.name)")
+                                    .designFont(15, weight: .bold)
+                                    .foregroundStyle(Theme.ink)
+                                Text(PatternBreak.summary(modeRaw: part.breakModeRaw, fixedMinutes: part.breakMinutes, customRulesRaw: part.breakRulesRaw))
+                                    .designFont(13)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(Theme.muted)
+                        }
+                        .padding(14)
+                        .frame(minHeight: 56)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .padding(14)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("\(part.name)を編集")
                 }
                 Button {
-                    sheet = .edit(workplace.uuid)
+                    sheet = .partNew
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .bold))
+                    Label("パターンを追加", systemImage: "plus")
+                        .designFont(15, weight: .bold)
                         .foregroundStyle(Theme.ink)
-                        .frame(width: 44, height: 44)
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 44)
                         .background(Theme.lime)
-                        .clipShape(Circle())
+                        .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("workplace.pattern.add")
             }
             Button {
                 expanded = open ? nil : workplace.uuid
@@ -183,7 +195,7 @@ struct WorkplaceDirectoryScreen: View {
                 // Recovered names are chevron.up / chevron.down. Which bit means open is unrecovered.
                 // A collapsed card in the screenshot shows the downward chevron.
                 Image(systemName: open ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(14, weight: .bold)
                     .foregroundStyle(Color.white)
                     .frame(maxWidth: .infinity)
             }
@@ -198,7 +210,7 @@ struct WorkplaceDirectoryScreen: View {
 
     private func capsule(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .bold))
+            .designFont(13, weight: .bold)
             .foregroundStyle(Theme.ink)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)

@@ -1,23 +1,41 @@
 import SwiftUI
 
+/// The raw values behind `Theme`, kept so the contrast tests read the same numbers.
+enum ThemeHex {
+    static let background: UInt = 0xF3F1EC
+    static let card: UInt = 0xFFFFFF
+    static let cardRaised: UInt = 0xE6E3DC
+    static let tabBar: UInt = 0x1C1C1E
+    static let lime: UInt = 0xC6F24E
+    static let ink: UInt = 0x111111
+    static let muted: UInt = 0x5C5C63
+    static let accentText: UInt = 0x41570A
+    static let danger: UInt = 0xB3261E
+}
+
 enum Theme {
     /// Paper, white cards, and black pills follow the reference screenshots.
     /// Stacking distances were not recovered from the binary.
-    static let background = Color(hex: 0xF3F1EC)
-    static let card = Color(hex: 0xFFFFFF)
-    static let cardRaised = Color(hex: 0xE6E3DC)
+    static let background = Color(hex: ThemeHex.background)
+    static let card = Color(hex: ThemeHex.card)
+    static let cardRaised = Color(hex: ThemeHex.cardRaised)
     static let chip = Color(hex: 0xF7F6F2)
     static let dayFilled = Color(hex: 0x111111)
-    static let tabBar = Color(hex: 0x1C1C1E)
-    static let lime = Color(hex: 0xC6F24E)
-    static let ink = Color(hex: 0x111111)
+    static let tabBar = Color(hex: ThemeHex.tabBar)
+    static let lime = Color(hex: ThemeHex.lime)
+    static let ink = Color(hex: ThemeHex.ink)
     static let onDark = Color.white
-    static let muted = Color(hex: 0x8E8E93)
+    /// Secondary text. 5.9:1 on `background` and 6.7:1 on white (WCAG AA needs 4.5:1).
+    static let muted = Color(hex: ThemeHex.muted)
+    /// Lime is a fill colour only. Text and icons drawn in the accent on a light
+    /// surface use this deep olive: 7.2:1 on `background`, 8.1:1 on white.
+    static let accentText = Color(hex: ThemeHex.accentText)
     static let line = Color(hex: 0xE4E1DA)
-    static let border = Color(hex: 0xD5D2CB)
+    static let border = Color(hex: 0xA9A59C)
     static let track = Color(hex: 0xE6E3DC)
-    static let behind = Color(hex: 0xFF6B9A)
-    static let destructive = Color(hex: 0xFF5A5A)
+    /// Error and "behind goal" text. 6.5:1 on white.
+    static let behind = Color(hex: ThemeHex.danger)
+    static let destructive = Color(hex: ThemeHex.danger)
 
     static let palette = ["C6F24E", "111111", "F4A7A0", "B7D7C5", "F3C1D3", "A9C7F5", "C7B6E4", "F3D98A"]
 }
@@ -36,21 +54,26 @@ extension Font {
 /// number was not identified, so the choice follows the screenshot.
 struct DesignFont: ViewModifier {
     var weight: Font.Weight
+    var design: Font.Design
+    var digits: Bool
     @ScaledMetric(relativeTo: .body) private var size: CGFloat = 16
 
-    init(_ size: CGFloat, weight: Font.Weight = .regular) {
+    init(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) {
         self.weight = weight
+        self.design = design
+        self.digits = digits
         self._size = ScaledMetric(wrappedValue: size, relativeTo: .body)
     }
 
     func body(content: Content) -> some View {
-        content.font(.system(size: size, weight: weight))
+        let base = Font.system(size: size, weight: weight, design: design)
+        return content.font(digits ? base.monospacedDigit() : base)
     }
 }
 
 extension View {
-    func designFont(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
-        modifier(DesignFont(size, weight: weight))
+    func designFont(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) -> some View {
+        modifier(DesignFont(size, weight: weight, design: design, digits: digits))
     }
 }
 
@@ -63,6 +86,21 @@ extension Color {
             blue: Double(hex & 0xFF) / 255,
             opacity: alpha
         )
+    }
+
+    /// Ink on light fills and white on dark ones, chosen from relative luminance
+    /// so a label on a workplace colour always clears 4.5:1 where possible.
+    static func readable(onHex hex: String) -> Color {
+        var clean = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.hasPrefix("#") { clean.removeFirst() }
+        var value: UInt64 = 0
+        Scanner(string: clean).scanHexInt64(&value)
+        func channel(_ shift: UInt64) -> Double {
+            let c = Double((value >> shift) & 0xFF) / 255
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let luminance = 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+        return luminance > 0.18 ? Theme.ink : Color.white
     }
 
     init(hexString: String) {

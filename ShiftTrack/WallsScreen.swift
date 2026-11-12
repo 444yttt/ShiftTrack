@@ -28,7 +28,7 @@ struct WallsScreen: View {
                 Spacer()
                 Button("閉じる") { dismiss() }
                     .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
                     .accessibilityIdentifier("walls.close")
                 HelpButton { showHelp = true }
             }
@@ -40,7 +40,7 @@ struct WallsScreen: View {
                     .foregroundStyle(Theme.muted)
                 Text(Formatters.yen(forecast))
                     .designFont(16, weight: .black)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                 if let next {
@@ -101,7 +101,7 @@ struct WallsScreen: View {
                     Spacer()
                     Text(Formatters.percent(ratio, decimals: false))
                         .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
@@ -140,7 +140,7 @@ struct HelpSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(paragraphs, id: \.self) { paragraph in
                         Text(paragraph)
-                            .font(.system(size: 15))
+                            .designFont(15)
                             .foregroundStyle(Theme.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -153,7 +153,7 @@ struct HelpSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()

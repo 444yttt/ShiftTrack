@@ -241,7 +241,9 @@ final class ShiftPartPlaceTests: XCTestCase {
             return XCTFail("place")
         }
         XCTAssertEqual(drafts.count, 1)
-        XCTAssertEqual(drafts[0].breakMinutes, 0)
+        // The pattern carries a fixed 60 minute break, so the shift gets it.
+        XCTAssertEqual(drafts[0].breakMinutes, 60)
+        XCTAssertFalse(drafts[0].breakFollowsRules)
         XCTAssertTrue(drafts[0].endAddsOneDay)
         let rows = try context.fetch(FetchDescriptor<WorkShift>())
         XCTAssertEqual(rows.count, 2)
@@ -250,13 +252,14 @@ final class ShiftPartPlaceTests: XCTestCase {
         XCTAssertEqual(kept.breakMinutes, 15)
         let added = try XCTUnwrap(rows.first { $0.partID == night.uuid })
         XCTAssertTrue(calendar.isDate(added.date, inSameDayAs: day(2026, 11, 5)))
-        XCTAssertEqual(added.breakMinutes, 0)
+        XCTAssertEqual(added.breakMinutes, 60)
         XCTAssertFalse(added.breakFollowsRules)
         XCTAssertEqual(added.startMinutes, 22 * 60)
         XCTAssertEqual(added.endMinutes, 5 * 60)
         XCTAssertTrue(added.patternEndOnNextDay)
-        XCTAssertEqual(added.workedMinutes, 7 * 60)
-        XCTAssertEqual(added.estimatedYen(includeTransport: false), (1000 * 7 * 60 + 30) / 60)
+        XCTAssertEqual(added.workedMinutes, 6 * 60)
+        XCTAssertEqual(added.estimatedYen(includeTransport: false), (1000 * 6 * 60 + 30) / 60)
+        XCTAssertEqual(placed.inserted.count, 1)
         XCTAssertEqual(stored.estimatedYen(includeTransport: false), kept.estimatedYen(includeTransport: false))
 
         let repeatNight = ShiftPartCommit.apply(

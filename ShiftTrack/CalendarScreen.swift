@@ -20,6 +20,7 @@ struct CalendarScreen: View {
     @State private var pickedDays: [Date] = []
     @State private var pendingPlace: ShiftPartPlace.Pending?
     @State private var placeNote = ""
+    @State private var lastPlaced: [WorkShift] = []
     @State private var showGuide = false
 
     private enum CalendarCover: Identifiable {
@@ -28,6 +29,8 @@ struct CalendarScreen: View {
         case editor(EditorRoute)
         case patterns
         case partEditor
+        case partEdit(UUID)
+        case partList
         case request(RequestRoute)
         case help
 
@@ -38,6 +41,8 @@ struct CalendarScreen: View {
             case .editor(let route): "editor-\(route.id)"
             case .patterns: "patterns"
             case .partEditor: "part-editor"
+            case .partEdit(let id): "part-\(id.uuidString)"
+            case .partList: "part-list"
             case .request(let route): "request-\(route.id)"
             case .help: "help"
             }
@@ -78,8 +83,8 @@ struct CalendarScreen: View {
                     month = Date()
                     selectedDay = ShiftDatePolicy.selectedDayAfterMonthChange(selected: selectedDay, visibleMonth: Date())
                 }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.lime)
+                .designFont(13, weight: .bold)
+                .foregroundStyle(Theme.accentText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("calendar.thisMonth")
             }
@@ -117,13 +122,13 @@ struct CalendarScreen: View {
 
             HStack {
                 Text(listTitle)
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(15, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 if selectedDay != nil {
                     Button("月の一覧") { selectedDay = nil }
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.lime)
+                        .designFont(12, weight: .medium)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .padding(.top, 8)
@@ -131,7 +136,7 @@ struct CalendarScreen: View {
             if workplaces.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("勤務先を1件追加すると、シフトを入れられます。")
-                        .font(.system(size: 14))
+                        .designFont(14)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     LimeCapsuleButton(title: "勤務先を追加", fillWidth: true) {
@@ -140,7 +145,7 @@ struct CalendarScreen: View {
                 }
             } else if listedShifts.isEmpty {
                 Text(selectedDay == nil ? "この月のシフトはまだありません" : "この日のシフトはありません")
-                    .font(.system(size: 14))
+                    .designFont(14)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -152,6 +157,7 @@ struct CalendarScreen: View {
                             ShiftCard(shift: shift, includeTransport: settings?.includeTransport ?? true)
                         }
                         .buttonStyle(.plain)
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.97).combined(with: .opacity))
                         .accessibilityIdentifier("calendar.shift")
                         .accessibilityLabel(ShiftSpeech.line(
                             name: shift.workplace?.name ?? "勤務先なし",
@@ -160,16 +166,17 @@ struct CalendarScreen: View {
                         ))
                     }
                 }
+                .animation(Motion.allowed(Motion.settle, reduce: reduceMotion), value: listedShifts.map(\.uuid))
             }
 
             if !listedRequests.isEmpty {
                 Text("希望")
-                    .font(.system(size: 15, weight: .bold))
+                    .designFont(15, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 4)
                 Text("希望はシフトではありません。給料の見込にも、今日の予定全体の時給分にも入りません。")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(spacing: 10) {
@@ -190,31 +197,26 @@ struct CalendarScreen: View {
             }
             .padding(.top, 4)
 
-            HStack(spacing: 12) {
-                Button("パターン") { cover = .patterns }
-                Button("希望を追加") {
+            HStack(spacing: 10) {
+                SecondaryPillButton(title: "曜日でまとめて入れる", systemImage: "repeat", fillWidth: true, identifier: "calendar.patterns") {
+                    cover = .patterns
+                }
+                SecondaryPillButton(title: "希望を追加", systemImage: "hand.raised", fillWidth: true, identifier: "calendar.request.add") {
                     cover = .request(RequestRoute(requestID: nil, date: addDay))
                 }
             }
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(Theme.lime)
-            .frame(maxWidth: .infinity)
 
-            Button {
+            SecondaryPillButton(title: "シフト表から取り込む", systemImage: "text.viewfinder", fillWidth: true, identifier: "calendar.import") {
                 router.presentChooser(fallbackDate: addDay, defaultWorkplace: assumedWorkplaceName)
-            } label: {
-                Text("シフト表から取り込む")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.lime)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
             }
-            .buttonStyle(.plain)
         }
         .background(Theme.background)
         .onChange(of: router.focusRequest) { _, request in
             guard let request else { return }
             reveal(request.dates)
+        }
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
         }
         .overlay {
             if showGuide {
@@ -251,6 +253,12 @@ struct CalendarScreen: View {
             case .partEditor:
                 ShiftPartEditor()
                     .presentationBackground(Theme.background)
+            case .partEdit(let id):
+                ShiftPartEditor(partID: id)
+                    .presentationBackground(Theme.background)
+            case .partList:
+                ShiftPartList()
+                    .presentationBackground(Theme.background)
             case .request(let route):
                 RequestEditorView(route: route)
                     .presentationBackground(Theme.background)
@@ -262,7 +270,7 @@ struct CalendarScreen: View {
                         "上の勤務先は横幅を等分します。タップすると、その勤務先だけを表示します。",
                         "「給」は給料日です。月払いは今までと同じ日です。週払いと日払いは、勤務先で選んだときだけ印が変わります。設定のカレンダーで隠せます。",
                         "「希」は希望です。シフトではなく、給料には入りません。シフトにするまで見込金額は変わりません。",
-                        "シフトパターンは、選んだ日へ開始・終了・勤務先を置きます。同じパターンの日は足しません。別のシフトがある日は保留して、そのタップでは追加しません。休憩は写しません。曜日のひな形は別の「パターン」です。",
+                        "シフトパターンは、時間・休憩・やることをまとめて、選んだ日に置きます。置いた直後なら「取り消す」で戻せます。同じパターンがある日には足さず、別のシフトがある日があるときは何も追加しません。名前の横の鉛筆か「一覧」から、編集と削除ができます。曜日ごとにまとめて入れたいときは「曜日でまとめて入れる」を使います。",
                         "日付を押すと、その日のシフトを下に出します。時間が重なるときは、保存の前に確認します。",
                         "＋シフトを追加の「シフト表」に日付と時刻を書くと、その場で保存してこの画面に出します。1件ずつ入力するか、直近10件の履歴からも追加できます。"
                     ]
@@ -293,7 +301,7 @@ struct CalendarScreen: View {
         HStack(spacing: 6) {
             ForEach(CalendarGrid.weekdaySymbols(weekStartsOnMonday: weekStartsOnMonday), id: \.self) { symbol in
                 Text(symbol)
-                    .font(.system(size: 11, weight: .medium))
+                    .designFont(11, weight: .medium)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity)
             }
@@ -317,7 +325,7 @@ struct CalendarScreen: View {
             VStack(spacing: 4) {
                 Text("\(Calendar.current.component(.day, from: day))")
                     .font(.doto(16))
-                    .foregroundStyle(selected ? Theme.ink : (dayShifts.isEmpty ? Theme.ink : Theme.lime))
+                    .foregroundStyle(selected || dayShifts.isEmpty ? Theme.ink : Theme.lime)
                 HStack(spacing: 3) {
                     if colors.isEmpty {
                         Circle().fill(Color.clear).frame(width: 5, height: 5)
@@ -337,22 +345,22 @@ struct CalendarScreen: View {
             .clipShape(Capsule())
             .overlay {
                 if picked && !selected {
-                    Capsule().stroke(Theme.lime, lineWidth: 1.5)
+                    Capsule().stroke(Theme.ink, lineWidth: 2)
                 }
             }
             .overlay(alignment: .topTrailing) {
                 if isPayday(day) {
                     Text("給")
-                        .font(.system(size: 8, weight: .black))
-                        .foregroundStyle(selected ? Theme.ink : Theme.lime)
+                        .designFont(10, weight: .black)
+                        .foregroundStyle(selected || dayShifts.isEmpty ? Theme.ink : Theme.lime)
                         .padding(3)
                 }
             }
             .overlay(alignment: .topLeading) {
                 if hasOpenRequest(day) {
                     Text("希")
-                        .font(.system(size: 8, weight: .black))
-                        .foregroundStyle(selected ? Theme.ink : Theme.lime)
+                        .designFont(10, weight: .black)
+                        .foregroundStyle(selected || dayShifts.isEmpty ? Theme.ink : Theme.lime)
                         .padding(3)
                 }
             }
@@ -399,7 +407,10 @@ struct CalendarScreen: View {
                 }
                 place(part, days: days)
             },
-            onClosePending: { pendingPlace = nil }
+            onClosePending: { pendingPlace = nil },
+            onEdit: { cover = .partEdit($0.uuid) },
+            onManage: { cover = .partList },
+            onUndo: lastPlaced.isEmpty ? nil : { undoPlace() }
         )
     }
 
@@ -430,6 +441,7 @@ struct CalendarScreen: View {
             workplaces: workplaces,
             context: context
         )
+        lastPlaced = result.inserted
         if let failure = result.failure {
             placeNote = failure
             pendingPlace = nil
@@ -438,18 +450,24 @@ struct CalendarScreen: View {
         switch result.outcome {
         case .pending(let pending):
             pendingPlace = pending
-            placeNote = "追加した件数 0"
+            placeNote = "追加できませんでした（0件）。"
         case .missingWorkplace:
             pendingPlace = nil
-            placeNote = "勤務先がないので、どの日にも置いていません。"
+            placeNote = "勤務先がないので、置けませんでした。"
         case .placed(let drafts):
             pendingPlace = nil
-            placeNote = "置いた件数 \(drafts.count)。同じパターンの日は足していません。休憩は0分のままです。"
+            placeNote = ShiftPartPlace.placedNote(count: drafts.count)
             if drafts.count == 1 {
                 selectedDay = drafts[0].day
                 month = drafts[0].day
             }
         }
+    }
+
+    private func undoPlace() {
+        ShiftPartCommit.undo(lastPlaced, context: context)
+        lastPlaced = []
+        placeNote = "取り消しました。"
     }
 
     private var listedShifts: [WorkShift] {
@@ -591,7 +609,7 @@ struct CalendarScreen: View {
     private func monthButton(_ systemName: String, label: String, identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 13, weight: .bold))
+                .designFont(13, weight: .bold)
                 .foregroundStyle(Color.white)
                 .frame(width: 32, height: 32)
                 .background(Theme.dayFilled)

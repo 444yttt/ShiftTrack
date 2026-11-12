@@ -121,7 +121,7 @@ struct ImportChooserView: View {
             } label: {
                 Text("コピーした文字を貼る")
                     .designFont(16, weight: .medium)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
             }
             .buttonStyle(.plain)
             .padding(.top, 8)
@@ -135,7 +135,7 @@ struct ImportChooserView: View {
 
             if working {
                 ProgressView()
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
             } else {
@@ -153,7 +153,7 @@ struct ImportChooserView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("閉じる") { dismiss() }
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
             }
         }
         .darkSheet()
@@ -279,7 +279,7 @@ struct ImportReviewView: View {
             if !savedNote.isEmpty {
                 Text(savedNote)
                     .designFont(13)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
                     .padding(.top, 8)
             }
 
@@ -305,7 +305,7 @@ struct ImportReviewView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("戻る") { onBack() }
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
             }
         }
         .darkSheet()
@@ -328,7 +328,7 @@ struct ImportReviewView: View {
                 candidate.wrappedValue.included.toggle()
             } label: {
                 Image(systemName: candidate.wrappedValue.included ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
+                    .designFont(22)
                     .foregroundStyle(candidate.wrappedValue.included ? Theme.lime : Theme.muted)
             }
             .buttonStyle(.plain)
@@ -341,12 +341,12 @@ struct ImportReviewView: View {
                     .foregroundStyle(Theme.muted)
                 Text(candidate.wrappedValue.createWorkplace ? "新規の勤務先として追加" : "既存の勤務先")
                     .designFont(13, weight: .medium)
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
             }
             Spacer()
             Button("編集") { editingID = candidate.wrappedValue.id }
                 .designFont(16, weight: .medium)
-                .foregroundStyle(Theme.lime)
+                .foregroundStyle(Theme.accentText)
         }
         .padding(14)
         .background(Theme.card)
@@ -498,7 +498,7 @@ struct CandidateEditor: View {
                                 Text(workplace.name).tag(Optional(workplace.uuid))
                             }
                         }
-                        .tint(Theme.lime)
+                        .tint(Theme.accentText)
                     }
                     DatePicker("日付", selection: $candidate.date, displayedComponents: .date)
                         .environment(\.locale, Locale(identifier: "ja_JP"))
@@ -514,7 +514,7 @@ struct CandidateEditor: View {
                             .foregroundStyle(Theme.muted)
                     } else {
                         Toggle("休憩を規則から入れる", isOn: candidateBreakFollows)
-                            .tint(Theme.lime)
+                            .tint(Theme.accentText)
                         BreakMinutesControl(minutes: candidateBreakEntry, range: 0...600)
                     }
                     if PayMath.workedMinutes(
@@ -538,12 +538,12 @@ struct CandidateEditor: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完了") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("完了") { typing = false }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()
