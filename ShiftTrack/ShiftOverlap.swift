@@ -150,14 +150,14 @@ enum ShiftOverlap {
         let clocks = "\(Formatters.clock(hit.startMinutes))〜\(Formatters.clock(hit.endMinutes))"
         switch hit.kind {
         case .time:
-            return "\(hit.name) \(clocks) と重なっています"
+            return "\(hit.name)（\(clocks)）と時間がかぶります。"
         case .travel(let minutes):
-            return "\(minutes)分しかありません（移動に必要な時間より短いです）"
+            return "\(hit.name)（\(clocks)）との間が\(minutes)分です。移動にかかる時間より短くなります。"
         }
     }
 
     static func confirmMessage(_ hits: [Hit]) -> String {
-        hits.map(row).joined(separator: "\n") + "\n保存せず編集に戻ります"
+        hits.map(row).joined(separator: "\n") + "\n「編集に戻る」を選ぶと、保存せずに時間を直せます。"
     }
 
     /// Minutes shown in 「分しかありません」. The comparison itself uses seconds.

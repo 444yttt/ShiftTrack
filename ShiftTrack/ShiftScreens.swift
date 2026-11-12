@@ -849,12 +849,12 @@ struct ShiftEditorView: View {
                 if let workplaceID, ids.contains(workplaceID) { return }
                 self.workplaceID = workplaces.last?.uuid
             }
-            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
-                Button("このまま保存") {
+            .alert("時間を確かめてください", isPresented: overlapAlert) {
+                Button("それでも保存する") {
                     overlap = []
                     save(force: true)
                 }
-                Button("やめる", role: .cancel) {
+                Button("編集に戻る", role: .cancel) {
                     overlap = []
                 }
             } message: {
@@ -1465,7 +1465,7 @@ struct ShiftOverlapList: View {
     var body: some View {
         NavigationStack {
             ScreenScroll(spacing: Space.s) {
-                InfoNote(text: "次のシフトと重なるか、移動の時間が足りません。このまま保存するか、編集に戻って時間を直してください。", tone: .warning)
+                InfoNote(text: "次のシフトと時間がかぶるか、移動の時間が足りません。それでも保存するか、編集に戻って時間を直してください。", tone: .warning)
                     .padding(.top, Space.xs)
                 Card(spacing: Space.xs) {
                     ForEach(hits) { hit in
@@ -1476,11 +1476,11 @@ struct ShiftOverlapList: View {
                         RowDivider()
                     }
                 }
-                PrimaryButton(title: "このまま保存", identifier: "overlap.save", action: onSave)
+                PrimaryButton(title: "それでも保存する", identifier: "overlap.save", action: onSave)
                 SecondaryButton(title: "編集に戻る", identifier: "overlap.cancel", action: onCancel)
             }
             .background(Theme.paper)
-            .navigationTitle("このシフトは確認が必要です")
+            .navigationTitle("時間を確かめてください")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -29,7 +29,7 @@ struct WorkplaceWizard: View {
     @State private var night = true
     @State private var overtime = true
     @State private var legalBreak = true
-    // 3. いつものシフト
+    // 3. よく入る時間
     @State private var patternName = ""
     @State private var startMinute = 17 * 60
     @State private var endMinute = 22 * 60
@@ -39,7 +39,7 @@ struct WorkplaceWizard: View {
     @State private var loaded = false
     @FocusState private var typing: Bool
 
-    private let steps = ["お店", "給料", "いつものシフト"]
+    private let steps = ["お店", "時給と給料日", "よく入る時間"]
 
     var body: some View {
         NavigationStack {
@@ -183,7 +183,7 @@ struct WorkplaceWizard: View {
         VStack(alignment: .leading, spacing: Space.m) {
             header(
                 systemImage: "yensign",
-                title: "給料の決まり",
+                title: "時給と給料日",
                 detail: "見込みの計算に使います。あとから勤務先の編集で変えられます。"
             )
             Card {
@@ -222,7 +222,7 @@ struct WorkplaceWizard: View {
         VStack(alignment: .leading, spacing: Space.m) {
             header(
                 systemImage: "calendar.badge.clock",
-                title: "いつものシフト（任意）",
+                title: "よく入る時間（任意）",
                 detail: "よく入る時間をパターンにしておくと、カレンダーやホームから1回で置けます。なければ空のまま登録できます。"
             )
             Card {

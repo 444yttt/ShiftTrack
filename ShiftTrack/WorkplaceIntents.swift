@@ -96,7 +96,7 @@ enum WorkplaceActions {
             calendar: calendar
         )
         if !found.isEmpty {
-            return "このシフトは確認が必要です。アプリで確認してから保存してください。"
+            return "ほかのシフトと時間がかぶるか、移動の時間が足りません。アプリで確かめてから保存してください。"
         }
         let follows = !workplace.payIsDaily
         let breakMinutes = follows

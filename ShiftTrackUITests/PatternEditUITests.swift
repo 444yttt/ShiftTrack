@@ -23,7 +23,7 @@ final class PatternEditUITests: XCTestCase {
         } else if app.buttons["完了"].exists {
             app.buttons["完了"].tap()
         }
-        // The wizard: お店 → 給料 (the default wage is filled in) → いつものシフト.
+        // The wizard: お店 → 時給と給料日 (the default wage is filled in) → よく入る時間.
         app.buttons["wizard.next"].tap()
         app.buttons["wizard.next"].tap()
         app.buttons["wizard.finish"].tap()

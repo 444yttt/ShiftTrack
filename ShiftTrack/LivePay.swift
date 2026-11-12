@@ -1,13 +1,7 @@
 import Foundation
 
-/// Today-screen clock. `WorkplaceListView` installs a 1-second timeline only
-/// while `start <= gate < end`. The closure copies shift start and end, then
-/// scales break minutes from `Context.date`. The gate date from `0x100260e08`
-/// was not reduced to `Date()` or `Context.date`. The yen is that copied
-/// interval, not pay earned so far.
-///
-/// 「いま稼いだお給料」 is a different function. Its help text says the number
-/// increases. This amount does not, and 7500 yen was not read from a screen.
+/// Phase of a shift (before, during, after) with a break scaled by elapsed
+/// time. Kept for its tests; the home screen now uses `EarningsSoFar`.
 enum LivePay {
     enum Phase: Equatable {
         case notAShift
@@ -65,44 +59,6 @@ enum LivePay {
             scheduledBreak: breakMinutes,
             remainingMinutes: remainingMinutes(until: endDate, from: now)
         )
-    }
-
-    static func line(_ phase: Phase, evaluation: ScheduledPay.Evaluation?) -> String {
-        switch phase {
-        case .notAShift:
-            return "開始と終了が同じです"
-        case .beforeStart(let minutes):
-            return "はじまりまで あと \(Formatters.hours(minutes))"
-        case .during(_, _, let minutes):
-            return scheduledLine(evaluation, suffix: "終わりまで あと \(Formatters.hours(minutes))")
-        case .afterEnd:
-            return scheduledLine(evaluation, suffix: "終了しました")
-        }
-    }
-
-    private static func scheduledLine(_ evaluation: ScheduledPay.Evaluation?, suffix: String) -> String {
-        switch evaluation {
-        case .amount(let amount):
-            return "予定全体の時給分 \(ScheduledPay.amountText(amount.total))（交通費の前）。今まで稼いだ金額ではありません。\(suffix)"
-        case .historyOpen:
-            return "この日の時給はまだ決まっていません。\(suffix)"
-        case .notThisFormula, nil:
-            return "この日の見込みは出していません。\(suffix)"
-        }
-    }
-
-    static func breakCaption(_ phase: Phase) -> String {
-        switch phase {
-        case .notAShift:
-            return "休憩は計算していません"
-        case .beforeStart:
-            return "開始前です。"
-        case .during(let scaled, let scheduled, _):
-            guard let scaled else { return "休憩の目安は出していません" }
-            return "休憩の目安 \(scaled)分（予定\(scheduled)分を経過の割合で按分。開始と終了は予定のまま）"
-        case .afterEnd(let scaled, let scheduled):
-            return "終了後の休憩は予定の\(scheduled)分です（按分 \(scaled)分）"
-        }
     }
 
     /// Display for 「あと」. A remainder under a minute still shows 1 so the

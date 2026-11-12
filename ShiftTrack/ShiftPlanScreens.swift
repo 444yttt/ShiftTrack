@@ -173,12 +173,12 @@ struct PatternEditorView: View {
             } message: {
                 Text("入っているシフトは削除しません。")
             }
-            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
-                Button("このまま保存") {
+            .alert("時間を確かめてください", isPresented: overlapAlert) {
+                Button("それでも保存する") {
                     overlap = []
                     save(force: true)
                 }
-                Button("やめる", role: .cancel) { overlap = [] }
+                Button("編集に戻る", role: .cancel) { overlap = [] }
             } message: {
                 Text(ShiftOverlap.confirmMessage(overlap))
             }
@@ -378,13 +378,13 @@ struct PatternApplyView: View {
                 }
                 .disabled(result.create.isEmpty)
             }
-            .alert("このシフトは確認が必要です", isPresented: overlapAlert) {
-                Button("このまま保存") {
+            .alert("時間を確かめてください", isPresented: overlapAlert) {
+                Button("それでも保存する") {
                     let pending = overlap
                     overlap = []
                     if !pending.isEmpty { apply(currentResult, force: true) }
                 }
-                Button("やめる", role: .cancel) { overlap = [] }
+                Button("編集に戻る", role: .cancel) { overlap = [] }
             } message: {
                 Text(ShiftOverlap.confirmMessage(overlap))
             }
