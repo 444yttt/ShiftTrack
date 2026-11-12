@@ -103,7 +103,7 @@ final class ShellUITests: XCTestCase {
         let messages = app.buttons["settings.messages"]
         XCTAssertTrue(messages.waitForExistence(timeout: 6))
         messages.tap()
-        let messageTitle = app.navigationBars["メッセージの文章"]
+        let messageTitle = app.navigationBars["連絡メッセージのひな形"]
         XCTAssertTrue(messageTitle.waitForExistence(timeout: 6))
         app.buttons["閉じる"].tap()
         XCTAssertTrue(app.switches["settings.notifyEnd"].waitForExistence(timeout: 4))

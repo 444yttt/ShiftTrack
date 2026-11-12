@@ -1812,7 +1812,7 @@ struct WorkplaceEditorView: View {
                     editorLink("住所・位置（任意）")
                 }
                 NavigationLink {
-                    LateMessageComposer()
+                    MessageTemplateEditor()
                 } label: {
                     editorLink("遅刻連絡の文章の型")
                 }

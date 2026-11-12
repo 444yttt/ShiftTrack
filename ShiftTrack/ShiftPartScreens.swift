@@ -1,9 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Pattern controls for the calendar and the today list.
-/// Tapping a pattern puts its times, break and todos on the chosen day in one step.
-/// The edit and manage entries open `ShiftPartEditor` and `ShiftPartList`.
+/// Pattern controls for the calendar and the home screen.
+/// Tapping a pattern puts its times, break and to-dos on the chosen day in one
+/// step. The edit and manage entries open `ShiftPartEditor` and `ShiftPartList`.
 struct ShiftPartSection: View {
     var parts: [ShiftPart]
     var dayChipDay: Date
@@ -32,60 +32,70 @@ struct ShiftPartSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("シフトパターン")
-                .designFont(18, weight: .bold)
-                .foregroundStyle(Theme.ink)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("pattern.heading")
-            Text("タップすると、\(Formatters.longDay(dayChipDay))に時間・休憩・やることをまとめて置きます。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: Space.s) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("シフトパターン")
+                    .font(AppFont.sectionTitle)
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("pattern.heading")
+                Text(gathering
+                     ? "パターンを押すと、選んだ日すべてに時間・休憩・やることを置きます。"
+                     : "押すと、\(Formatters.longDay(dayChipDay))に時間・休憩・やることを置きます。")
+                    .font(AppFont.helper)
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, Space.xs)
             if !note.isEmpty {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .center, spacing: Space.xs) {
+                    Image(systemName: "checkmark.circle")
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.signalInk)
+                        .accessibilityHidden(true)
                     Text(note)
-                        .designFont(14, weight: .bold)
+                        .font(AppFont.label)
                         .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .accessibilityIdentifier("pattern.result")
                     if let onUndo {
-                        Button("取り消す", action: onUndo)
-                            .designFont(14, weight: .bold)
-                            .foregroundStyle(Theme.accentText)
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("pattern.undo")
+                        TextLinkButton(title: "取り消す", systemImage: "arrow.uturn.backward", identifier: "pattern.undo", action: onUndo)
                     }
                 }
+                .padding(.horizontal, Space.s)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                 .transition(.opacity)
             }
             if let pending {
                 pendingCard(pending)
             }
             if showsGathering {
-                HStack(spacing: 10) {
-                    SecondaryPillButton(
+                HStack(spacing: Space.xs) {
+                    SecondaryButton(
                         title: gathering ? "選ぶのを終える" : "日付をまとめて選ぶ",
                         systemImage: gathering ? "checkmark" : "calendar.badge.plus",
+                        fillWidth: false,
                         identifier: "calendar.pick.mode",
                         action: onToggleGathering
                     )
                     if gathering {
-                        Text("選んだ日 \(pickedCount)")
-                            .designFont(14, weight: .bold)
+                        Text("選んだ日 \(pickedCount)日")
+                            .font(AppFont.label)
                             .foregroundStyle(Theme.ink)
                             .accessibilityIdentifier("calendar.picked.count")
                     }
                 }
+                if gathering && patternDays.isEmpty {
+                    InfoNote(text: "カレンダーの日付を押して選んでください。もう一度押すと外れます。")
+                }
             }
             if visible.isEmpty {
-                Text(canCreate ? "まだパターンがありません。よく使う時間を登録しておくと、1タップで置けます。" : "先に勤務先を1件追加してください。")
-                    .designFont(14)
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                InfoNote(text: canCreate
+                         ? "まだパターンがありません。よく入る時間を登録しておくと、1回押すだけで置けます。"
+                         : "先に勤務先を1件登録してください。")
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.xs) {
                         ForEach(visible) { part in
                             Button {
                                 onDayChip(part)
@@ -102,15 +112,9 @@ struct ShiftPartSection: View {
                     .padding(.vertical, 2)
                 }
                 if showsPatternRows {
-                    Text(gathering
-                         ? "下の行をタップすると、選んだ日すべてに置きます。"
-                         : "下の行は、日付を選んでいなければ\(Formatters.longDay(dayChipDay))だけに置きます。")
-                        .designFont(13)
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    VStack(spacing: 8) {
+                    VStack(spacing: Space.xs) {
                         ForEach(visible) { part in
-                            HStack(spacing: 8) {
+                            HStack(spacing: Space.xs) {
                                 Button {
                                     onPatternRow(part)
                                 } label: {
@@ -118,69 +122,47 @@ struct ShiftPartSection: View {
                                 }
                                 .buttonStyle(PressableStyle())
                                 .accessibilityIdentifier("\(identifierPrefix).pattern.\(part.name)")
-                                Button {
+                                IconButton(
+                                    systemImage: "pencil",
+                                    label: "\(part.name)を編集",
+                                    identifier: "\(identifierPrefix).pattern.edit.\(part.name)"
+                                ) {
                                     onEdit(part)
-                                } label: {
-                                    Image(systemName: "pencil")
-                                        .designFont(16, weight: .bold)
-                                        .foregroundStyle(Theme.ink)
-                                        .frame(width: 48, height: 48)
-                                        .background(Theme.card)
-                                        .clipShape(Circle())
-                                        .overlay(Circle().stroke(Theme.border, lineWidth: 1))
                                 }
-                                .buttonStyle(PressableStyle())
-                                .accessibilityLabel("\(part.name)を編集")
-                                .accessibilityIdentifier("\(identifierPrefix).pattern.edit.\(part.name)")
                             }
                         }
                     }
                 }
             }
-            HStack(spacing: 10) {
-                LimeCapsuleButton(title: "パターンを作る", fillWidth: true, identifier: "\(identifierPrefix).part.add", action: onCreate)
+            HStack(spacing: Space.xs) {
+                SecondaryButton(title: "パターンを作る", systemImage: "plus", identifier: "\(identifierPrefix).part.add", action: onCreate)
                     .disabled(!canCreate)
                 if !visible.isEmpty {
-                    SecondaryPillButton(title: "一覧", systemImage: "list.bullet", identifier: "\(identifierPrefix).part.manage", action: onManage)
+                    SecondaryButton(title: "一覧", systemImage: "list.bullet", fillWidth: false, identifier: "\(identifierPrefix).part.manage", action: onManage)
                 }
-            }
-            if patternDays.isEmpty && gathering {
-                Text("カレンダーの日付をタップして選んでください。")
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 8)
         .animation(Motion.allowed(Motion.chip, reduce: reduceMotion), value: note)
     }
 
     private func pendingCard(_ pending: ShiftPartPlace.Pending) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("確認が必要な日があります")
-                .designFont(15, weight: .bold)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Label("ほかのシフトがある日を含むため、置きませんでした", systemImage: "exclamationmark.circle")
+                .font(AppFont.rowTitle)
                 .foregroundStyle(Theme.ink)
-            Text("このシフトは確認が必要です")
-                .designFont(14, weight: .bold)
-                .foregroundStyle(Theme.accentText)
             ForEach(Array(pending.clashes.enumerated()), id: \.offset) { _, line in
                 Text(line)
-                    .designFont(14)
+                    .font(AppFont.body)
                     .foregroundStyle(Theme.ink)
             }
-            Text("別のシフトがある日があるため、今回は何も追加していません。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            Button("閉じる", action: onClosePending)
-                .designFont(14, weight: .bold)
-                .foregroundStyle(Theme.accentText)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("pattern.pending.close")
+            InfoNote(text: "その日を外して選び直すか、「1件ずつ入力」から重ねて追加してください。何も追加していません。")
+            TextLinkButton(title: "閉じる", identifier: "pattern.pending.close", action: onClosePending)
         }
-        .padding(12)
+        .padding(Space.s)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.cardRaised)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).stroke(Theme.ink, lineWidth: 1.5))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pattern.pending")
     }
@@ -189,72 +171,68 @@ struct ShiftPartSection: View {
         "\(Formatters.clock(part.startMinute))–\(Formatters.clock(part.endMinute))"
     }
 
+    private func swatch(_ part: ShiftPart) -> some View {
+        Circle()
+            .fill(Color(hexString: part.colorHex))
+            .frame(width: 14, height: 14)
+            .overlay(Circle().stroke(Theme.ink.opacity(0.35), lineWidth: 1))
+            .accessibilityHidden(true)
+    }
+
     private func chipLabel(_ part: ShiftPart) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(Color(hexString: part.colorHex))
-                .frame(width: 12, height: 12)
-                .overlay(Circle().stroke(Theme.ink.opacity(0.35), lineWidth: 1))
+        HStack(spacing: Space.xs) {
+            swatch(part)
             VStack(alignment: .leading, spacing: 1) {
                 Text(part.name)
-                    .designFont(15, weight: .bold)
+                    .font(AppFont.label)
                     .foregroundStyle(Theme.ink)
                 Text(timeLine(part))
-                    .designFont(12)
-                    .foregroundStyle(Theme.muted)
+                    .font(AppFont.helper.monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
             }
-            Text("置く")
-                .designFont(13, weight: .bold)
-                .foregroundStyle(Theme.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Theme.lime)
-                .clipShape(Capsule())
+            Image(systemName: "plus.circle.fill")
+                .font(.title3)
+                .foregroundStyle(Theme.signalInk)
+                .accessibilityHidden(true)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Space.s)
         .frame(minHeight: 52)
-        .background(Theme.card)
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
         .accessibilityElement(children: .combine)
-        .accessibilityHint("タップすると、\(Formatters.longDay(dayChipDay))に置きます")
+        .accessibilityHint("押すと、\(Formatters.longDay(dayChipDay))に置きます")
     }
 
     private func rowLabel(_ part: ShiftPart) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(Color(hexString: part.colorHex))
-                .frame(width: 12, height: 12)
-                .overlay(Circle().stroke(Theme.ink.opacity(0.35), lineWidth: 1))
+        HStack(spacing: Space.s) {
+            swatch(part)
             VStack(alignment: .leading, spacing: 2) {
                 Text(part.name)
-                    .designFont(16, weight: .bold)
+                    .font(AppFont.rowTitle)
                     .foregroundStyle(Theme.ink)
                 Text(timeLine(part))
-                    .designFont(14)
-                    .foregroundStyle(Theme.muted)
+                    .font(AppFont.helper.monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
                 Text(PatternBreak.summary(
                     modeRaw: part.breakModeRaw,
                     fixedMinutes: part.breakMinutes,
                     customRulesRaw: part.breakRulesRaw
                 ))
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
+                .font(AppFont.helper)
+                .foregroundStyle(Theme.ink2)
             }
-            Spacer(minLength: 8)
-            Text("置く")
-                .designFont(14, weight: .bold)
+            Spacer(minLength: Space.xs)
+            Text(gathering ? "選んだ日に置く" : "置く")
+                .font(AppFont.label)
                 .foregroundStyle(Theme.ink)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, Space.s)
                 .frame(minHeight: 36)
-                .background(Theme.lime)
-                .clipShape(Capsule())
+                .background(Theme.signal, in: Capsule())
         }
-        .padding(12)
+        .padding(Space.s)
         .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.border, lineWidth: 1))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
     }
 }
 

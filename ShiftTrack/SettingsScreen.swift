@@ -233,7 +233,7 @@ struct SettingsScreen: View {
         .sheet(item: $cover) { destination in
             switch destination {
             case .messages:
-                LateTemplateList()
+                MessageTemplateEditor()
             case .about:
                 AboutSheet()
             }

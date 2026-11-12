@@ -7,10 +7,12 @@ struct LateMessageFillTests {
         let text = LateMessageFill.apply(
             template: LateMessageFill.polite,
             addressee: "店長",
-            reason: "電車の遅延のため",
+            reason: "電車が遅れているため",
             delay: "15分ほど遅れます"
         )
-        #expect(text == "申し訳ありません。\n店長\n電車の遅延のため、15分ほど遅れます")
+        #expect(text == "店長\nお疲れさまです。電車が遅れているため、15分ほど遅れます。\n着きしだい、すぐに入ります。ご迷惑をおかけしてすみません。")
+        let short = LateMessageFill.apply(template: LateMessageFill.casual, addressee: "", reason: "道が混んでいるため", delay: "10分ほど遅れます")
+        #expect(short == "道が混んでいるため、10分ほど遅れます。急いで向かいます。")
     }
 
     @Test

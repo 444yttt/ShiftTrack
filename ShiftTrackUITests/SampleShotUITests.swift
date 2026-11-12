@@ -13,7 +13,17 @@ final class SampleShotUITests: XCTestCase {
         }
         let name = app.staticTexts["架空茶房 北窓"]
         show(name)
+        // The sample shift is running, so the live earnings and the clock are on screen.
+        XCTAssertTrue(app.staticTexts["today.earned"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["today.time"].exists)
         shot(app, "today")
+        app.swipeUp()
+        shot(app, "today-actions")
+        // No phone number in the sample: 電話 and メッセージ are disabled and say why.
+        XCTAssertFalse(app.buttons["today.action.phone"].isEnabled)
+        XCTAssertTrue(app.buttons["today.action.map"].isEnabled)
+        app.swipeDown()
+        app.swipeDown()
 
         app.buttons["＋シフトを追加"].tap()
         let editor = app.navigationBars["シフトを追加"]

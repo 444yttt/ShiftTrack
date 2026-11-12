@@ -21,34 +21,28 @@ enum ShiftTodoCodec {
     }
 }
 
-/// Place a `ShiftPart` on chosen days. Not original Swift.
+/// Place a `ShiftPart` on chosen days.
 ///
-/// Commit `0x100014370` runs only when the clash array is empty. Otherwise
-/// `PendingPlace` is kept and nothing is inserted. Placement `0x1001c75ec`
-/// reads workplace, start, and end. It inserts nothing without a workplace,
-/// skips a day that already has the same part id, forces seconds to 0, and
-/// rolls the end to the next day when the raw start minute is greater than
-/// or equal to the raw end minute. `defaultTodos` are copied with `done = 0`.
+/// Nothing is inserted while any chosen day already has a different shift:
+/// the outcome is `.pending` with one line per such day, and the screen shows
+/// them. A day that already has this pattern is skipped. Seconds are 0, and
+/// the end rolls to the next day when the start minute is at or after the end
+/// minute. The pattern's to-dos are copied as new, not done.
 ///
-/// Break: the reference path stored none. This app lets each pattern carry its
-/// own break (fixed minutes, the workplace's rules, or rules of its own), so
-/// `ShiftPartCommit` resolves it with `PatternBreak` and hands the result to
-/// `outcome`. Callers that pass nothing still get 0 minutes.
-///
-/// Overlap `0x100016734` is not recovered past the text 「のシフトがあります」.
-/// A day that already has this part id adds no clash. A day with any other
-/// part id, including a shift that has none, produces that text so the batch
-/// is not committed. Travel time and clock overlap are not applied.
+/// Break: each pattern carries its own (fixed minutes, the workplace's rules,
+/// or rules of its own); `ShiftPartCommit` resolves it with `PatternBreak`
+/// and hands it to `outcome`. Callers that pass nothing get 0 minutes.
 enum ShiftPartPlace {
-    static let clashText = "のシフトがあります"
+    /// Ending of a clash line; the line starts with the day.
+    static let clashText = "にはほかのシフトがあります"
 
     /// Line shown after a tap on a pattern.
     static func placedNote(count: Int) -> String {
         count == 0
-            ? "0件置きました。同じパターンがある日には、追加しません。"
+            ? "0件置きました。同じパターンが入っている日には足しません。"
             : "\(count)件置きました。"
     }
-    static let saveFailedText = "保存できませんでした。もう一度お試しください。"
+    static let saveFailedText = "保存できませんでした。少し待ってから、もう一度試してください。"
 
     struct Existing: Equatable {
         var day: Date
@@ -172,9 +166,8 @@ enum ShiftPartPlace {
         return .placed(drafts)
     }
 
-    /// Same part id: no clash line. Any other shift that day, including one
-    /// with no part id, yields the recovered text. The overlap formula is not
-    /// what decides this.
+    /// One line per day that holds a shift other than this pattern. A day that
+    /// already has this pattern is not a clash (it is skipped instead).
     static func clashLines(
         partID: UUID,
         days: [Date],
@@ -186,7 +179,7 @@ enum ShiftPartPlace {
             let onDay = existing.filter { calendar.isDate($0.day, inSameDayAs: day) }
             if onDay.contains(where: { $0.partID == partID }) { continue }
             if onDay.contains(where: { $0.partID != partID }) {
-                lines.append(clashText)
+                lines.append(Formatters.longDay(day, calendar: calendar) + clashText)
             }
         }
         return lines

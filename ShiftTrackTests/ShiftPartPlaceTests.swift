@@ -129,7 +129,10 @@ final class ShiftPartPlaceTests: XCTestCase {
         }
         XCTAssertEqual(hold.partID, part)
         XCTAssertEqual(hold.days, [blocked, open])
-        XCTAssertEqual(hold.clashes, [ShiftPartPlace.clashText, ShiftPartPlace.clashText])
+        XCTAssertEqual(hold.clashes, [
+            Formatters.longDay(blocked, calendar: calendar) + ShiftPartPlace.clashText,
+            Formatters.longDay(open, calendar: calendar) + ShiftPartPlace.clashText,
+        ])
 
         let again = ShiftPartPlace.outcome(
             partID: part,
