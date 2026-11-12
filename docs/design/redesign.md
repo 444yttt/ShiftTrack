@@ -211,17 +211,18 @@ through `Motion.allowed(_:reduce:)` and are dropped with Reduce Motion. The live
   labelled rows plus a plain-language summary and the next payday; 週払い 支払う曜日; 日払い note.
   割増 (深夜・休日・休日深夜・残業; each with an explicit mode: 割増率 or 金額), 休憩 (法定の目安 /
   この勤務先の決まり), 詳細 (打刻の丸め), メモ, 削除.
-- **After (wizard):** three labelled steps (お店 → 給料 → いつものシフト) with progress “1/3”, no fake
-  search field, real labels on every field, photo/link import kept.
+- **After (wizard):** three labelled steps (お店 → 時給と給料日 → よく入る時間) with “ステップ 1 / 3”, no
+  fake search field, real labels on every field, photo/link import kept.
 
 ### 設定 (SettingsScreen)
 - **Before:** the only black card (通知) with olive switches on black, “メッセージの文章” with no
   explanation, location “設定を開く” styled as plain text, an about row with a speech bubble.
-- **After:** grouped white cards with section headers: 通知 (two `ToggleRow`s with what they do),
-  カレンダーとリマインダー, 連絡メッセージ (row “メッセージのひな形” + one-line explanation + live
-  preview), シフトの重なり (移動にかかる時間), カレンダーの表示, 給料の計算 (交通費, 目標, new-workplace
-  defaults), 位置情報 (status + a real bordered button “設定アプリを開く” / “位置情報を許可する”),
-  Siri とショートカット, このアプリについて (privacy line, version, フォントのライセンス).
+- **After:** grouped white cards with section headers, in this order: 通知 (two `ToggleRow`s with what
+  they do), 連絡メッセージ (row “メッセージのひな形” + one-line explanation + live preview; second so it is
+  on screen without scrolling), カレンダーとリマインダー, シフトの重なり (移動にかかる時間), カレンダーの表示,
+  給料の計算 (交通費, 目標), 新しい勤務先の初期値, 位置情報 (status chip + a real bordered button
+  “設定アプリを開く” / “位置情報を許可する”), Siri とショートカット, このアプリについて (privacy line, version,
+  フォントのライセンス).
 - **Message template editor:** title 「連絡メッセージのひな形」. Explains that it is the text used by
   the ホーム/勤務先 “メッセージ” button and for late notices; token chips 「宛名」「理由」「遅れ」 insert
   `{宛名}` `{理由}` `{遅れ}`; a live preview with a sample (架空茶房 北窓, 電車の遅延のため, 15分ほど遅れます);
@@ -275,4 +276,15 @@ replaced by tests for the new tokens. Generic UI vocabulary (保存, 閉じる, 
 ## 9. Out of scope (this pass)
 
 Dark mode, iPad layouts, a widget/Live Activity UI (the plan code stays untouched), dated wage
-changes as a pay input (the stored history is kept but no longer shown), wage time-bands.
+changes as a pay input (the stored history is kept but no longer shown), wage time-bands, and
+per-weekday holiday percents (one percent for the chosen weekdays is editable). The legacy
+reconstructed formulas (`ScheduledPay`, `LivePay.phase`, parts of `InOutRecovered`) stay with their
+tests but no screen uses `ScheduledPay` any more.
+
+## 10. Numbers that change for existing data
+
+- A premium that was switched on with no yen amount (what the old setup wizard stored for night
+  pay) now pays the hourly wage plus its percent instead of ¥0 for those minutes.
+- Overtime switched on with no yen amount now adds its percent (the wizard stored 25%).
+- 支給の見込み now subtracts 天引 (negative adjustments) like the shift estimates already did, and
+  月の内訳 uses the same engine (premiums included, transport only when the setting is on).
