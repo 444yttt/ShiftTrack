@@ -1,25 +1,19 @@
 import Foundation
 
-/// Fills a late-message template.
+/// Fills the message template used by the メッセージ action.
 ///
-/// Confirmed: the late screen checks `{宛名}`, `{理由}`, and `{遅れ}` with
-/// `contains`, and calls `replacingOccurrences` five times before that.
-/// The other two search strings were not recovered, so they are not guessed.
-///
-/// Inferred: a line that still contains `{宛名}` is dropped when the name is
-/// empty. That sentence is in the template editor. The branch itself was not
-/// closed in the binary.
+/// Tokens: `{宛名}` (addressee), `{理由}` (reason) and `{遅れ}` (delay).
+/// A line that still holds `{宛名}` is dropped when the addressee is empty,
+/// so the template does not leave a blank greeting.
 enum LateMessageFill {
     static let addressee = "{宛名}"
     static let reason = "{理由}"
     static let delay = "{遅れ}"
 
-    /// Confirmed opening. The following lines only hold the three tokens.
-    static let polite = "申し訳ありません。\n{宛名}\n{理由}、{遅れ}"
-    /// Confirmed opening. The following lines only hold the three tokens.
-    static let casual = "すみません。\n{宛名}\n{理由}、{遅れ}"
-
-    static let explanation = "{宛名} は宛名、{理由} は遅れる理由、{遅れ} は遅れる時間か到着予定に置き換わります。宛名が空のときは、その行を省きます。"
+    /// Default template (ていねい).
+    static let polite = "{宛名}\nお疲れさまです。{理由}、{遅れ}。\n着きしだい、すぐに入ります。ご迷惑をおかけしてすみません。"
+    /// Shorter template (短め).
+    static let casual = "{宛名}\n{理由}、{遅れ}。急いで向かいます。"
 
     static let templateKey = "late.message.template"
 

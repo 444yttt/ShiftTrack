@@ -30,64 +30,54 @@ struct WorkplaceImportView: View {
     }
 
     private var chooser: some View {
-        ScreenScroll {
-            Text("ショップカードの写真か、Google マップでお店の「共有」からコピーしたリンク")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("ショップカード（写真）")
-                .designFont(16, weight: .bold)
-                .padding(.top, 8)
-            HStack(spacing: 8) {
-                PhotosPicker(selection: $photoItem, matching: .images) {
-                    capsule("写真から選ぶ", systemImage: "photo")
-                }
-                .buttonStyle(.plain)
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button { showCamera = true } label: {
-                        capsule("撮影する", systemImage: "camera")
+        ScreenScroll(spacing: Space.m) {
+            InfoNote(text: "ショップカードの写真か、地図アプリでお店の「共有」からコピーしたリンクから、名前・住所・電話番号を読み取ります。読み取りはこの端末の中で行います。")
+                .padding(.top, Space.xs)
+            SectionHeader(title: "ショップカードの写真")
+            Card {
+                HStack(spacing: Space.xs) {
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        sourceLabel("写真を選ぶ", systemImage: "photo")
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("wimport.photo")
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button { showCamera = true } label: {
+                            sourceLabel("撮影する", systemImage: "camera")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("wimport.camera")
+                    }
                 }
             }
-            Text("Google マップのリンク")
-                .designFont(16, weight: .bold)
-                .padding(.top, 16)
-            TextField("Google マップのリンクを貼り付け", text: $link)
-                .designFont(16)
-                .padding(14)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            Button("コピーしたリンクを貼る") {
-                if let clip = UIPasteboard.general.string { link = clip }
+            SectionHeader(title: "地図のリンク")
+            Card {
+                LabeledField(label: "リンク", text: $link, prompt: "https://", keyboard: .URL, identifier: "wimport.link")
+                TextLinkButton(title: "コピーしたリンクを貼る", systemImage: "doc.on.clipboard", identifier: "wimport.paste") {
+                    if let clip = UIPasteboard.general.string { link = clip }
+                }
+                if working {
+                    ProgressView("読み取っています…")
+                        .tint(Theme.signalInk)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    PrimaryButton(title: "リンクを読み取る", identifier: "wimport.read") {
+                        readLink()
+                    }
+                    .disabled(link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
-            .designFont(16, weight: .medium)
-            .foregroundStyle(Theme.accentText)
-            .padding(.top, 4)
             if !notice.isEmpty {
-                Text(notice)
-                    .designFont(13)
-                    .foregroundStyle(Theme.behind)
-                    .padding(.top, 8)
-            }
-            if working {
-                ProgressView().tint(Theme.accentText).frame(maxWidth: .infinity).padding(.top, 12)
-            } else {
-                LimeCapsuleButton(title: "リンクを読み取る", fillWidth: true, designSize: 16) {
-                    readLink()
-                }
-                .padding(.top, 12)
-                .disabled(link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
+                InfoNote(text: notice, tone: .error)
             }
         }
-        .background(Theme.background)
-        .navigationTitle("取り込み")
+        .background(Theme.paper)
+        .navigationTitle("写真・リンクから読む")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("キャンセル") { dismiss() }
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(Theme.signalInk)
             }
         }
         .darkSheet()
@@ -103,18 +93,17 @@ struct WorkplaceImportView: View {
         }
     }
 
-    private func capsule(_ title: String, systemImage: String) -> some View {
+    private func sourceLabel(_ title: String, systemImage: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
+                .accessibilityHidden(true)
             Text(title)
         }
-        .designFont(16, weight: .bold)
+        .font(AppFont.label)
         .foregroundStyle(Theme.ink)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Theme.card)
-        .clipShape(Capsule())
-        .overlay { Capsule().stroke(Theme.ink, lineWidth: 1) }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
     }
 
     private func readLink() {
@@ -167,60 +156,56 @@ struct WorkplaceReadResult: View {
     }
 
     var body: some View {
-        ScreenScroll {
-            let sections = ImportSectionLayout.sections()
-            if sections.contains(.mapNote) {
-                Text(ImportSection.mapNote.rawValue)
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if sections.contains(.readText) {
-                Text(ImportSection.readText.rawValue)
-                    .designFont(16, weight: .bold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                thumbnail
-                ForEach(draft.lines) { line in
-                    Text(line.text)
-                        .designFont(13)
-                        .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        ScreenScroll(spacing: Space.m) {
+            InfoNote(text: "読み取った結果です。違うところは直してから追加してください。画像の文字の枠を押すと、選んでいる欄に入ります。")
+                .padding(.top, Space.xs)
+            if draft.imageJPEG != nil || !draft.lines.isEmpty {
+                SectionHeader(title: "読み取った文字")
+                Card {
+                    thumbnail
+                    ForEach(draft.lines) { line in
+                        Text(line.text)
+                            .font(AppFont.helper)
+                            .foregroundStyle(Theme.ink)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
             if !draft.mapsNotice.isEmpty {
-                Text(draft.mapsNotice)
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                InfoNote(text: draft.mapsNotice)
             }
-            field("名前", id: .name, text: text(\.name, \.nameNote), note: draft.nameNote, choicesOpen: $showNames)
-            field("電話番号", id: .phone, text: text(\.phone, \.phoneNote), note: draft.phoneNote, choicesOpen: $showPhones)
-            field("住所", id: .address, text: text(\.address, \.addressNote), note: draft.addressNote, choicesOpen: $showAddresses)
-            locate
-            field("営業時間", id: .hours, text: text(\.hours, \.hoursNote), note: draft.hoursNote, choicesOpen: $showHours)
-            field("公式URL", id: .url, text: text(\.officialURL, \.urlNote), note: draft.urlNote, choicesOpen: $showURLs)
+            SectionHeader(title: "勤務先の情報")
+            Card {
+                field("名前", id: .name, text: text(\.name, \.nameNote), note: draft.nameNote, choicesOpen: $showNames)
+                field("電話番号", id: .phone, text: text(\.phone, \.phoneNote), note: draft.phoneNote, choicesOpen: $showPhones)
+                field("住所", id: .address, text: text(\.address, \.addressNote), note: draft.addressNote, choicesOpen: $showAddresses)
+                locate
+                field("営業時間", id: .hours, text: text(\.hours, \.hoursNote), note: draft.hoursNote, choicesOpen: $showHours)
+                field("公式サイト", id: .url, text: text(\.officialURL, \.urlNote), note: draft.urlNote, choicesOpen: $showURLs)
+            }
+            InfoNote(text: "住所から位置を探すときだけ、住所を Apple のマップに送ります。ほかの用途には使いません。")
             if working {
-                ProgressView().tint(Theme.accentText).frame(maxWidth: .infinity).padding(.top, 16)
+                ProgressView("位置を確かめています…")
+                    .tint(Theme.signalInk)
+                    .frame(maxWidth: .infinity)
             } else {
-                LimeCapsuleButton(title: "勤務先を追加", fillWidth: true, designSize: 16) {
+                PrimaryButton(title: "この内容で入れる", identifier: "wimport.apply") {
                     Task { await apply() }
                 }
-                .padding(.top, 16)
                 .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
             }
         }
-        .background(Theme.background)
-        .navigationTitle("読み取り結果")
+        .background(Theme.paper)
+        .navigationTitle("読み取った結果")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("キャンセル") { onBack() }
-                    .foregroundStyle(Theme.ink)
+                Button("戻る") { onBack() }
+                    .foregroundStyle(Theme.signalInk)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("勤務先を追加") { Task { await apply() } }
-                    .foregroundStyle(Theme.ink)
+                Button("入れる") { Task { await apply() } }
+                    .foregroundStyle(Theme.signalInk)
                     .disabled(working || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -246,7 +231,7 @@ struct WorkplaceReadResult: View {
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: 240)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                 .overlay { boxes }
                 .accessibilityLabel("読み取った画像")
         }
@@ -266,8 +251,8 @@ struct WorkplaceReadResult: View {
                     use(line)
                 } label: {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .stroke(active ? Theme.ink : Theme.muted, lineWidth: active ? 2 : 1)
-                        .background(active ? Theme.lime.opacity(0.45) : Color.white.opacity(0.05))
+                        .stroke(active ? Theme.ink : Theme.ink2, lineWidth: active ? 2 : 1)
+                        .background(active ? Theme.signal.opacity(0.45) : Color.white.opacity(0.05))
                 }
                 .buttonStyle(.plain)
                 .frame(width: rect.width, height: rect.height)
@@ -289,32 +274,33 @@ struct WorkplaceReadResult: View {
     }
 
     private var locate: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle("住所から位置を探す", isOn: $draft.locateFromAddress)
-                .designFont(16, weight: .bold)
-                .tint(Theme.accentText)
-                .disabled(draft.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            ToggleRow(
+                title: "住所から位置を探す",
+                helper: "見つかると、「地図」ボタンでその場所を開けます。",
+                isOn: $draft.locateFromAddress,
+                identifier: "wimport.locate"
+            )
+            .disabled(draft.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             if draft.locateFromAddress, draft.hasCoordinate {
                 let coordinate = CLLocationCoordinate2D(latitude: draft.latitude, longitude: draft.longitude)
                 Map(initialPosition: .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 500, longitudinalMeters: 500))) {
                     Marker(draft.locatedName.isEmpty ? "住所" : draft.locatedName, coordinate: coordinate)
                 }
                 .frame(height: 160)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                 .allowsHitTesting(false)
+                .accessibilityLabel("見つかった場所の地図")
                 if !draft.locatedName.isEmpty {
                     Text(draft.locatedName)
-                        .designFont(13)
+                        .font(AppFont.helper)
                         .foregroundStyle(Theme.ink)
                 }
                 if draft.namesDiffer {
-                    Label("見つかった場所の名前が店名と違います", systemImage: "exclamationmark.triangle")
-                        .designFont(13, weight: .bold)
-                        .foregroundStyle(Theme.ink)
+                    InfoNote(text: "見つかった場所の名前が、店の名前と違います。住所を確かめてください。", tone: .warning)
                 }
             }
         }
-        .padding(.top, 8)
         .onChange(of: draft.locateFromAddress) { _, on in
             if on {
                 Task { await locate() }
@@ -343,44 +329,41 @@ struct WorkplaceReadResult: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text(title)
-                    .designFont(13, weight: .bold)
+                    .font(AppFont.label)
+                    .foregroundStyle(Theme.ink)
                 if note.confidence == .review && !note.edited {
-                    Label("要確認", systemImage: "exclamationmark.triangle")
-                        .designFont(13, weight: .bold)
-                        .foregroundStyle(Theme.ink)
+                    StatusChip(text: "要確認", emphasized: true)
                         .accessibilityLabel("要確認")
                 }
             }
             TextField(title, text: text)
                 .focused($focus, equals: id)
-                .designFont(16)
-                .padding(14)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .font(AppFont.body)
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, Space.s)
+                .frame(minHeight: 48)
+                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+                .accessibilityLabel(title)
             if note.confidence == .missing || text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("見つかりませんでした")
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
+                InfoNote(text: "見つかりませんでした。わかれば入れてください。")
             }
             if !note.edited, let origin = note.origin, !text.wrappedValue.isEmpty {
-                Text(origin.footnote)
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
+                InfoNote(text: origin.footnote)
             }
             if !extras.isEmpty {
-                DisclosureGroup("候補が\(extras.count)件", isExpanded: choicesOpen) {
+                DisclosureGroup("ほかの候補 \(extras.count)件", isExpanded: choicesOpen) {
                     ForEach(Array(extras), id: \.self) { choice in
                         Button(choice) { text.wrappedValue = choice }
-                            .designFont(16)
+                            .font(AppFont.body)
                             .foregroundStyle(Theme.ink)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                 }
-                .designFont(13, weight: .medium)
-                .tint(Theme.muted)
+                .font(AppFont.label)
+                .tint(Theme.ink)
             }
         }
-        .padding(.top, 8)
     }
 
     private func text(_ key: WritableKeyPath<WorkplaceDraft, String>, _ note: WritableKeyPath<WorkplaceDraft, FieldNote>) -> Binding<String> {

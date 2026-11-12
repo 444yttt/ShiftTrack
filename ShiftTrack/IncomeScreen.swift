@@ -2,18 +2,20 @@ import SwiftData
 import SwiftUI
 
 private enum IncomeScope: String, CaseIterable, Identifiable {
-    case month = "月間"
-    case year = "年間"
+    case month = "月ごと"
+    case year = "年ごと"
     var id: String { rawValue }
 }
 
+/// 給料. Money that arrives in the chosen month or year (counted by payday),
+/// the goal, the split by workplace, and the pay screens.
 struct IncomeScreen: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query private var settingsRows: [AppSettings]
-    @State private var scope: IncomeScope = .year
+    @State private var scope: IncomeScope = .month
     @State private var anchor = Date()
     @State private var editGoal = false
     @State private var askApply = false
@@ -22,30 +24,30 @@ struct IncomeScreen: View {
     @State private var showWalls = false
     @State private var showGuideTable = false
     @State private var showBreakdown = false
+    @State private var showHelp = false
+    @State private var forecastWorkplace: UUID?
     @AppStorage("incomeGuide.birthYear") private var birthYear = 0
     @AppStorage("incomeGuide.birthMonth") private var birthMonth = 0
     @AppStorage("incomeGuide.birthDay") private var birthDay = 0
-    @State private var showGuide = false
-    @State private var forecastWorkplace: UUID?
 
     var body: some View {
         if let settings = settingsRows.first {
             content(settings)
         } else {
-            Theme.background
+            Theme.paper
         }
     }
 
     private var wallLine: String {
         let year = Calendar.current.component(.year, from: .now)
-        guard let interval = IncomeEngine.yearInterval(year) else { return "今年の見込みを出しています。" }
+        guard let interval = IncomeEngine.yearInterval(year) else { return "今年の見込みと比べます。" }
         let includeTransport = settingsRows.first?.includeTransport ?? true
         let snapshots = ShiftMapping.snapshots(shifts, includeTransport: includeTransport)
         let forecast = IncomeEngine.totals(shifts: snapshots, from: interval.0, until: interval.1, now: .now).forecastYen
         if let next = IncomeWalls.all.first(where: { forecast < $0.yen }) {
-            return "次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))。押すと内容を見られます。"
+            return "次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))"
         }
-        return "表示している壁はすべて超えています。押すと内容を見られます。"
+        return "表示している壁はすべて超えています"
     }
 
     private func guideFigures(year: Int) -> IncomeGuide.Figures {
@@ -75,7 +77,6 @@ struct IncomeScreen: View {
     }
 
     private func content(_ settings: AppSettings) -> some View {
-        @Bindable var settings = settings
         let snapshots = ShiftMapping.snapshots(shifts, includeTransport: settings.includeTransport)
         let calendar = Calendar.current
         let year = calendar.component(.year, from: anchor)
@@ -88,221 +89,24 @@ struct IncomeScreen: View {
         let minimum = scope == .year ? 10_000 : 5_000
         let upper = scope == .year ? 10_000_000 : 1_000_000
 
-        return ScreenScroll {
-            HStack {
-                InOutWordmark()
-                Spacer()
-                HelpButton { showGuide = true }
+        return ScreenScroll(spacing: Space.m) {
+            ScreenHeader(title: "給料") {
+                HelpButton { showHelp = true }
             }
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(scope == .year ? "\(year)" : Formatters.monthTitle(anchor))
-                    .font(dynamicTypeSize.isAccessibilitySize ? .system(.largeTitle, design: .rounded, weight: .bold) : .doto(54))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .accessibilityLabel(scope == .year ? "\(year)年" : Formatters.monthTitle(anchor))
-                if scope == .year {
-                    Text("年")
-                        .designFont(16, weight: .bold)
-                }
-                Spacer(minLength: 4)
-                HStack(spacing: 6) {
-                    chevron("chevron.left") { move(-1) }
-                    chevron("chevron.right") { move(1) }
-                }
-                HStack(spacing: 0) {
-                    ForEach(IncomeScope.allCases) { item in
-                        Button {
-                            scope = item
-                        } label: {
-                            Text(item.rawValue)
-                                .designFont(16, weight: .bold)
-                                .foregroundStyle(scope == item ? Theme.ink : Theme.muted)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(scope == item ? Theme.lime : Color.clear)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(3)
-                .background(Theme.card)
-                .clipShape(Capsule())
-            }
-            .padding(.top, 8)
-
-            yearForecastCard(totals)
-                .padding(.top, 12)
-
+            periodCard(year: year)
+            totalCard(totals, year: year, month: month)
+            goalCard(totals, goal: goal)
+            workplaceSection(totals, calendar: calendar)
             if scope == .month {
-                let monthRows = shifts
-                    .filter { calendar.isDate($0.date, equalTo: anchor, toGranularity: .month) }
-                    .map { shift in
-                        MonthShiftFact(
-                            startMinutes: shift.startMinutes,
-                            endMinutes: shift.endMinutes,
-                            workedMinutes: shift.workedMinutes,
-                            yen: shift.estimatedYen(includeTransport: settings.includeTransport),
-                            workplaceName: shift.workplace?.name ?? ""
-                        )
-                    }
-                let monthLine = MonthFacts.headline(MonthFacts.summarize(monthRows))
-                Text(monthLine)
-                    .designFont(13)
-                    .foregroundStyle(Theme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(monthLine)
+                monthFacts(calendar: calendar, includeTransport: settings.includeTransport)
             }
-
-            ForEach(workplaces) { workplace in
-                Button {
-                    forecastWorkplace = workplace.uuid
-                } label: {
-                    HStack {
-                        Text(PayWindows.phrase(workplace))
-                            .designFont(16, weight: .medium)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(Theme.muted)
-                    }
-                    .padding(16)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
-
-            goalHeader(title: scope == .year ? "年間目標" : "月間目標", goal: goal) {
-                pendingGoal = goal
-                editGoal = true
-            }
-            .padding(.top, 14)
-
-            salaryCard(totals, goal: goal)
-                .padding(.top, 12)
-
-            Text("勤務先ごと")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 4)
-
-            if totals.rows.isEmpty {
-                Text(emptySalaryText(calendar: calendar))
-                    .designFont(16)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(totals.rows) { row in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(Color(hexString: row.colorHex))
-                                .frame(width: 10, height: 10)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.name)
-                                    .designFont(16, weight: .medium)
-                                    .foregroundStyle(Theme.ink)
-                                Text(Formatters.hours(row.minutes))
-                                    .designFont(16)
-                                    .foregroundStyle(Theme.muted)
-                            }
-                            Spacer()
-                            Text(Formatters.yen(row.yen))
-                                .designFont(16, weight: .bold)
-                                .foregroundStyle(Theme.accentText)
-                        }
-                        .padding(14)
-                        .background(Theme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                }
-            }
-
-            Button {
-                showWalls = true
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("年収の壁")
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.ink)
-                    Text(wallLine)
-                        .designFont(16)
-                        .foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("income.walls")
-
-            Button {
-                showGuideTable = true
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("年収の目安")
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.ink)
-                    Text("2026年11月11日時点の目安です。税と社会保険は別の合計です。")
-                        .designFont(16)
-                        .foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("income.guide")
-
-            Button {
-                showBreakdown = true
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("月の内訳")
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.ink)
-                    Text("支給見込みです。深夜・休日の割増は分けていません。")
-                        .designFont(16)
-                        .foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("income.breakdown")
-
-            Text("表示しているのは、その月・年に入る給料です。給料日が翌月の勤務先は、働いた月ではなく入金月に載ります。")
-                .designFont(16)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            paydaySection
+            moreSection
+            InfoNote(text: "金額は、働いた月ではなく給料日のある月で数えます。税金や社会保険は引いていない目安です。")
         }
-        .background(Theme.background)
-        .onChange(of: showGuide) { _, on in
-            ScreenDim.shared.isOn = on
-        }
-        .overlay {
-            if showGuide, !GuideMemory.suppressed {
-                ZStack {
-                    Color.black.opacity(0.28).ignoresSafeArea()
-                    GuideCard(
-                        page: 1,
-                        total: 1,
-                        text: "今日と今月のお給料の見込みです。シフトの時間と時給から計算します。",
-                        onBack: nil,
-                        onNext: { showGuide = false },
-                        onClose: { showGuide = false }
-                    )
-                }
-            }
+        .background(Theme.paper)
+        .sheet(isPresented: $showHelp) {
+            HelpSheet(title: "給料の見方", paragraphs: HelpCopy.income)
         }
         .sheet(isPresented: Binding(
             get: { forecastWorkplace != nil },
@@ -312,11 +116,11 @@ struct IncomeScreen: View {
         }
         .sheet(isPresented: $showWalls) {
             WallsScreen()
-                .presentationBackground(Theme.background)
+                .presentationBackground(Theme.paper)
         }
         .sheet(isPresented: $showBreakdown) {
             PayBreakdownScreen()
-                .presentationBackground(Theme.background)
+                .presentationBackground(Theme.paper)
         }
         .sheet(isPresented: $showGuideTable) {
             IncomeGuideScreen(
@@ -326,131 +130,248 @@ struct IncomeScreen: View {
                 birthMonth: $birthMonth,
                 birthDay: $birthDay
             )
-            .presentationBackground(Theme.background)
+            .presentationBackground(Theme.paper)
         }
         .onAppear { refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
         .onChange(of: scope) { _, _ in refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
         .onChange(of: anchor) { _, _ in refreshDelta(settings, worked: totals.workedYen, year: year, month: month) }
         .sheet(isPresented: $editGoal) {
-            GoalEditorSheet(goal: $pendingGoal, minimum: minimum, upper: upper, title: scope == .year ? "年間目標" : "月間目標") {
+            GoalEditorSheet(goal: $pendingGoal, minimum: minimum, upper: upper, title: scope == .year ? "\(year)年の目標" : "\(month)月の目標") {
                 editGoal = false
                 askApply = true
             }
         }
         .confirmationDialog(
-            scope == .year ? "翌年以降も同じ金額を反映しますか" : "翌月以降も同じ金額を反映しますか",
+            scope == .year ? "翌年以降も同じ目標にしますか？" : "翌月以降も同じ目標にしますか？",
             isPresented: $askApply,
             titleVisibility: .visible
         ) {
-            Button("反映する") {
+            Button(scope == .year ? "翌年以降も同じにする" : "翌月以降も同じにする") {
                 store(settings, value: pendingGoal, year: year, month: month, applyForward: true)
             }
-            Button("反映しない") {
+            Button(scope == .year ? "この年だけにする" : "この月だけにする") {
                 store(settings, value: pendingGoal, year: year, month: month, applyForward: false)
             }
             Button("キャンセル", role: .cancel) {}
         }
     }
 
-    private func yearForecastCard(_ totals: IncomeEngine.Totals) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("年収の見込み")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Color.white)
-            forecastLine("働いた分", totals.workedYen)
-            forecastLine(scope == .year ? "年末までのシフト分" : "この期間のシフト分", totals.scheduledYen)
-            forecastLine("合計", totals.forecastYen)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.ink)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
+    // MARK: Cards
 
-    private func forecastLine(_ title: String, _ yen: Int) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(Color.white)
-            Spacer()
-            Text(Formatters.yen(yen))
-                .font(.doto(22))
-                .foregroundStyle(Theme.lime)
-        }
-    }
-
-    private func goalHeader(title: String, goal: Int, edit: @escaping () -> Void) -> some View {
-        HStack {
-            Text(title)
-                .designFont(16, weight: .medium)
-                .foregroundStyle(Theme.muted)
-            Spacer()
-            Button(action: edit) {
-                HStack(spacing: 6) {
-                    Text(Formatters.yen(goal))
-                        .designFont(16, weight: .black)
-                    Image(systemName: "pencil")
-                        .designFont(16, weight: .bold)
+    private func periodCard(year: Int) -> some View {
+        Card(spacing: Space.s) {
+            SegmentedRow(label: "表示する期間", selection: $scope, identifier: "income.scope") {
+                ForEach(IncomeScope.allCases) { item in
+                    Text(item.rawValue).tag(item)
                 }
-                .foregroundStyle(Theme.accentText)
             }
-            .buttonStyle(.plain)
+            HStack(spacing: Space.xs) {
+                chevron("chevron.left", label: scope == .year ? "前の年" : "前の月") { move(-1) }
+                Spacer(minLength: 0)
+                if scope == .year {
+                    DotoText("\(year)", size: 30, spoken: "\(year)年")
+                        .accessibilityIdentifier("income.period")
+                } else {
+                    DotoText(Formatters.dotoMonth(anchor), size: 30, spoken: Formatters.monthTitle(anchor))
+                        .accessibilityIdentifier("income.period")
+                }
+                Spacer(minLength: 0)
+                chevron("chevron.right", label: scope == .year ? "次の年" : "次の月") { move(1) }
+            }
+            if !isCurrentPeriod {
+                TextLinkButton(title: scope == .year ? "今年に戻る" : "今月に戻る", identifier: "income.now") {
+                    anchor = Date()
+                }
+                .frame(maxWidth: .infinity)
+            }
         }
     }
 
-    private func salaryCard(_ totals: IncomeEngine.Totals, goal: Int) -> some View {
+    private var isCurrentPeriod: Bool {
+        Calendar.current.isDate(anchor, equalTo: .now, toGranularity: scope == .year ? .year : .month)
+    }
+
+    private func totalCard(_ totals: IncomeEngine.Totals, year: Int, month: Int) -> some View {
+        Card(spacing: Space.s) {
+            Text(scope == .year ? "\(year)年に入る給料（見込み）" : "\(month)月に入る給料（見込み）")
+                .font(AppFont.label)
+                .foregroundStyle(Theme.ink2)
+            DotoText("¥" + Formatters.yenDigits(totals.forecastYen), size: 40, spoken: "\(totals.forecastYen)円")
+                .accessibilityIdentifier("income.total")
+            HStack(spacing: Space.xs) {
+                StatTile(title: "働いた分", value: Formatters.yen(totals.workedYen))
+                StatTile(title: "これからの分", value: Formatters.yen(totals.scheduledYen))
+            }
+            ValueRow(title: "勤務時間の合計", value: Formatters.hours(totals.forecastMinutes))
+        }
+    }
+
+    private func goalCard(_ totals: IncomeEngine.Totals, goal: Int) -> some View {
         let ratio = goal > 0 ? Double(totals.workedYen) / Double(goal) : 0
         let remaining = goal - totals.workedYen
-        return VStack(alignment: .leading, spacing: 14) {
-            SalaryDonut(rows: totals.rows, center: Formatters.yen(totals.workedYen), delta: delta)
-            HStack {
-                Text(goal > 0 ? Formatters.percent(ratio, decimals: true) : "—")
-                    .designFont(16, weight: .black)
+        return Card(spacing: Space.s) {
+            HStack(alignment: .center) {
+                Text(scope == .year ? "年の目標" : "月の目標")
+                    .font(AppFont.rowTitle)
                     .foregroundStyle(Theme.ink)
-                Spacer()
-                Text(remainingLabel(remaining))
-                    .designFont(16, weight: .medium)
-                    .foregroundStyle(Theme.ink)
-            }
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.track)
-                    Capsule()
-                        .fill(Theme.lime)
-                        .frame(width: proxy.size.width * min(1, max(0, ratio)))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Space.xs)
+                SecondaryButton(title: "変える", systemImage: "pencil", fillWidth: false, identifier: "income.goal.edit") {
+                    pendingGoal = goal
+                    editGoal = true
                 }
             }
-            .frame(height: 10)
-            HStack(spacing: 8) {
-                mini("総勤務時間", value: Formatters.hours(totals.forecastMinutes))
-                mini("給料見込", value: Formatters.yen(totals.forecastYen))
+            ValueRow(title: "目標", value: Formatters.yen(goal), emphasized: true)
+            ProgressBar(value: ratio, label: "目標に対する働いた分")
+            HStack(alignment: .firstTextBaseline) {
+                Text(goal > 0 ? "働いた分で \(Formatters.percent(ratio, decimals: true))" : "目標が未設定です")
+                Spacer(minLength: Space.xs)
+                Text(remainingLabel(remaining))
+            }
+            .font(AppFont.helper)
+            .foregroundStyle(Theme.ink2)
+            if let delta, delta != 0 {
+                Label(
+                    "前に見たときから \(delta > 0 ? "+" : "−")\(Formatters.yen(abs(delta)))",
+                    systemImage: delta > 0 ? "arrow.up.right" : "arrow.down.right"
+                )
+                .font(AppFont.helper.weight(.semibold))
+                .foregroundStyle(delta > 0 ? Theme.signalInk : Theme.danger)
             }
         }
-        .padding(16)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private func mini(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .designFont(16, weight: .medium)
-                .foregroundStyle(Theme.muted)
-            Text(value)
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+    private func workplaceSection(_ totals: IncomeEngine.Totals, calendar: Calendar) -> some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader(title: "勤務先ごと")
+            Card(spacing: Space.s) {
+                if totals.rows.isEmpty {
+                    Text(emptySalaryText(calendar: calendar))
+                        .font(AppFont.body)
+                        .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    HStack(alignment: .center, spacing: Space.m) {
+                        SalaryDonut(rows: totals.rows)
+                            .frame(width: 96, height: 96)
+                        VStack(alignment: .leading, spacing: Space.xs) {
+                            ForEach(totals.rows) { row in
+                                HStack(spacing: Space.xs) {
+                                    Circle()
+                                        .fill(Color(hexString: row.colorHex))
+                                        .overlay(Circle().stroke(Theme.ink.opacity(0.3), lineWidth: 1))
+                                        .frame(width: 10, height: 10)
+                                        .accessibilityHidden(true)
+                                    Text(row.name)
+                                        .font(AppFont.label)
+                                        .foregroundStyle(Theme.ink)
+                                        .lineLimit(1)
+                                    Spacer(minLength: Space.xxs)
+                                    Text(Formatters.percent(row.share, decimals: false))
+                                        .font(AppFont.helper.monospacedDigit())
+                                        .foregroundStyle(Theme.ink2)
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
+                        }
+                    }
+                    RowDivider()
+                    ForEach(totals.rows) { row in
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.name)
+                                    .font(AppFont.rowTitle)
+                                    .foregroundStyle(Theme.ink)
+                                Text(Formatters.hours(row.minutes))
+                                    .font(AppFont.helper)
+                                    .foregroundStyle(Theme.ink2)
+                            }
+                            Spacer(minLength: Space.xs)
+                            Text(Formatters.yen(row.yen))
+                                .font(AppFont.value.weight(.bold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.cardRaised)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
+
+    private func monthFacts(calendar: Calendar, includeTransport: Bool) -> some View {
+        let rows = shifts
+            .filter { calendar.isDate($0.date, equalTo: anchor, toGranularity: .month) }
+            .map { shift in
+                MonthShiftFact(
+                    startMinutes: shift.startMinutes,
+                    endMinutes: shift.endMinutes,
+                    workedMinutes: shift.workedMinutes,
+                    yen: shift.estimatedYen(includeTransport: includeTransport),
+                    workplaceName: shift.workplace?.name ?? ""
+                )
+            }
+        return InfoNote(text: "この月に働く分：" + MonthFacts.headline(MonthFacts.summarize(rows)), systemImage: "calendar")
+    }
+
+    private var paydaySection: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader(title: "給料日ごとの見込み", detail: "勤務先を選ぶと、締めの期間ごとの金額と支給日が見られます。")
+            if workplaces.isEmpty {
+                EmptyState(systemImage: "building.2", message: "勤務先を登録すると、ここに出ます。")
+            } else {
+                Card(spacing: 0) {
+                    ForEach(workplaces) { workplace in
+                        Button {
+                            forecastWorkplace = workplace.uuid
+                        } label: {
+                            NavRow(title: workplace.name, subtitle: PayWindows.phrase(workplace))
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        .accessibilityIdentifier("income.periods.\(workplace.name)")
+                        RowDivider()
+                    }
+                }
+            }
+        }
+    }
+
+    private var moreSection: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader(title: "くわしく見る")
+            Card(spacing: 0) {
+                Button {
+                    showBreakdown = true
+                } label: {
+                    NavRow(systemImage: "list.bullet.rectangle", title: "月の内訳", subtitle: "基本給・割増・交通費・天引と、入金の予定")
+                }
+                .buttonStyle(RowButtonStyle())
+                .accessibilityIdentifier("income.breakdown")
+                RowDivider()
+                Button {
+                    showWalls = true
+                } label: {
+                    NavRow(systemImage: "flag", title: "年収の壁", subtitle: wallLine)
+                }
+                .buttonStyle(RowButtonStyle())
+                .accessibilityIdentifier("income.walls")
+                RowDivider()
+                Button {
+                    showGuideTable = true
+                } label: {
+                    NavRow(systemImage: "checklist", title: "年収の目安", subtitle: "税と社会保険の線と、今年の見込みを比べます")
+                }
+                .buttonStyle(RowButtonStyle())
+                .accessibilityIdentifier("income.guide")
+            }
+        }
+    }
+
+    // MARK: Helpers
 
     private func remainingLabel(_ remaining: Int) -> String {
         if remaining > 0 { return "目標まで \(Formatters.yen(remaining))" }
-        if remaining == 0 { return "目標達成" }
-        return "目標を \(Formatters.yen(-remaining)) 超過"
+        if remaining == 0 { return "目標に届きました" }
+        return "目標を \(Formatters.yen(-remaining)) 超えています"
     }
 
     private func refreshDelta(_ settings: AppSettings, worked: Int, year: Int, month: Int) {
@@ -473,9 +394,9 @@ struct IncomeScreen: View {
             return calendar.isDate(shift.date, equalTo: anchor, toGranularity: .month)
         }
         if workedHere {
-            return "この期間に働いたシフトはあります。給料日が翌月以降の勤務先は、入金される月の給料に出ます。"
+            return "この期間に働くシフトはあります。給料日が翌月以降の勤務先は、入金される月に出ます。"
         }
-        return "この期間に入る給料のシフトはまだありません"
+        return "この期間に入る給料はまだありません。"
     }
 
     private func store(_ settings: AppSettings, value: Int, year: Int, month: Int, applyForward: Bool) {
@@ -490,75 +411,53 @@ struct IncomeScreen: View {
     private func move(_ delta: Int) {
         let component: Calendar.Component = scope == .year ? .year : .month
         guard let next = Calendar.current.date(byAdding: component, value: delta, to: anchor) else { return }
-        anchor = next
+        if reduceMotion {
+            anchor = next
+        } else {
+            withAnimation(Motion.layout) { anchor = next }
+        }
     }
 
-    private func chevron(_ name: String, action: @escaping () -> Void) -> some View {
+    private func chevron(_ name: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: name)
-                .designFont(16, weight: .bold)
+                .font(.body.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .frame(width: 44, height: 44)
-                .background(Theme.dayFilled)
-                .clipShape(Circle())
+                .background(Theme.sunken, in: Circle())
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(name == "chevron.left" ? (scope == .year ? "前の年" : "前の月") : (scope == .year ? "次の年" : "次の月"))
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(label)
     }
 }
 
+/// Ring of each workplace's share. Decorative: the rows beside it carry the numbers.
 private struct SalaryDonut: View {
     var rows: [IncomeEngine.Row]
-    var center: String
-    var delta: Int?
 
     var body: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Canvas { context, size in
-                    let total = rows.reduce(0) { $0 + $1.yen }
-                    let center = CGPoint(x: size.width / 2, y: size.height / 2)
-                    let radius = min(size.width, size.height) / 2 - 10
-                    if total <= 0 {
-                        var path = Path()
-                        path.addArc(center: center, radius: radius, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
-                        context.stroke(path, with: .color(Theme.track), lineWidth: 14)
-                        return
-                    }
-                    var start = -Double.pi / 2
-                    for row in rows where row.yen > 0 {
-                        let sweep = Double(row.yen) / Double(total) * 2 * .pi
-                        var path = Path()
-                        path.addArc(
-                            center: center,
-                            radius: radius,
-                            startAngle: .radians(start),
-                            endAngle: .radians(start + sweep),
-                            clockwise: false
-                        )
-                        context.stroke(path, with: .color(Color(hexString: row.colorHex)), style: StrokeStyle(lineWidth: 14, lineCap: .butt))
-                        start += sweep
-                    }
-                }
-                .frame(width: 132, height: 132)
+        Canvas { context, size in
+            let total = rows.reduce(0) { $0 + $1.yen }
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let lineWidth: CGFloat = 16
+            let radius = min(size.width, size.height) / 2 - lineWidth / 2
+            var track = Path()
+            track.addArc(center: center, radius: radius, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
+            context.stroke(track, with: .color(Theme.sunken), lineWidth: lineWidth)
+            guard total > 0 else { return }
+            var start = -Double.pi / 2
+            for row in rows where row.yen > 0 {
+                let sweep = Double(row.yen) / Double(total) * 2 * .pi
+                var path = Path()
+                path.addArc(center: center, radius: radius, startAngle: .radians(start), endAngle: .radians(start + sweep), clockwise: false)
+                context.stroke(path, with: .color(Color(hexString: row.colorHex)), style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
+                var edge = Path()
+                edge.addArc(center: center, radius: radius + lineWidth / 2, startAngle: .radians(start), endAngle: .radians(start + sweep), clockwise: false)
+                context.stroke(edge, with: .color(Theme.ink.opacity(0.15)), lineWidth: 1)
+                start += sweep
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("今日までの給料")
-                    .designFont(16, weight: .medium)
-                    .foregroundStyle(Theme.muted)
-                Text(center)
-                    .designFont(16, weight: .black)
-                    .foregroundStyle(Theme.accentText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                if let delta, delta != 0 {
-                    Text(delta > 0 ? "+\(Formatters.yen(delta))" : Formatters.yen(delta))
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(delta > 0 ? Theme.lime : Theme.behind)
-                }
-            }
-            Spacer(minLength: 0)
         }
+        .accessibilityHidden(true)
     }
 }
 
@@ -571,63 +470,49 @@ struct GoalEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var error = ""
-    @FocusState private var typing: Bool
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(title)
-                    .designFont(16, weight: .medium)
-                    .foregroundStyle(Theme.muted)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("¥")
-                        .designFont(16, weight: .black)
-                        .foregroundStyle(Theme.accentText)
-                    TextField("0", text: $text)
-                        .keyboardType(.numberPad)
-                        .designFont(16, weight: .black)
-                        .foregroundStyle(Theme.ink)
-                        .focused($typing)
+            VStack(alignment: .leading, spacing: Space.m) {
+                Card {
+                    YenField(
+                        label: "目標の金額",
+                        text: $text,
+                        helper: "\(Formatters.yen(minimum))以上、\(Formatters.yen(upper))未満で入れます。",
+                        error: error.isEmpty ? nil : error,
+                        identifier: "goal.amount"
+                    )
                 }
-                Text("\(Formatters.yen(minimum))〜\(Formatters.yen(upper - 1))")
-                    .designFont(16)
-                    .foregroundStyle(Theme.muted)
-                if !error.isEmpty {
-                    Text(error)
-                        .designFont(16)
-                        .foregroundStyle(Theme.behind)
-                }
-                Spacer()
-                LimeCapsuleButton(title: "完了する", fillWidth: true, designSize: 16) { commit() }
+                Spacer(minLength: 0)
+                PrimaryButton(title: "決定", identifier: "goal.save") { commit() }
             }
-            .padding(20)
-            .background(Theme.background)
+            .padding(Space.m)
+            .background(Theme.paper)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
-                        .foregroundStyle(Theme.accentText)
+                        .foregroundStyle(Theme.signalInk)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完了") { typing = false }
-                        .foregroundStyle(Theme.accentText)
+                    Button("完了") { Keyboard.dismiss() }
+                        .foregroundStyle(Theme.signalInk)
                 }
             }
             .darkSheet()
             .onAppear {
                 text = String(goal)
-                typing = true
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 
     private func commit() {
         let value = Int(text.filter(\.isNumber)) ?? 0
         guard value >= minimum, value < upper else {
-            error = "\(Formatters.yen(minimum))以上、\(Formatters.yen(upper))未満にしてください"
+            error = "\(Formatters.yen(minimum))以上、\(Formatters.yen(upper))未満にしてください。"
             return
         }
         goal = value

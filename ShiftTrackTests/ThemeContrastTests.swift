@@ -32,10 +32,12 @@ final class ThemeContrastTests: XCTestCase {
             ("accent on paper", ThemeHex.accentText, ThemeHex.background),
             ("accent on card", ThemeHex.accentText, ThemeHex.card),
             ("accent on raised", ThemeHex.accentText, ThemeHex.cardRaised),
+            // System tab bar items (before iOS 26) on the light bar material.
+            ("selected tab item", ThemeHex.accentText, 0xF7F7F7),
+            ("unselected tab item", ThemeHex.muted, 0xF7F7F7),
             ("error on paper", ThemeHex.danger, ThemeHex.background),
             ("error on card", ThemeHex.danger, ThemeHex.card),
             ("white on ink", white, ThemeHex.ink),
-            ("white on tab bar", white, ThemeHex.tabBar),
             ("lime on ink", ThemeHex.lime, ThemeHex.ink),
         ]
         for (name, foreground, background) in pairs {

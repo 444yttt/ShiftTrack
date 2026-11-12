@@ -5,6 +5,8 @@ import SwiftUI
 import UIKit
 #endif
 
+/// 設定. Every group is a white card under a section header; every control
+/// has a visible label and a line that says what it changes.
 struct SettingsScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var context
@@ -15,113 +17,184 @@ struct SettingsScreen: View {
     @State private var wageText = ""
     @State private var transportText = ""
     @FocusState private var focused: Bool
-    @State private var showGuide = false
-    @State private var showAboutBubble = false
-    @State private var cover: SettingsCover?
-    @State private var locationStatus = LocationPrompt.label(LocationPrompt.shared.status)
-    @State private var settingsNote = ""
+    @State private var sheet: SettingsSheet?
+    @State private var locationStatus = LocationPrompt.shared.status
+    @State private var noticeNote = ""
+    @State private var mirrorNote = ""
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
     @AppStorage(ShiftNoticeRefresh.beforeKey) private var notifyBefore = false
     @AppStorage(ShiftNoticeRefresh.endKey) private var notifyAtEnd = false
     @AppStorage(ShiftMirrorRefresh.calendarKey) private var mirrorCalendar = false
     @AppStorage(ShiftMirrorRefresh.reminderKey) private var mirrorReminders = false
 
-    private enum SettingsCover: Identifiable {
-        case messages, about
-        var id: String {
-            switch self {
-            case .messages: "messages"
-            case .about: "about"
-            }
-        }
+    private enum SettingsSheet: String, Identifiable {
+        case messages, license, help
+        var id: String { rawValue }
     }
 
     var body: some View {
         if let settings = settingsRows.first {
             form(settings)
         } else {
-            Theme.background
+            Theme.paper
         }
     }
 
     private func form(_ settings: AppSettings) -> some View {
         @Bindable var settings = settings
-        return ScreenScroll {
-            HStack {
-                Text("設定")
-                    .designFont(16, weight: .black)
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                HelpButton { showGuide = true }
+        return ScreenScroll(spacing: Space.m) {
+            ScreenHeader(title: "設定") {
+                HelpButton { sheet = .help }
             }
-            .padding(.top, ScreenInsets.settingsOptional)
 
-            Button {
-                cover = .messages
-            } label: {
-                settingsRow("メッセージの文章")
+            SectionHeader(title: "通知", detail: "この端末からだけ知らせます。オンにしたときに許可を求めます。")
+            Card(spacing: Space.s) {
+                ToggleRow(
+                    title: "シフトの前に知らせる",
+                    helper: "開始の30分前に通知します。",
+                    isOn: $notifyBefore,
+                    identifier: "settings.notifyBefore"
+                )
+                RowDivider()
+                ToggleRow(
+                    title: "勤務の終わりに知らせる",
+                    helper: "終了の時刻に、働いた時間と休憩の確認をうながします。",
+                    isOn: $notifyAtEnd,
+                    identifier: "settings.notifyEnd"
+                )
+                if !noticeNote.isEmpty {
+                    InfoNote(text: noticeNote, tone: .error)
+                    SecondaryButton(title: "設定アプリを開く", systemImage: "arrow.up.forward.app", identifier: "settings.notices.open") {
+                        openSystemSettings()
+                    }
+                }
             }
-            .buttonStyle(SettingsPressStyle())
-            .accessibilityIdentifier("settings.messages")
+            .onChange(of: notifyAtEnd) { _, _ in Task { await updateNotices() } }
+            .onChange(of: notifyBefore) { _, _ in Task { await updateNotices() } }
+            .sensoryFeedback(.selection, trigger: notifyAtEnd)
+            .sensoryFeedback(.selection, trigger: notifyBefore)
 
-            noticeCard
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("シフトの重なり")
-                    .designFont(16, weight: .bold)
-                Stepper("勤務先の移動にかかる時間  \(travelMinutes)分", value: $travelMinutes, in: 0...180, step: 5)
-                    .accessibilityIdentifier("settings.travel")
-                Text("シフトの時間が重なったときや、違う勤務先の間がこの時間より短いときに、保存の前に確認します。0分にすると、間隔は見ません。")
-                    .designFont(16)
-                    .foregroundStyle(Theme.muted)
+            SectionHeader(title: "連絡メッセージ", detail: "ホームと勤務先の「メッセージ」ボタンで、遅れるときの連絡に使う文章です。")
+            Card(spacing: Space.xs) {
+                Button {
+                    sheet = .messages
+                } label: {
+                    NavRow(systemImage: "text.bubble", title: "メッセージのひな形", subtitle: "宛名・理由・遅れる時間が入る文章を直せます")
+                }
+                .buttonStyle(RowButtonStyle())
+                .accessibilityIdentifier("settings.messages")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("いまのひな形で作ると")
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.ink2)
+                    Text(MessageTemplate.preview(MessageTemplate.current))
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Space.s)
+                        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .accessibilityIdentifier("settings.messages.preview")
+                }
             }
-            .padding(ScreenInsets.settings)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(.top, ScreenInsets.settingsOptional)
+
+            SectionHeader(title: "カレンダーとリマインダー", detail: "「しふとらっく」という名前のカレンダーとリストだけを作って更新します。ほかの予定やリマインダーは変えません。")
+            Card(spacing: Space.s) {
+                ToggleRow(
+                    title: "シフトをカレンダーに書き出す",
+                    helper: "シフトを予定として入れ、時間を直すと予定も直します。",
+                    isOn: $mirrorCalendar,
+                    identifier: "settings.calendar"
+                )
+                RowDivider()
+                ToggleRow(
+                    title: "やることをリマインダーに書き出す",
+                    helper: "シフトのやることを、開始の時刻のリマインダーにします。",
+                    isOn: $mirrorReminders,
+                    identifier: "settings.reminders"
+                )
+                if !mirrorNote.isEmpty {
+                    InfoNote(text: mirrorNote, tone: .error)
+                    SecondaryButton(title: "設定アプリを開く", systemImage: "arrow.up.forward.app", identifier: "settings.mirror.open") {
+                        openSystemSettings()
+                    }
+                }
+            }
+            .onChange(of: mirrorCalendar) { _, on in Task { await updateCalendar(on) } }
+            .onChange(of: mirrorReminders) { _, on in Task { await updateReminders(on) } }
+            .sensoryFeedback(.selection, trigger: mirrorCalendar)
+            .sensoryFeedback(.selection, trigger: mirrorReminders)
+
+            SectionHeader(title: "シフトの重なり")
+            Card {
+                StepperRow(
+                    label: "勤務先の移動にかかる時間",
+                    valueText: travelMinutes == 0 ? "見ない" : "\(travelMinutes)分",
+                    value: $travelMinutes,
+                    range: 0...180,
+                    step: 5,
+                    helper: "違う勤務先のシフトの間がこれより短いと、保存の前に知らせます。0分にすると間隔は見ません。時間が重なるときは、いつも知らせます。",
+                    identifier: "settings.travel"
+                )
+            }
             .sensoryFeedback(.selection, trigger: travelMinutes)
 
-            locationCard
-            mirrorCard
-            if !settingsNote.isEmpty {
-                Text(settingsNote)
-                    .designFont(16)
-                    .foregroundStyle(Theme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, ScreenInsets.settingsOptional)
+            SectionHeader(title: "カレンダーの表示")
+            Card(spacing: Space.s) {
+                ToggleRow(
+                    title: "週の始まりを月曜にする",
+                    helper: "オフのときは日曜から始まります。",
+                    isOn: $settings.weekStartsOnMonday,
+                    identifier: "settings.weekStartsOnMonday"
+                )
+                RowDivider()
+                ToggleRow(
+                    title: "給料日をカレンダーに出す",
+                    helper: "給料日の日付に「給」と出します。",
+                    isOn: $settings.showPaydayOnCalendar,
+                    identifier: "settings.showPayday"
+                )
             }
 
-            aboutRow
-
-            Text("勤務先の追加とパターンは「勤務先」タブです。")
-                .designFont(16)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, ScreenInsets.settingsOptional)
-
-            Text("給料の目標")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, ScreenInsets.settingsOptional)
-
-            VStack(spacing: 0) {
-                numberRow("月間目標", text: $monthGoalText)
-                line
-                numberRow("年間目標", text: $goalText)
-                line
-                numberRow("新しい勤務先の時給", text: $wageText)
-                line
-                numberRow("新しい勤務先の交通費", text: $transportText)
-                Text("月間は5,000円以上100万円未満、年間は1万円以上1,000万円未満です。給料画面で月や年ごとに変えた金額が優先されます。")
-                    .designFont(16)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 12)
+            SectionHeader(title: "給料の計算", detail: "金額はすべて目安です。税金や社会保険は計算していません。")
+            Card(spacing: Space.s) {
+                ToggleRow(
+                    title: "交通費を給料に含める",
+                    helper: "オンにすると、シフトごとに勤務先の交通費を足して見込みを出します。",
+                    isOn: $settings.includeTransport,
+                    identifier: "settings.includeTransport"
+                )
+                RowDivider()
+                YenField(
+                    label: "月の目標",
+                    text: $monthGoalText,
+                    helper: "5,000円以上、100万円未満。給料タブで月ごとに変えた金額があれば、そちらを使います。",
+                    error: rangeError(monthGoalText, range: 5_000..<1_000_000, text: "5,000円以上、100万円未満で入れてください。"),
+                    identifier: "settings.goal.month"
+                )
+                YenField(
+                    label: "年の目標",
+                    text: $goalText,
+                    helper: "1万円以上、1,000万円未満。",
+                    error: rangeError(goalText, range: 10_000..<10_000_000, text: "1万円以上、1,000万円未満で入れてください。"),
+                    identifier: "settings.goal.year"
+                )
             }
-            .padding(.horizontal, 14)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            SectionHeader(title: "新しい勤務先の初期値", detail: "シフト表の取り込みで、知らない勤務先名から勤務先を作るときに使います。")
+            Card(spacing: Space.s) {
+                YenField(
+                    label: "時給",
+                    text: $wageText,
+                    error: rangeError(wageText, range: 0..<100_001, text: "10万円以下で入れてください。"),
+                    identifier: "settings.default.wage"
+                )
+                YenField(
+                    label: "交通費（1回あたり）",
+                    text: $transportText,
+                    error: rangeError(transportText, range: 0..<100_001, text: "10万円以下で入れてください。"),
+                    identifier: "settings.default.transport"
+                )
+            }
             .onAppear { syncFields(settings) }
             .onChange(of: goalText) { _, new in
                 commit(new, range: 10_000..<10_000_000) { value in
@@ -134,185 +207,132 @@ struct SettingsScreen: View {
                 }
             }
             .onChange(of: wageText) { _, new in
-                commit(new, range: 0...100_000) { value in
+                commit(new, range: 0..<100_001) { value in
                     if settings.defaultHourlyWage != value { settings.defaultHourlyWage = value }
                 }
             }
             .onChange(of: transportText) { _, new in
-                commit(new, range: 0...100_000) { value in
+                commit(new, range: 0..<100_001) { value in
                     if settings.defaultTransportAllowance != value { settings.defaultTransportAllowance = value }
                 }
             }
             .onChange(of: settings.weekStartsOnMonday) { _, _ in persist() }
             .onChange(of: settings.showPaydayOnCalendar) { _, _ in persist() }
             .onChange(of: settings.includeTransport) { _, _ in persist() }
-            .onChange(of: settings.annualIncomeGoal) { _, new in
-                rewrite(new, into: $goalText)
+            .onChange(of: settings.annualIncomeGoal) { _, new in rewrite(new, into: $goalText) }
+            .onChange(of: settings.monthlyIncomeGoal) { _, new in rewrite(new, into: $monthGoalText) }
+
+            SectionHeader(title: "位置情報", detail: "勤務先の住所を、今いる場所から入れるときだけ使います。")
+            Card(spacing: Space.s) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("いまの状態")
+                        .font(AppFont.body)
+                        .foregroundStyle(Theme.ink)
+                    Spacer(minLength: Space.xs)
+                    StatusChip(text: Self.locationLabel(locationStatus), emphasized: Self.locationAllowed(locationStatus))
+                }
+                .accessibilityElement(children: .combine)
+                SecondaryButton(
+                    title: locationStatus == .notDetermined ? "位置情報を許可する" : "設定アプリを開く",
+                    systemImage: locationStatus == .notDetermined ? "location" : "arrow.up.forward.app",
+                    identifier: "settings.location"
+                ) {
+                    if locationStatus == .notDetermined {
+                        LocationPrompt.shared.onChange = {
+                            locationStatus = LocationPrompt.shared.status
+                        }
+                        LocationPrompt.shared.request()
+                    } else {
+                        openSystemSettings()
+                    }
+                }
+                if locationStatus != .notDetermined {
+                    InfoNote(text: "許可を変えるときは、設定アプリの「しふとらっく」→「位置情報」で選びます。")
+                }
             }
 
-            Text("カレンダーの設定")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, ScreenInsets.settingsOptional)
-
-            VStack(spacing: 0) {
-                Toggle(isOn: $settings.weekStartsOnMonday) {
-                    Text("週の始まりを月曜にする")
-                        .designFont(16, weight: .medium)
-                        .foregroundStyle(Theme.ink)
-                }
-                .tint(Theme.accentText)
-                .padding(.vertical, 14)
-                Rectangle().fill(Theme.line).frame(height: 1)
-                Toggle(isOn: $settings.showPaydayOnCalendar) {
-                    Text("給料日の表示")
-                        .designFont(16, weight: .medium)
-                        .foregroundStyle(Theme.ink)
-                }
-                .tint(Theme.accentText)
-                .padding(.vertical, 14)
-                Rectangle().fill(Theme.line).frame(height: 1)
-                Toggle(isOn: $settings.includeTransport) {
-                    Text("交通費を給料に含める")
-                        .designFont(16, weight: .medium)
-                        .foregroundStyle(Theme.ink)
-                }
-                .tint(Theme.accentText)
-                .padding(.vertical, 14)
-            }
-            .padding(.horizontal, 14)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Siri / ショートカット")
-                    .designFont(16, weight: .bold)
+            SectionHeader(title: "Siri とショートカット")
+            Card {
+                Text("「しふとらっくでシフト表を取り込む」と話しかけると、シフト表の取り込みが開きます。ショートカット App の「シフト表の画像を取り込む」に画像を渡すこともできます。読み取りはこの端末の中で行い、保存の前に確認できます。")
+                    .font(AppFont.body)
                     .foregroundStyle(Theme.ink)
-                Text("「しふとらっくでシフト表を取り込む」と言うと、読み上げた内容から候補を作り、保存前に確認できます。画像はショートカットの「シフト表の画像を取り込む」に渡せます。どちらも端末内で処理します。")
-                    .designFont(16)
-                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, ScreenInsets.settingsOptional)
+
+            SectionHeader(title: "このアプリについて")
+            Card(spacing: Space.xs) {
+                ValueRow(title: "バージョン", value: Self.versionText)
+                RowDivider()
+                Text("勤務先、シフト、設定はこの端末の中だけに保存します。サーバーには送りません。金額はすべて目安です。")
+                    .font(AppFont.helper)
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, Space.xxs)
+                RowDivider()
+                Button {
+                    sheet = .license
+                } label: {
+                    NavRow(systemImage: "textformat", title: "フォントのライセンス", subtitle: "Doto（SIL Open Font License 1.1）")
+                }
+                .buttonStyle(RowButtonStyle())
+                .accessibilityIdentifier("settings.license")
+            }
         }
-        .background(Theme.background)
+        .background(Theme.paper)
         .focused($focused)
         .onAppear {
-            locationStatus = LocationPrompt.label(LocationPrompt.shared.status)
+            locationStatus = LocationPrompt.shared.status
         }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: cover?.id)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: notifyBefore)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: notifyAtEnd)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorCalendar)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorReminders)
-        .onChange(of: showGuide) { _, on in
-            ScreenDim.shared.isOn = on
-        }
-        .overlay {
-            if showGuide {
-                ZStack {
-                    Color.black.opacity(0.28).ignoresSafeArea()
-                    GuideCard(
-                        page: 1,
-                        total: GuideCopy.settings.count,
-                        text: GuideCopy.settings[0],
-                        onBack: nil,
-                        onNext: {
-                            GuideMemory.mark("settings")
-                            showGuide = false
-                        },
-                        onClose: {
-                            GuideMemory.mark("settings")
-                            showGuide = false
-                        }
-                    )
-                }
-            }
-        }
-        .sheet(item: $cover) { destination in
+        .animation(reduceMotion ? nil : Motion.layout, value: noticeNote)
+        .animation(reduceMotion ? nil : Motion.layout, value: mirrorNote)
+        .sheet(item: $sheet) { destination in
             switch destination {
             case .messages:
-                LateTemplateList()
-            case .about:
-                AboutSheet()
+                MessageTemplateEditor()
+            case .license:
+                LicenseSheet()
+            case .help:
+                HelpSheet(title: "設定について", paragraphs: HelpCopy.settings)
             }
         }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("完了") { focused = false }
+                Button("完了") {
+                    focused = false
+                    Keyboard.dismiss()
+                }
             }
         }
     }
 
-    private func settingsRow(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .designFont(16, weight: .bold)
-            Spacer()
-            Image(systemName: "arrow.up.right")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.muted)
+    // MARK: Labels
+
+    static func locationLabel(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return "許可しています"
+        case .denied, .restricted:
+            return "許可していません"
+        case .notDetermined:
+            return "まだ選んでいません"
+        @unknown default:
+            return "まだ選んでいません"
         }
-        .padding(ScreenInsets.settings)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, ScreenInsets.settingsOptional)
     }
 
-    private var aboutRow: some View {
-        HStack(spacing: 8) {
-            Text("しふとらっくについて")
-                .designFont(16, weight: .bold)
-            Button {
-                showAboutBubble.toggle()
-            } label: {
-                Text("?")
-                    .designFont(18, weight: .black)
-                    .foregroundStyle(Theme.accentText)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("しふとらっくについての説明")
-            Spacer()
-            Button {
-                cover = .about
-            } label: {
-                Image(systemName: "arrow.up.right")
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.muted)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("しふとらっくについて")
-        }
-        .padding(ScreenInsets.settings)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, ScreenInsets.settingsOptional)
-        .zIndex(showAboutBubble ? 2 : 0)
-        .overlay(alignment: .bottomLeading) {
-            if showAboutBubble {
-                Text(AboutBubble.body)
-                    .designFont(13)
-                    .foregroundStyle(Theme.ink)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 12)
-                    .padding(.bottom, 22)
-                    .frame(maxWidth: 320, alignment: .leading)
-                    .background {
-                        SpeechTail(cornerRadius: ScreenInsets.aboutBubbleCorner)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.16), radius: 10, y: 3)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    .offset(y: -36)
-                    .accessibilityIdentifier("about.bubble")
-            }
-        }
+    static func locationAllowed(_ status: CLAuthorizationStatus) -> Bool {
+        status == .authorizedAlways || status == .authorizedWhenInUse
     }
+
+    static var versionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = info?["CFBundleVersion"] as? String ?? "1"
+        return "\(version)（\(build)）"
+    }
+
+    // MARK: Actions
 
     private func openSystemSettings() {
         #if canImport(UIKit)
@@ -321,102 +341,18 @@ struct SettingsScreen: View {
         #endif
     }
 
-    private var noticeCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("通知")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Color.white)
-            Toggle("勤務の終わりに確認", isOn: $notifyAtEnd)
-                .tint(Theme.accentText)
-                .accessibilityIdentifier("settings.notifyEnd")
-            Text("終了時刻に、この端末から知らせます。")
-                .designFont(16)
-                .foregroundStyle(Color.white.opacity(0.7))
-            Toggle("シフトの前に通知", isOn: $notifyBefore)
-                .tint(Theme.accentText)
-                .accessibilityIdentifier("settings.notifyBefore")
-            Text("開始の30分前に知らせます。")
-                .designFont(16)
-                .foregroundStyle(Color.white.opacity(0.7))
-        }
-        .padding(ScreenInsets.settings)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.ink)
-        .foregroundStyle(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, ScreenInsets.settingsOptional)
-        .onChange(of: notifyAtEnd) { _, _ in Task { await updateNotices() } }
-        .onChange(of: notifyBefore) { _, _ in Task { await updateNotices() } }
-        .sensoryFeedback(.selection, trigger: notifyAtEnd)
-        .sensoryFeedback(.selection, trigger: notifyBefore)
-    }
-
-    private var locationCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("位置情報の許可")
-                .designFont(16, weight: .bold)
-            Text(locationStatus)
-                .foregroundStyle(Theme.muted)
-            Text("勤務先の住所を、今いる場所から入れるときに使います。")
-                .designFont(16)
-                .foregroundStyle(Theme.muted)
-            Button(locationStatus == "未設定" ? "位置情報を許可する" : "設定を開く") {
-                if locationStatus == "未設定" {
-                    LocationPrompt.shared.onChange = {
-                        locationStatus = LocationPrompt.label(LocationPrompt.shared.status)
-                    }
-                    LocationPrompt.shared.request()
-                } else {
-                    openSystemSettings()
-                }
-            }
-            .buttonStyle(SettingsPressStyle())
-            .accessibilityIdentifier("settings.location")
-        }
-        .padding(ScreenInsets.settings)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, ScreenInsets.settingsOptional)
-    }
-
-    private var mirrorCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("カレンダーとリマインダー")
-                .designFont(16, weight: .bold)
-            Toggle("シフトをカレンダーに入れる", isOn: $mirrorCalendar)
-                .tint(Theme.accentText)
-                .accessibilityIdentifier("settings.calendar")
-            Toggle("やることをリマインダーに入れる", isOn: $mirrorReminders)
-                .tint(Theme.accentText)
-                .accessibilityIdentifier("settings.reminders")
-            Text("オンにすると「しふとらっく」というカレンダーとリマインダーだけを更新します。")
-                .designFont(16)
-                .foregroundStyle(Theme.muted)
-        }
-        .padding(ScreenInsets.settings)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.top, ScreenInsets.settingsOptional)
-        .onChange(of: mirrorCalendar) { _, on in Task { await updateCalendar(on) } }
-        .onChange(of: mirrorReminders) { _, on in Task { await updateReminders(on) } }
-        .sensoryFeedback(.selection, trigger: mirrorCalendar)
-        .sensoryFeedback(.selection, trigger: mirrorReminders)
-    }
-
     private func updateNotices() async {
         if notifyBefore || notifyAtEnd {
             let allowed = await SettingsAccess.requestNotifications()
             if !allowed {
                 notifyBefore = false
                 notifyAtEnd = false
-                settingsNote = "通知が許可されていません。設定アプリから変更できます。"
+                noticeNote = "通知が許可されていないため、オンにできませんでした。設定アプリの「しふとらっく」→「通知」で許可できます。"
                 await ShiftNoticeRefresh.apply(shifts: shifts)
                 return
             }
         }
-        settingsNote = ""
+        noticeNote = ""
         await ShiftNoticeRefresh.apply(shifts: shifts)
     }
 
@@ -425,19 +361,19 @@ struct SettingsScreen: View {
             let allowed = await ExternalMirror.shared.requestEvents()
             guard allowed else {
                 mirrorCalendar = false
-                settingsNote = "カレンダーが許可されていません。設定アプリから変更できます。"
+                mirrorNote = "カレンダーへのアクセスが許可されていないため、オンにできませんでした。"
                 return
             }
             do {
                 try ExternalMirror.shared.syncEvents(mirrorEvents())
-                settingsNote = ""
+                mirrorNote = ""
             } catch {
                 mirrorCalendar = false
-                settingsNote = "この端末にはカレンダーを追加できませんでした。"
+                mirrorNote = "この端末にはカレンダーを追加できませんでした。"
             }
         } else {
             try? ExternalMirror.shared.clearEvents()
-            settingsNote = ""
+            mirrorNote = ""
         }
     }
 
@@ -446,19 +382,19 @@ struct SettingsScreen: View {
             let allowed = await ExternalMirror.shared.requestReminders()
             guard allowed else {
                 mirrorReminders = false
-                settingsNote = "リマインダーが許可されていません。設定アプリから変更できます。"
+                mirrorNote = "リマインダーへのアクセスが許可されていないため、オンにできませんでした。"
                 return
             }
             do {
                 try await ExternalMirror.shared.syncReminders(mirrorRemindersList())
-                settingsNote = ""
+                mirrorNote = ""
             } catch {
                 mirrorReminders = false
-                settingsNote = "この端末にはリマインダーを追加できませんでした。"
+                mirrorNote = "この端末にはリマインダーを追加できませんでした。"
             }
         } else {
             try? await ExternalMirror.shared.clearReminders()
-            settingsNote = ""
+            mirrorNote = ""
         }
     }
 
@@ -495,27 +431,13 @@ struct SettingsScreen: View {
         return ShiftMirrorPlan.reminders(items, now: .now)
     }
 
-    private var line: some View {
-        Rectangle().fill(Theme.line).frame(height: 1)
-    }
+    // MARK: Fields
 
-    private func numberRow(_ title: String, text: Binding<String>) -> some View {
-        HStack {
-            Text(title)
-                .designFont(16, weight: .medium)
-                .foregroundStyle(Theme.ink)
-            Spacer()
-            Text("¥")
-                .foregroundStyle(Theme.muted)
-            TextField("0", text: text)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.accentText)
-                .frame(width: 110)
-                .focused($focused)
-        }
-        .padding(.vertical, 14)
+    private func rangeError(_ raw: String, range: Range<Int>, text: String) -> String? {
+        let digits = raw.filter(\.isNumber)
+        guard !digits.isEmpty else { return nil }
+        guard let value = Int(digits), range.contains(value) else { return text }
+        return nil
     }
 
     private func syncFields(_ settings: AppSettings) {
@@ -525,7 +447,7 @@ struct SettingsScreen: View {
         transportText = String(settings.defaultTransportAllowance)
     }
 
-    private func commit(_ raw: String, range: some RangeExpression<Int>, apply: (Int) -> Void) {
+    private func commit(_ raw: String, range: Range<Int>, apply: (Int) -> Void) {
         let digits = raw.filter(\.isNumber)
         guard !digits.isEmpty, let value = Int(digits), range.contains(value) else { return }
         apply(value)
@@ -541,15 +463,5 @@ struct SettingsScreen: View {
         if current != value {
             text.wrappedValue = String(value)
         }
-    }
-}
-
-private struct SettingsPressStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(!reduce && configuration.isPressed ? 0.98 : 1)
-            .animation(reduce ? nil : .smooth(duration: 0.16), value: configuration.isPressed)
     }
 }

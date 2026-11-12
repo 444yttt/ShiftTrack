@@ -5,14 +5,50 @@ import UIKit
 @main
 struct ShiftTrackApp: App {
     init() {
+        FontRegistry.ensureDoto()
+        let paper = Self.uiColor(ThemeHex.background)
+        let ink = Self.uiColor(ThemeHex.ink)
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(red: 243 / 255, green: 241 / 255, blue: 236 / 255, alpha: 1)
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.black]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.black]
+        appearance.backgroundColor = paper
+        appearance.shadowColor = .clear
+        appearance.titleTextAttributes = [.foregroundColor: ink]
+        appearance.largeTitleTextAttributes = [.foregroundColor: ink]
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
+
+        // The root uses the system tab bar. iOS 26 draws its own glass bar and
+        // keeps the system item colours (selected = the app tint). Before iOS 26,
+        // keep the default blurred background at every scroll position (the
+        // transparent scroll-edge look let rows show through the labels) and
+        // use readable item colours: the default grey is under 4.5:1 for the
+        // small labels.
+        if #unavailable(iOS 26.0) {
+            let item = UITabBarItemAppearance()
+            let muted = Self.uiColor(ThemeHex.muted)
+            let accent = Self.uiColor(ThemeHex.accentText)
+            item.normal.iconColor = muted
+            item.normal.titleTextAttributes = [.foregroundColor: muted]
+            item.selected.iconColor = accent
+            item.selected.titleTextAttributes = [.foregroundColor: accent]
+            let tabBar = UITabBarAppearance()
+            tabBar.configureWithDefaultBackground()
+            tabBar.stackedLayoutAppearance = item
+            tabBar.inlineLayoutAppearance = item
+            tabBar.compactInlineLayoutAppearance = item
+            UITabBar.appearance().standardAppearance = tabBar
+            UITabBar.appearance().scrollEdgeAppearance = tabBar
+        }
+    }
+
+    private static func uiColor(_ hex: UInt) -> UIColor {
+        UIColor(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
     }
 
     var body: some Scene {
@@ -55,28 +91,21 @@ struct RootView: View {
         && !ProcessInfo.processInfo.arguments.contains("-UITestingSample")
 
     var body: some View {
-        ZStack {
-            switch tab {
-            case .list:
-                TodayScreen().transition(.opacity)
-            case .calendar:
-                CalendarScreen().transition(.opacity)
-            case .workplaces:
-                WorkplaceDirectoryScreen().transition(.opacity)
-            case .income:
-                IncomeScreen().transition(.opacity)
-            case .settings:
-                SettingsScreen().transition(.opacity)
-            }
+        // The standard tab bar, anchored to the bottom safe area. Each screen is a
+        // scroll view, so its content scrolls under the bar and its last row can
+        // still be scrolled clear of it.
+        TabView(selection: $tab) {
+            TodayScreen()
+                .appTab(.list)
+            CalendarScreen()
+                .appTab(.calendar)
+            IncomeScreen()
+                .appTab(.income)
+            WorkplaceDirectoryScreen()
+                .appTab(.workplaces)
+            SettingsScreen()
+                .appTab(.settings)
         }
-        // Screens own their side gutter (`ScreenScroll`). The old extra 20pt frame
-        // here stacked with it and left only about 320pt of a 393pt screen.
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.background)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            CustomTabBar(selection: $tab)
-        }
-        .topSafeAreaCover()
         .background {
             ShiftEndPulse()
         }
@@ -121,7 +150,6 @@ struct RootView: View {
             ShiftTrackShortcuts.updateAppShortcutParameters()
             router.considerPending()
         }
-        .animation(Motion.allowed(Motion.layout, reduce: reduceMotion), value: tab)
         .overlay {
             if showOnboarding {
                 OnboardingScreen {

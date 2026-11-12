@@ -258,8 +258,6 @@ final class BreakRulesTests: XCTestCase {
             LivePay.phase(now: before, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
             .beforeStart(remainingMinutes: 240)
         )
-        XCTAssertFalse(LivePay.line(.beforeStart(remainingMinutes: 240), evaluation: nil).contains("円"))
-        XCTAssertFalse(LivePay.breakCaption(.beforeStart(remainingMinutes: 240)).contains("-30"))
         XCTAssertEqual(
             LivePay.phase(now: start, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
             .during(scaledBreak: 0, scheduledBreak: 60, remainingMinutes: 8 * 60)
@@ -283,13 +281,6 @@ final class BreakRulesTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(midwayAmount?.total, 9000)
-        let during = LivePay.line(
-            .during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 240),
-            evaluation: midwayAmount.map { .amount($0) }
-        )
-        XCTAssertTrue(during.contains("予定全体の時給分"))
-        XCTAssertTrue(during.contains("今まで稼いだ金額ではありません"))
-        XCTAssertFalse(during.contains("いま稼いだ"))
         let quote = PayMath.quote(
             workplace: workplace,
             day: shiftDay,

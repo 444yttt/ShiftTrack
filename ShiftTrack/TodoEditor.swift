@@ -1,8 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// Edits one shift's todos. The add label and the open circle are confirmed.
-/// Where they sit on the screen is not. A finished item has no confirmed symbol.
+/// やること for one shift: check items off, add new ones, delete them.
 struct TodoEditor: View {
     var shiftID: UUID
     @Environment(\.dismiss) private var dismiss
@@ -14,52 +13,78 @@ struct TodoEditor: View {
 
     var body: some View {
         NavigationStack {
-            ScreenScroll {
+            ScreenScroll(spacing: Space.m) {
                 if let shift {
-                    Text(shift.workplace?.name ?? "勤務先")
-                        .designFont(16, weight: .bold)
-                    Text(Formatters.longDay(shift.date))
-                        .designFont(13)
-                        .foregroundStyle(Theme.muted)
-                    ForEach(shift.todos) { item in
-                        Button {
-                            toggle(item.id, on: shift)
-                        } label: {
-                            HStack(spacing: 8) {
-                                if let symbol = ConfirmedSymbols.todoMark(done: item.done) {
-                                    Image(systemName: symbol)
-                                } else {
-                                    Text("済")
-                                        .designFont(13, weight: .bold)
-                                }
-                                Text(item.title)
-                                    .designFont(16)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
+                    Text("\(shift.workplace?.name ?? "勤務先")・\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜")
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, Space.xs)
+                    Card(spacing: 0) {
+                        if shift.todos.isEmpty {
+                            Text("やることはまだありません")
+                                .font(AppFont.body)
+                                .foregroundStyle(Theme.ink2)
+                                .frame(minHeight: 44)
                         }
-                        .buttonStyle(PressableStyle())
-                        .foregroundStyle(Theme.ink)
+                        ForEach(shift.todos) { item in
+                            HStack(spacing: Space.xs) {
+                                Button {
+                                    toggle(item.id, on: shift)
+                                } label: {
+                                    HStack(spacing: Space.s) {
+                                        Image(systemName: item.done ? "checkmark.circle.fill" : ConfirmedSymbols.todoMark(done: false) ?? "circle")
+                                            .font(.title3)
+                                            .foregroundStyle(item.done ? Theme.signalInk : Theme.ink2)
+                                            .accessibilityHidden(true)
+                                        Text(item.title)
+                                            .font(AppFont.body)
+                                            .foregroundStyle(item.done ? Theme.ink2 : Theme.ink)
+                                            .strikethrough(item.done, color: Theme.ink2)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .frame(minHeight: 48)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(RowButtonStyle())
+                                .accessibilityLabel(item.title)
+                                .accessibilityValue(item.done ? "完了" : "未完了")
+                                .accessibilityAddTraits(item.done ? [.isSelected, .isButton] : .isButton)
+                                Button {
+                                    remove(item.id, on: shift)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(Theme.danger)
+                                        .frame(width: 44, height: 44)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("\(item.title)を削除")
+                            }
+                            RowDivider()
+                        }
                     }
-                    Text("やることを追加")
-                        .designFont(16, weight: .bold)
-                    TextField("やること", text: $draft)
-                        .designFont(16)
-                        .padding(ScreenInsets.todo)
-                        .background(Theme.cardRaised)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .accessibilityIdentifier("todo.draft")
-                    Button("追加") { add(on: shift) }
-                        .buttonStyle(PressableStyle())
-                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .accessibilityIdentifier("todo.add")
+                    Card {
+                        LabeledField(label: "やることを追加", text: $draft, prompt: "例：レジ締め", identifier: "todo.draft")
+                            .submitLabel(.done)
+                            .onSubmit { add(on: shift) }
+                        PrimaryButton(title: "追加", systemImage: "plus", identifier: "todo.add") { add(on: shift) }
+                            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        InfoNote(text: "設定で「やることをリマインダーに書き出す」をオンにすると、リマインダーにも入ります。")
+                    }
+                } else {
+                    EmptyState(systemImage: "questionmark.folder", message: "このシフトは見つかりませんでした")
                 }
             }
-            .background(Theme.background)
+            .background(Theme.paper)
             .navigationTitle("やること")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                Button("閉じる") { dismiss() }
-                    .accessibilityIdentifier("todo.close")
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.signalInk)
+                        .accessibilityIdentifier("todo.close")
+                }
             }
+            .darkSheet()
         }
     }
 
@@ -77,6 +102,13 @@ struct TodoEditor: View {
         var items = shift.todos
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].done.toggle()
+        shift.todos = items
+        try? context.save()
+    }
+
+    private func remove(_ id: UUID, on shift: WorkShift) {
+        var items = shift.todos
+        items.removeAll { $0.id == id }
         shift.todos = items
         try? context.save()
     }

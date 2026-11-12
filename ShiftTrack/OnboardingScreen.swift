@@ -22,88 +22,111 @@ enum FirstRun {
     }
 }
 
+/// First launch: three short pages. Permissions are not requested here; each
+/// one is asked for when the person turns its setting on.
 struct OnboardingScreen: View {
     var onFinish: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var page = 0
     @State private var showWizard = false
 
+    private let pageCount = 3
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: Space.m) {
             HStack {
-                Text("\(page + 1)/3")
-                    .designFont(13, weight: .bold)
-                    .foregroundStyle(Theme.muted)
+                Text("\(page + 1) / \(pageCount)")
+                    .font(AppFont.label.monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
+                    .accessibilityLabel("\(pageCount)ページ中\(page + 1)ページ目")
                 Spacer()
                 Button("スキップ", action: onFinish)
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.ink)
+                    .font(AppFont.label)
+                    .foregroundStyle(Theme.signalInk)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("onboarding.skip")
             }
-            Group {
-                switch page {
-                case 0:
-                    pageCopy(
-                        title: "シフトを、この端末に残す",
-                        body: "勤務の時間と、その日の給与の見込みをまとめます。金額は概算です。"
-                    )
-                case 1:
-                    pageCopy(
-                        title: "勤務先を追加する",
-                        body: "名前と時給があると、シフトの見込みが出ます。あとからでも追加できます。"
-                    )
-                    Button("勤務先を追加") { showWizard = true }
-                        .buttonStyle(PressableStyle(large: true))
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Theme.lime)
-                        .clipShape(Capsule())
-                default:
-                    pageCopy(
-                        title: "必要なときだけ許可する",
-                        body: "位置情報は、勤務先の住所を今いる場所から入れるときに使います。通知は、設定でオンにしたとき、開始の30分前と終了時刻にこの端末から知らせます。"
-                    )
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            Button(page == 2 ? "はじめる" : "次へ") {
-                if page == 2 {
-                    Task {
-                        _ = await SettingsAccess.requestNotifications()
-                        LocationPrompt.shared.request()
-                        onFinish()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.l) {
+                    switch page {
+                    case 0:
+                        LandscapeView(date: .now)
+                            .frame(height: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.hero, style: .continuous))
+                        pageCopy(
+                            title: "シフトと給料を、ひと目で",
+                            body: "勤務先とシフトを入れると、ホームに今日の予定と、勤務中の「いままでの稼ぎ」が出ます。金額は時給と設定から出した目安です。"
+                        )
+                    case 1:
+                        symbolHero("building.2.fill")
+                        pageCopy(
+                            title: "まず勤務先を登録",
+                            body: "名前と時給があれば始められます。住所と電話番号も入れておくと、ホームから地図・電話・メッセージがすぐ使えます。"
+                        )
+                        SecondaryButton(title: "いま勤務先を登録する", systemImage: "plus", identifier: "onboarding.workplace") {
+                            showWizard = true
+                        }
+                    default:
+                        symbolHero("hand.raised.fill")
+                        pageCopy(
+                            title: "許可は、使うときだけ",
+                            body: "通知はシフトの前と終わりに、位置情報は住所を今いる場所から入れるときだけ使います。どちらも設定でオンにしたときに許可を求めます。記録はこの端末の中だけに残ります。"
+                        )
                     }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollIndicators(.hidden)
+            pageDots
+            PrimaryButton(title: page == pageCount - 1 ? "はじめる" : "次へ", identifier: page == pageCount - 1 ? "onboarding.finish" : "onboarding.next") {
+                if page == pageCount - 1 {
+                    onFinish()
                 } else {
                     changePage(page + 1)
                 }
             }
-            .buttonStyle(PressableStyle(large: true))
-            .designFont(16, weight: .bold)
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Theme.ink)
-            .clipShape(Capsule())
-            .accessibilityIdentifier(page == 2 ? "onboarding.finish" : "onboarding.next")
         }
-        .padding(24)
+        .padding(.horizontal, Space.l)
+        .padding(.vertical, Space.m)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.background)
+        .background(Theme.paper)
         .sheet(isPresented: $showWizard) {
             WorkplaceWizard()
         }
-        .animation(reduceMotion ? nil : Motion.layout, value: showWizard)
+    }
+
+    private var pageDots: some View {
+        HStack(spacing: Space.xs) {
+            ForEach(0..<pageCount, id: \.self) { index in
+                Capsule()
+                    .fill(index == page ? Theme.ink : Theme.stroke)
+                    .frame(width: index == page ? 24 : 8, height: 8)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityHidden(true)
+    }
+
+    private func symbolHero(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 44, weight: .semibold))
+            .foregroundStyle(Theme.ink)
+            .frame(width: 104, height: 104)
+            .background(Theme.signal, in: Circle())
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Space.l)
+            .accessibilityHidden(true)
     }
 
     private func pageCopy(title: String, body: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Space.s) {
             Text(title)
-                .designFont(28, weight: .black)
+                .font(.title.weight(.bold))
                 .foregroundStyle(Theme.ink)
+                .accessibilityAddTraits(.isHeader)
             Text(body)
-                .designFont(16)
-                .foregroundStyle(Theme.muted)
+                .font(AppFont.body)
+                .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

@@ -1,80 +1,84 @@
 import SwiftUI
 
 /// The raw values behind `Theme`, kept so the contrast tests read the same numbers.
+/// See docs/design/redesign.md §3 for every pair and its ratio.
 enum ThemeHex {
-    static let background: UInt = 0xF3F1EC
+    /// Paper. Screen background.
+    static let background: UInt = 0xF4F2EC
+    /// White cards.
     static let card: UInt = 0xFFFFFF
-    static let cardRaised: UInt = 0xE6E3DC
-    static let tabBar: UInt = 0x1C1C1E
-    static let lime: UInt = 0xC6F24E
-    static let ink: UInt = 0x111111
-    static let muted: UInt = 0x5C5C63
-    static let accentText: UInt = 0x41570A
+    /// Sunken fields and off chips.
+    static let cardRaised: UInt = 0xECE9E1
+    /// Signal lime. A fill colour only; never text on a light surface.
+    static let lime: UInt = 0xC8F04B
+    static let ink: UInt = 0x161616
+    /// Secondary text: 6.6:1 on paper, 6.1:1 on sunken. Also the unselected
+    /// tab bar items before iOS 26.
+    static let muted: UInt = 0x55555C
+    /// Accent text, links, the switch “on” track and the selected tab bar
+    /// item (the app tint): 7.0:1 on paper.
+    static let accentText: UInt = 0x3D5A0A
     static let danger: UInt = 0xB3261E
+    /// Control outlines (fields, secondary buttons): 3.5:1 on white, 3.2:1 on paper.
+    static let stroke: UInt = 0x8C887E
+    /// Decorative hairlines between rows.
+    static let line: UInt = 0xE2DED5
 }
 
 enum Theme {
-    /// Paper, white cards, and black pills follow the reference screenshots.
-    /// Stacking distances were not recovered from the binary.
-    static let background = Color(hex: ThemeHex.background)
-    static let card = Color(hex: ThemeHex.card)
-    static let cardRaised = Color(hex: ThemeHex.cardRaised)
-    static let chip = Color(hex: 0xF7F6F2)
-    static let dayFilled = Color(hex: 0x111111)
-    static let tabBar = Color(hex: ThemeHex.tabBar)
-    static let lime = Color(hex: ThemeHex.lime)
+    // Semantic names used by the redesigned screens.
+    static let paper = Color(hex: ThemeHex.background)
+    static let surface = Color(hex: ThemeHex.card)
+    static let sunken = Color(hex: ThemeHex.cardRaised)
     static let ink = Color(hex: ThemeHex.ink)
+    static let ink2 = Color(hex: ThemeHex.muted)
+    static let signal = Color(hex: ThemeHex.lime)
+    static let signalInk = Color(hex: ThemeHex.accentText)
+    static let stroke = Color(hex: ThemeHex.stroke)
+    static let line = Color(hex: ThemeHex.line)
+    static let danger = Color(hex: ThemeHex.danger)
     static let onDark = Color.white
-    /// Secondary text. 5.9:1 on `background` and 6.7:1 on white (WCAG AA needs 4.5:1).
-    static let muted = Color(hex: ThemeHex.muted)
-    /// Lime is a fill colour only. Text and icons drawn in the accent on a light
-    /// surface use this deep olive: 7.2:1 on `background`, 8.1:1 on white.
-    static let accentText = Color(hex: ThemeHex.accentText)
-    static let line = Color(hex: 0xE4E1DA)
-    static let border = Color(hex: 0xA9A59C)
-    static let track = Color(hex: 0xE6E3DC)
-    /// Error and "behind goal" text. 6.5:1 on white.
-    static let behind = Color(hex: ThemeHex.danger)
-    static let destructive = Color(hex: ThemeHex.danger)
 
+    // Older names, kept so every screen reads the same tokens.
+    static let background = paper
+    static let card = surface
+    static let cardRaised = sunken
+    static let chip = surface
+    static let dayFilled = ink
+    static let lime = signal
+    static let muted = ink2
+    static let accentText = signalInk
+    static let border = stroke
+    static let track = sunken
+    static let behind = danger
+    static let destructive = danger
+
+    /// Workplace colours. Stored as hex on each workplace, so existing values stay.
     static let palette = ["C6F24E", "111111", "F4A7A0", "B7D7C5", "F3C1D3", "A9C7F5", "C7B6E4", "F3D98A"]
 }
 
 extension Font {
-    /// Official Google Fonts Doto, instantiated at Black and maximum roundness.
-    /// The reference calls this face `Doto-BlackRound`. The file is not from the IPA.
-    /// Those calls are `Font.custom`, not `scaledValueForValue:`, so they stay fixed.
+    /// PostScript name of the bundled Doto instance (Google Fonts Doto, SIL OFL 1.1,
+    /// instanced at wght 900 / ROND 100; `Fonts/OFL.txt`). Latin glyphs only:
+    /// use it for `0-9 : ¥ , . % / – +` and spaces. Prefer `DotoText`, which
+    /// caps Dynamic Type growth and gives VoiceOver a spoken label.
+    static let dotoName = "Doto-BlackRound"
+
     static func doto(_ size: CGFloat) -> Font {
-        .custom("Doto-BlackRound", size: size)
+        .custom(dotoName, size: size, relativeTo: .largeTitle)
     }
 }
 
-/// Design size passed to `scaledValueForValue:`. At the default content size the
-/// drawn size is this number. Dynamic Type changes it. Which string uses which
-/// number was not identified, so the choice follows the screenshot.
-struct DesignFont: ViewModifier {
-    var weight: Font.Weight
-    var design: Font.Design
-    var digits: Bool
-    @ScaledMetric(relativeTo: .body) private var size: CGFloat = 16
-
-    init(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) {
-        self.weight = weight
-        self.design = design
-        self.digits = digits
-        self._size = ScaledMetric(wrappedValue: size, relativeTo: .body)
-    }
-
-    func body(content: Content) -> some View {
-        let base = Font.system(size: size, weight: weight, design: design)
-        return content.font(digits ? base.monospacedDigit() : base)
-    }
-}
-
-extension View {
-    func designFont(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) -> some View {
-        modifier(DesignFont(size, weight: weight, design: design, digits: digits))
-    }
+/// Text styles of the redesign. They follow Dynamic Type.
+enum AppFont {
+    static let screenTitle = Font.title2.weight(.bold)
+    static let sectionTitle = Font.headline
+    static let rowTitle = Font.body.weight(.semibold)
+    static let body = Font.body
+    static let label = Font.subheadline.weight(.semibold)
+    static let helper = Font.footnote
+    static let badge = Font.caption.weight(.bold)
+    static let value = Font.body.weight(.semibold).monospacedDigit()
 }
 
 extension Color {
@@ -162,7 +166,41 @@ enum Formatters {
     static func monthTitle(_ date: Date, calendar: Calendar = .current) -> String {
         let month = calendar.component(.month, from: date)
         let year = calendar.component(.year, from: date)
-        return "\(month)月 \(year)"
+        return "\(year)年\(month)月"
+    }
+
+    /// `2026.11`, for Doto (which has no kanji). Pair it with `monthTitle` for VoiceOver.
+    static func dotoMonth(_ date: Date, calendar: Calendar = .current) -> String {
+        let month = calendar.component(.month, from: date)
+        let year = calendar.component(.year, from: date)
+        return String(format: "%d.%02d", year, month)
+    }
+
+    /// `14:05` from a date, for Doto.
+    static func clock(of date: Date, calendar: Calendar = .current) -> String {
+        String(format: "%d:%02d", calendar.component(.hour, from: date), calendar.component(.minute, from: date))
+    }
+
+    /// 「14時5分」, what VoiceOver should say for a clock.
+    static func spokenClock(_ minutes: Int) -> String {
+        let parts = InOutRecovered.minuteOfDay(minutes)
+        return parts.minute == 0 ? "\(parts.hour)時" : "\(parts.hour)時\(parts.minute)分"
+    }
+
+    static func spokenClock(of date: Date, calendar: Calendar = .current) -> String {
+        spokenClock(calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date))
+    }
+
+    /// Yen without the sign, e.g. `12,345`.
+    static func yenDigits(_ value: Int) -> String {
+        let text = yen(value)
+        return text.hasPrefix("¥") ? String(text.dropFirst()) : text
+    }
+
+    /// 「1時間20分」 from seconds, rounded up to the minute so a running shift never reads 0.
+    static func remaining(_ seconds: TimeInterval) -> String {
+        guard seconds > 0 else { return "0分" }
+        return hours(Int((seconds / 60).rounded(.up)))
     }
 
     static func percent(_ ratio: Double, decimals: Bool) -> String {

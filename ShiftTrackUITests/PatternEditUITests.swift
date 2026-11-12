@@ -11,8 +11,8 @@ final class PatternEditUITests: XCTestCase {
         app.launchArguments = ["-UITestingReset"]
         app.launch()
 
-        XCTAssertTrue(app.buttons["tab.workplaces"].waitForExistence(timeout: 12))
-        app.buttons["tab.workplaces"].tap()
+        XCTAssertTrue(app.tab("勤務先").waitForExistence(timeout: 12))
+        app.tab("勤務先").tap()
         app.buttons["勤務先を追加"].tap()
         let name = app.textFields["field.名前"]
         XCTAssertTrue(name.waitForExistence(timeout: 6))
@@ -23,13 +23,13 @@ final class PatternEditUITests: XCTestCase {
         } else if app.buttons["完了"].exists {
             app.buttons["完了"].tap()
         }
-        app.swipeUp()
-        app.buttons["追加して次へ"].tap()
-        app.buttons["次へ"].tap()
-        app.buttons["はじめる"].tap()
+        // The wizard: お店 → 時給と給料日 (the default wage is filled in) → よく入る時間.
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.finish"].tap()
         XCTAssertTrue(app.buttons["workplace.card"].waitForExistence(timeout: 6))
 
-        app.buttons["tab.calendar"].tap()
+        app.tab("カレンダー").tap()
         let add = app.buttons["calendar.part.add"]
         scrollTo(app, add)
         add.tap()

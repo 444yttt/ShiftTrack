@@ -11,7 +11,7 @@ final class ShellUITests: XCTestCase {
         app.launchArguments = ["-UITestingReset"]
         app.launch()
 
-        let today = app.buttons["tab.today"]
+        let today = app.tab("ホーム")
         XCTAssertTrue(today.waitForExistence(timeout: 12))
         let clock = app.staticTexts["today.clock"]
         XCTAssertTrue(clock.waitForExistence(timeout: 8))
@@ -24,7 +24,7 @@ final class ShellUITests: XCTestCase {
         XCTAssertEqual(clock.label, clockBefore)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "いま稼いだお給料")).firstMatch.exists)
 
-        app.buttons["tab.calendar"].tap()
+        app.tab("カレンダー").tap()
         shot("02-calendar")
         app.buttons["calendar.nextMonth"].tap()
         let back = app.buttons["calendar.thisMonth"]
@@ -32,7 +32,7 @@ final class ShellUITests: XCTestCase {
         back.tap()
         XCTAssertFalse(back.exists)
 
-        app.buttons["tab.workplaces"].tap()
+        app.tab("勤務先").tap()
         shot("03-workplaces-empty")
         app.buttons["勤務先を追加"].tap()
         let name = app.textFields["field.名前"]
@@ -44,10 +44,10 @@ final class ShellUITests: XCTestCase {
         } else if app.buttons["完了"].exists {
             app.buttons["完了"].tap()
         }
-        app.swipeUp()
-        app.buttons["追加して次へ"].tap()
-        app.buttons["次へ"].tap()
-        app.buttons["はじめる"].tap()
+        // The wizard: お店 → 時給と給料日 (the default wage is filled in) → よく入る時間.
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.finish"].tap()
         let card = app.buttons.matching(identifier: "workplace.card").firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 6))
         let saveButton = app.buttons["完了する"]
@@ -65,9 +65,11 @@ final class ShellUITests: XCTestCase {
         shot("04-patterns")
         app.buttons["patterns.close"].tap()
 
-        app.buttons["tab.today"].tap()
+        today.tap()
         XCTAssertEqual(clock.label, clockBefore)
-        app.buttons["＋シフトを追加"].tap()
+        let addShift = app.buttons["＋シフトを追加"]
+        XCTAssertTrue(addShift.waitForExistence(timeout: 6))
+        tapVisible(app, addShift)
         let start = app.buttons["開始"]
         require(start, timeout: 8, shotName: "05-editor-missing", app: app)
         start.tap()
@@ -87,7 +89,7 @@ final class ShellUITests: XCTestCase {
             editorBar.buttons["キャンセル"].tap()
         }
 
-        app.buttons["tab.income"].tap()
+        app.tab("給料").tap()
         shot("06-income")
         let walls = app.buttons["income.walls"]
         XCTAssertTrue(walls.waitForExistence(timeout: 6))
@@ -96,22 +98,23 @@ final class ShellUITests: XCTestCase {
         shot("07-walls")
         app.buttons["walls.close"].tap()
 
-        app.buttons["tab.settings"].tap()
+        app.tab("設定").tap()
         shot("08-settings")
         XCTAssertFalse(app.staticTexts["勤務先の設定"].exists)
         XCTAssertFalse(app.otherElements["guide.card"].exists)
         let messages = app.buttons["settings.messages"]
         XCTAssertTrue(messages.waitForExistence(timeout: 6))
-        messages.tap()
-        let messageTitle = app.navigationBars["メッセージの文章"]
-        XCTAssertTrue(messageTitle.waitForExistence(timeout: 6))
+        tapVisible(app, messages)
+        // 設定 → 連絡メッセージ → メッセージのひな形 opens the template editor.
+        require(app.navigationBars["連絡メッセージのひな形"], timeout: 6, shotName: "09-messages-missing", app: app)
+        shot("09-messages")
         app.buttons["閉じる"].tap()
         XCTAssertTrue(app.switches["settings.notifyEnd"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.notifyBefore"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["settings.location"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.calendar"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.reminders"].waitForExistence(timeout: 4))
-        app.buttons["tab.today"].tap()
+        today.tap()
         XCTAssertEqual(clock.label, clockBefore)
     }
 
@@ -121,6 +124,8 @@ final class ShellUITests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
+    /// Scrolls until the element sits in the open part of the screen, clear of
+    /// the status bar and the tab bar, then taps it.
     private func tapVisible(_ app: XCUIApplication, _ element: XCUIElement) {
         let top: CGFloat = 90
         let bottom = app.frame.maxY - 120
