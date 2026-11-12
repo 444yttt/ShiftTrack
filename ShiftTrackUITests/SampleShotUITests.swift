@@ -15,6 +15,12 @@ final class SampleShotUITests: XCTestCase {
         show(name)
         shot(app, "today")
 
+        app.buttons["＋シフトを追加"].tap()
+        let editor = app.navigationBars["シフトを追加"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 6))
+        shot(app, "add-shift")
+        editor.buttons["キャンセル"].tap()
+
         app.buttons["tab.calendar"].tap()
         show(app.buttons["calendar.nextMonth"])
         shot(app, "calendar")
@@ -22,6 +28,14 @@ final class SampleShotUITests: XCTestCase {
         app.buttons["tab.workplaces"].tap()
         show(app.buttons["workplace.add"])
         shot(app, "workplaces")
+        show(app.buttons["workplace.card"])
+        app.buttons["workplace.card"].tap()
+        show(app.buttons["workplace.pattern.add"])
+        app.buttons["workplace.pattern.add"].tap()
+        let patternEditor = app.navigationBars["パターンを作る"]
+        XCTAssertTrue(patternEditor.waitForExistence(timeout: 6))
+        shot(app, "pattern-editor")
+        app.buttons["pattern.editor.close"].tap()
 
         app.buttons["tab.settings"].tap()
         if app.buttons["おわり"].waitForExistence(timeout: 2) {
