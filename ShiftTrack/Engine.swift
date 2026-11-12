@@ -60,6 +60,34 @@ enum PayMath {
         )
     }
 
+    /// Base wage and premium of one shift (no transport, no 天引・手当).
+    /// Base is the plain hourly wage for the paid minutes; premium is the rest
+    /// of the wage (night, holiday, overtime). Daily wage and a custom amount
+    /// are all base.
+    static func wageParts(_ shift: WorkShift, calendar: Calendar = .current) -> (base: Int, premium: Int) {
+        guard let workplace = shift.workplace else { return (0, 0) }
+        let paidOverride = shift.partID == nil ? nil : shift.workedMinutes
+        let wage = quote(
+            workplace: workplace,
+            day: shift.date,
+            start: shift.startMinutes,
+            end: shift.endMinutes,
+            breakMinutes: shift.breakMinutes,
+            customPay: shift.customPay,
+            adjustment: 0,
+            includeTransport: false,
+            paidOverride: paidOverride,
+            calendar: calendar
+        )
+        if shift.customPay != nil || workplace.payIsDaily {
+            return (wage, 0)
+        }
+        let paid = paidOverride ?? workedMinutes(start: shift.startMinutes, end: shift.endMinutes, breakMinutes: shift.breakMinutes)
+        let plain = paid > 0 ? (max(0, workplace.hourlyWage) * paid + 30) / 60 : 0
+        let base = min(plain, wage)
+        return (base, max(0, wage - base))
+    }
+
     static func payday(for shiftDay: Date, workplace: Workplace, calendar: Calendar = .current) -> Date {
         let day = calendar.startOfDay(for: shiftDay)
         let dayNumber = calendar.component(.day, from: day)
@@ -86,8 +114,9 @@ enum PayMath {
         return calendar.date(byAdding: .day, value: chosen - 1, to: start) ?? start
     }
 
-    /// ShiftTrack's per-minute wage. Not a recovered IN/OUT pay function.
-    /// `quote` uses the whole paid span. The today screen uses a prefix.
+    /// ShiftTrack's per-minute wage for the first `paidMinutes` minutes from
+    /// `start`, rounded to whole yen. Rates come from `PayRates`, the same
+    /// table the live earnings on the home screen use.
     static func timedAmount(
         workplace: Workplace,
         day: Date,
@@ -96,46 +125,30 @@ enum PayMath {
         calendar: Calendar = .current
     ) -> Int {
         guard paidMinutes > 0 else { return 0 }
-        let holiday = workplace.holidayPayEnabled && workplace.holidayWeekdays.contains(calendar.component(.weekday, from: calendar.startOfDay(for: day)))
-        var weighted = 0
-        for offset in 0..<paidMinutes {
-            let minute = ((start + offset) % (24 * 60) + (24 * 60)) % (24 * 60)
-            weighted += rate(at: minute, holiday: holiday, workplace: workplace)
-        }
-        var amount = (weighted + 30) / 60
-        if workplace.overtimeEnabled {
-            let extraMinutes = max(0, paidMinutes - max(0, workplace.overtimeAfterMinutes))
-            if extraMinutes > 0 {
-                if workplace.overtimePerHour {
-                    amount += (max(0, workplace.overtimeExtra) * extraMinutes + 30) / 60
-                } else {
-                    amount += max(0, workplace.overtimeExtra)
-                }
-            }
-        }
+        let rates = PayRates(workplace: workplace, day: day, calendar: calendar)
+        let weighted = rates.weightedRateSum(start: start, minutes: paidMinutes)
+        let amount = (weighted + 30) / 60 + rates.overtimeYen(paidMinutes: paidMinutes)
         return max(0, amount)
     }
 
-    private static func rate(at minute: Int, holiday: Bool, workplace: Workplace) -> Int {
-        if holiday && workplace.holidayNightEnabled && contains(minute, workplace.holidayNightStartMinutes, workplace.holidayNightEndMinutes) {
-            return max(0, workplace.holidayNightWage)
+    /// Unrounded yen for a fractional number of paid minutes. The live earnings
+    /// floor this, so the number never runs ahead of the time worked.
+    static func timedAmountExact(
+        workplace: Workplace,
+        day: Date,
+        start: Int,
+        paidMinutes: Double,
+        calendar: Calendar = .current
+    ) -> Double {
+        guard paidMinutes > 0, paidMinutes.isFinite else { return 0 }
+        let rates = PayRates(workplace: workplace, day: day, calendar: calendar)
+        let whole = Int(paidMinutes.rounded(.down))
+        let fraction = paidMinutes - Double(whole)
+        var weighted = Double(rates.weightedRateSum(start: start, minutes: whole))
+        if fraction > 0 {
+            weighted += fraction * Double(rates.hourlyRate(atMinuteOfDay: start + whole))
         }
-        if !holiday && workplace.nightPayEnabled && contains(minute, workplace.nightStartMinutes, workplace.nightEndMinutes) {
-            return max(0, workplace.nightWage)
-        }
-        if holiday && workplace.holidayPayEnabled {
-            return max(0, workplace.holidayWage)
-        }
-        return max(0, workplace.hourlyWage)
-    }
-
-    private static func contains(_ minute: Int, _ start: Int, _ end: Int) -> Bool {
-        let minute = ShiftDatePolicy.clockMinutes(minute)
-        let start = ShiftDatePolicy.clockMinutes(start)
-        let end = ShiftDatePolicy.clockMinutes(end)
-        if start == end { return false }
-        if start < end { return minute >= start && minute < end }
-        return minute >= start || minute < end
+        return max(0, weighted / 60 + rates.overtimeYenExact(paidMinutes: paidMinutes))
     }
 
     static func endDate(

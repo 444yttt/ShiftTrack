@@ -175,29 +175,11 @@ struct PayPeriodDetailView: View {
         var transport = 0
         for shift in mine {
             guard let workplace = shift.workplace else { continue }
-            switch ScheduledPay.evaluate(
-                day: shift.date,
-                start: shift.startMinutes,
-                end: shift.endMinutes,
-                breakMinutes: shift.breakMinutes,
-                workplace: workplace,
-                customPay: shift.customPay
-            ) {
-            case .amount(let amount):
-                base += Int(amount.base.rounded())
-                premium += Int(amount.premium.rounded())
-            default:
-                base += PayMath.quote(
-                    workplace: workplace,
-                    day: shift.date,
-                    start: shift.startMinutes,
-                    end: shift.endMinutes,
-                    breakMinutes: shift.breakMinutes,
-                    customPay: shift.customPay,
-                    adjustment: 0,
-                    includeTransport: false
-                )
-            }
+            // Same engine as the monthly totals. The old `ScheduledPay` path read
+            // only the wage history and showed a base of ¥0 when it was empty.
+            let wage = PayMath.wageParts(shift)
+            base += wage.base
+            premium += wage.premium
             allowance += max(0, shift.adjustmentYen)
             if includeTransport {
                 transport += max(0, workplace.transportAllowance)
