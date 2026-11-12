@@ -283,9 +283,8 @@ replaced by tests for the new tokens. Generic UI vocabulary (保存, 閉じる, 
 
 Dark mode, iPad layouts, a widget/Live Activity UI (the plan code stays untouched), dated wage
 changes as a pay input (the stored history is kept but no longer shown), wage time-bands, and
-per-weekday holiday percents (one percent for the chosen weekdays is editable). The legacy
-reconstructed formulas (`ScheduledPay`, `LivePay.phase`, parts of `InOutRecovered`) stay with their
-tests but no screen uses `ScheduledPay` any more.
+per-weekday holiday percents (one percent for the chosen weekdays is editable). `ScheduledPay` and `LivePay` were not SwiftData models and no screen used them, so they
+were removed. `InOutRecovered` stays; screens and the break rules still use it.
 
 ## 10. Numbers that change for existing data
 

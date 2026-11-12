@@ -250,37 +250,6 @@ final class BreakRulesTests: XCTestCase {
         let calendar = calendar()
         let workplace = place(wage: 1200, transport: 500)
         let shiftDay = day(2026, 11, 8)
-        let start = day(2026, 11, 8, 9, 0)
-        let halfway = start.addingTimeInterval(4 * 3600)
-        let after = start.addingTimeInterval(9 * 3600)
-        let before = start.addingTimeInterval(-4 * 3600)
-        XCTAssertEqual(
-            LivePay.phase(now: before, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
-            .beforeStart(remainingMinutes: 240)
-        )
-        XCTAssertEqual(
-            LivePay.phase(now: start, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
-            .during(scaledBreak: 0, scheduledBreak: 60, remainingMinutes: 8 * 60)
-        )
-        XCTAssertEqual(
-            LivePay.phase(now: halfway, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
-            .during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 4 * 60)
-        )
-        XCTAssertEqual(
-            LivePay.phase(now: after, day: shiftDay, start: 9 * 60, end: 17 * 60, breakMinutes: 60, workplace: workplace, calendar: calendar),
-            .afterEnd(scaledBreak: 60, scheduledBreak: 60)
-        )
-        workplace.wageHistory = [.init(at: shiftDay, hourlyWage: 1200)]
-        let midwayAmount = ScheduledPay.hourlyAmount(
-            day: shiftDay,
-            start: 9 * 60,
-            end: 17 * 60,
-            breakMinutes: 30,
-            workplace: workplace,
-            customPay: nil,
-            calendar: calendar
-        )
-        XCTAssertEqual(midwayAmount?.total, 9000)
         let quote = PayMath.quote(
             workplace: workplace,
             day: shiftDay,
@@ -314,33 +283,6 @@ final class BreakRulesTests: XCTestCase {
         XCTAssertEqual(stored.endMinutes, 17 * 60)
     }
 
-    func testOvernightAfterEndAndTwoWorkplacesStayIndependent() {
-        let calendar = calendar()
-        let first = place()
-        let second = place()
-        let shiftDay = day(2026, 11, 8)
-        let midway = day(2026, 11, 9, 2, 0)
-        let after = day(2026, 11, 9, 7, 0)
-        XCTAssertEqual(
-            LivePay.phase(now: midway, day: shiftDay, start: 22 * 60, end: 6 * 60, breakMinutes: 60, workplace: first, calendar: calendar),
-            .during(scaledBreak: 30, scheduledBreak: 60, remainingMinutes: 4 * 60)
-        )
-        XCTAssertEqual(
-            LivePay.phase(now: after, day: shiftDay, start: 22 * 60, end: 6 * 60, breakMinutes: 60, workplace: first, calendar: calendar),
-            .afterEnd(scaledBreak: 60, scheduledBreak: 60)
-        )
-        let other = LivePay.phase(
-            now: midway,
-            day: shiftDay,
-            start: 10 * 60,
-            end: 12 * 60,
-            breakMinutes: 0,
-            workplace: second,
-            calendar: calendar
-        )
-        XCTAssertEqual(other, .afterEnd(scaledBreak: 0, scheduledBreak: 0))
-    }
-
     func testScheduledHourlyYenUsesTheRecoveredInterval() {
         XCTAssertEqual(InOutRecovered.scheduledHourlyYen(totalSeconds: 8 * 3600, breakMinutes: 60, hourlyWage: 1000), 7000)
         XCTAssertEqual(InOutRecovered.scheduledHourlyYen(totalSeconds: 8 * 3600, breakMinutes: 30, hourlyWage: 1000), 7500)
@@ -349,11 +291,6 @@ final class BreakRulesTests: XCTestCase {
         let calendar = calendar()
         let workplace = place(wage: 1000)
         let day = day(2026, 11, 8)
-        let empty = ScheduledPay.hourlyAmount(
-            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
-            workplace: workplace, customPay: nil, calendar: calendar
-        )
-        XCTAssertEqual(empty?.total, 0)
         let january = self.day(2026, 1, 1, 15, 0)
         let june = self.day(2026, 6, 1, 8, 0)
         XCTAssertEqual(
@@ -400,52 +337,12 @@ final class BreakRulesTests: XCTestCase {
             0
         )
         workplace.wageHistory = [.init(at: day, hourlyWage: 1000)]
-        workplace.wageBands = [.init(startMinutes: 18 * 60, endMinutes: 22 * 60, hourlyWage: 3000, includesNightPremium: true)]
-        let plain = ScheduledPay.hourlyAmount(
-            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
-            workplace: workplace, customPay: nil, calendar: calendar
-        )
-        XCTAssertEqual(plain?.total, 7000)
-        workplace.wageHistory = [.init(at: self.day(2026, 12, 1), hourlyWage: 2000)]
-        XCTAssertEqual(
-            ScheduledPay.evaluate(
-                day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 60,
-                workplace: workplace, customPay: nil, calendar: calendar
-            ),
-            .historyOpen
-        )
-        workplace.wageHistory = [.init(at: day, hourlyWage: 1000)]
         let quote = PayMath.quote(
             workplace: workplace, day: day, start: 9 * 60, end: 17 * 60,
             breakMinutes: 60, customPay: nil, adjustment: 0, includeTransport: false, calendar: calendar
         )
         XCTAssertEqual(quote, (1000 * 420 + 30) / 60)
-        workplace.nightPayEnabled = true
-        workplace.nightStartMinutes = 22 * 60
-        workplace.nightEndMinutes = 5 * 60
-        workplace.nightRatePercent = 25
-        let night = ScheduledPay.hourlyAmount(
-            day: day, start: 22 * 60, end: 6 * 60, breakMinutes: 0,
-            workplace: workplace, customPay: nil, calendar: calendar
-        )
-        XCTAssertEqual(night?.base ?? -1, 8000, accuracy: 0.001)
-        XCTAssertEqual(night?.premium ?? -1, 1750, accuracy: 0.001)
-        XCTAssertEqual(night?.total ?? -1, 9750, accuracy: 0.001)
-        workplace.nightPayEnabled = false
-        workplace.overtimeEnabled = true
-        workplace.overtimeAfterMinutes = 480
-        workplace.overtimeRatePercent = 25
-        let overtime = ScheduledPay.hourlyAmount(
-            day: day, start: 9 * 60, end: 18 * 60, breakMinutes: 0,
-            workplace: workplace, customPay: nil, calendar: calendar
-        )
-        XCTAssertEqual(overtime?.base ?? -1, 9000, accuracy: 0.001)
-        XCTAssertEqual(overtime?.premium ?? -1, 250, accuracy: 0.001)
         let daily = place(daily: true)
-        XCTAssertNil(ScheduledPay.hourlyAmount(
-            day: day, start: 9 * 60, end: 17 * 60, breakMinutes: 0,
-            workplace: daily, customPay: nil, calendar: calendar
-        ))
         let old = PayMath.quote(
             workplace: daily, day: day, start: 9 * 60, end: 17 * 60,
             breakMinutes: 0, customPay: nil, adjustment: 0, includeTransport: false, calendar: calendar

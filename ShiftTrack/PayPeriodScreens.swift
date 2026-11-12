@@ -196,8 +196,8 @@ struct PayPeriodDetailView: View {
         var transport = 0
         for shift in mine {
             guard let workplace = shift.workplace else { continue }
-            // Same engine as the monthly totals. The old `ScheduledPay` path read
-            // only the wage history and showed a base of ¥0 when it was empty.
+            // Same engine as the monthly totals. Empty wage history uses the
+            // hourly wage stored on the workplace.
             let wage = PayMath.wageParts(shift)
             base += wage.base
             premium += wage.premium
