@@ -157,6 +157,7 @@ struct CalendarScreen: View {
                             ShiftCard(shift: shift, includeTransport: settings?.includeTransport ?? true)
                         }
                         .buttonStyle(.plain)
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.97).combined(with: .opacity))
                         .accessibilityIdentifier("calendar.shift")
                         .accessibilityLabel(ShiftSpeech.line(
                             name: shift.workplace?.name ?? "勤務先なし",
@@ -165,6 +166,7 @@ struct CalendarScreen: View {
                         ))
                     }
                 }
+                .animation(Motion.allowed(Motion.settle, reduce: reduceMotion), value: listedShifts.map(\.uuid))
             }
 
             if !listedRequests.isEmpty {
@@ -212,6 +214,9 @@ struct CalendarScreen: View {
         .onChange(of: router.focusRequest) { _, request in
             guard let request else { return }
             reveal(request.dates)
+        }
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
         }
         .overlay {
             if showGuide {

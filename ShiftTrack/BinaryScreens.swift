@@ -461,7 +461,7 @@ struct AboutSheet: View {
     var body: some View {
         NavigationStack {
             ScreenScroll {
-                Text("IN/OUT について")
+                Text("しふとらっくについて")
                     .designFont(22, weight: .black)
                 Text("シフトと給与の見込みを、この端末に残します。")
                     .designFont(15)

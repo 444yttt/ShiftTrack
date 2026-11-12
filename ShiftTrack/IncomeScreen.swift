@@ -286,6 +286,9 @@ struct IncomeScreen: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.background)
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
+        }
         .overlay {
             if showGuide, !GuideMemory.suppressed {
                 ZStack {
@@ -495,7 +498,7 @@ struct IncomeScreen: View {
             Image(systemName: name)
                 .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
-                .frame(width: 28, height: 28)
+                .frame(width: 44, height: 44)
                 .background(Theme.dayFilled)
                 .clipShape(Circle())
         }

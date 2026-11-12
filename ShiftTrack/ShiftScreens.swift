@@ -790,6 +790,7 @@ struct ShiftEditorView: View {
     @State private var overlapSheet = false
     @AppStorage("settings.travelMinutes") private var travelMinutes = 30
     @State private var chosenPart: UUID?
+    @State private var copyNote = ""
     @State private var destinationName = ""
     @State private var destinationPlace = ""
     @FocusState private var typing: Bool
@@ -961,6 +962,26 @@ struct ShiftEditorView: View {
                         Text("空のときは勤務先に向かいます")
                             .designFont(13)
                             .foregroundStyle(Theme.muted)
+                    }
+                    if let existing {
+                        formCard {
+                            Text("このシフトをコピー")
+                                .designFont(16, weight: .bold)
+                            HStack(spacing: 8) {
+                                SecondaryPillButton(title: "翌日", systemImage: "doc.on.doc", fillWidth: true, identifier: "editor.copy.day") {
+                                    copyShift(existing, days: 1)
+                                }
+                                SecondaryPillButton(title: "来週の同じ曜日", systemImage: "doc.on.doc", fillWidth: true, identifier: "editor.copy.week") {
+                                    copyShift(existing, days: 7)
+                                }
+                            }
+                            if !copyNote.isEmpty {
+                                Text(copyNote)
+                                    .designFont(14, weight: .medium)
+                                    .foregroundStyle(Theme.ink)
+                                    .accessibilityIdentifier("editor.copy.note")
+                            }
+                        }
                     }
                     if existing != nil {
                         Button("削除する") { confirmDelete = true }
@@ -1411,6 +1432,49 @@ struct ShiftEditorView: View {
         let digits = trimmed.filter(\.isNumber)
         let value = Int(digits) ?? 0
         return negative ? -value : value
+    }
+
+    /// Copies a saved shift to another day. A day that already has the same
+    /// workplace and times is left alone.
+    private func copyShift(_ source: WorkShift, days: Int) {
+        let calendar = Calendar.current
+        guard let workplace = source.workplace,
+              let moved = calendar.date(byAdding: .day, value: days, to: source.date) else { return }
+        let day = calendar.startOfDay(for: moved)
+        let duplicate = shifts.contains { other in
+            other.uuid != source.uuid
+                && calendar.isDate(other.date, inSameDayAs: day)
+                && other.workplace?.uuid == workplace.uuid
+                && other.startMinutes == source.startMinutes
+                && other.endMinutes == source.endMinutes
+        }
+        if duplicate {
+            copyNote = "\(Formatters.longDay(day))には、同じシフトがすでにあります。"
+            return
+        }
+        context.insert(WorkShift(
+            date: day,
+            startMinutes: source.startMinutes,
+            endMinutes: source.endMinutes,
+            breakMinutes: source.breakMinutes,
+            notes: source.notes,
+            customPay: source.customPay,
+            adjustmentYen: source.adjustmentYen,
+            adjustmentNote: source.adjustmentNote,
+            breakFollowsRules: source.breakFollowsRules,
+            partID: source.partID,
+            patternEndOnNextDay: source.patternEndOnNextDay,
+            todosRaw: ShiftTodoCodec.encode(source.todos.map { ShiftTodoCodec.Item(id: UUID(), title: $0.title, done: false) }),
+            workplace: workplace,
+            destinationName: source.destinationName,
+            destinationPlace: source.destinationPlace
+        ))
+        do {
+            try context.save()
+            copyNote = "\(Formatters.longDay(day))にコピーしました。"
+        } catch {
+            copyNote = "コピーできませんでした。もう一度試してください。"
+        }
     }
 
     private func deleteShift() {

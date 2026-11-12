@@ -21,6 +21,7 @@ struct TodayScreen: View {
     @State private var showGuide = false
     private enum TodaySheet: Identifiable {
         case editor(EditorRoute)
+        case wizard
         case part
         case partEdit(UUID)
         case partList
@@ -31,6 +32,7 @@ struct TodayScreen: View {
         var id: String {
             switch self {
             case .editor(let route): "editor-\(route.id)"
+            case .wizard: "wizard"
             case .part: "part"
             case .partEdit(let id): "part-\(id.uuidString)"
             case .partList: "part-list"
@@ -119,6 +121,9 @@ struct TodayScreen: View {
             }
         }
         .background(Theme.background)
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
+        }
         .overlay {
             if showGuide {
                 ZStack {
@@ -155,6 +160,8 @@ struct TodayScreen: View {
             switch route {
             case .editor(let editor):
                 ShiftEditorView(route: editor)
+            case .wizard:
+                WorkplaceWizard()
             case .part:
                 ShiftPartEditor()
                     .presentationBackground(Theme.background)
@@ -430,12 +437,20 @@ struct TodayScreen: View {
         return VStack(alignment: .leading, spacing: 10) {
             if rows.isEmpty {
                 VStack(spacing: 16) {
-                    Text("この日のシフトはありません")
+                    Text(workplaces.isEmpty ? "まずは勤務先を1件追加しましょう" : "この日のシフトはありません")
                         .designFont(16, weight: .medium)
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
-                    addShiftButton
+                    if workplaces.isEmpty {
+                        LimeCapsuleButton(title: "勤務先を追加", identifier: "today.workplace.add") {
+                            sheet = .wizard
+                        }
                         .padding(.bottom, 20)
+                    } else {
+                        addShiftButton
+                            .padding(.bottom, 20)
+                    }
                 }
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))

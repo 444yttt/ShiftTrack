@@ -206,6 +206,9 @@ struct SettingsScreen: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: notifyAtEnd)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorCalendar)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: mirrorReminders)
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
+        }
         .overlay {
             if showGuide {
                 ZStack {
@@ -261,7 +264,7 @@ struct SettingsScreen: View {
 
     private var aboutRow: some View {
         HStack(spacing: 8) {
-            Text("IN/OUT について")
+            Text("しふとらっくについて")
                 .designFont(16, weight: .bold)
             Button {
                 showAboutBubble.toggle()
@@ -269,10 +272,10 @@ struct SettingsScreen: View {
                 Text("?")
                     .designFont(18, weight: .black)
                     .foregroundStyle(Theme.accentText)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("IN/OUT についての説明")
+            .accessibilityLabel("しふとらっくについての説明")
             Spacer()
             Button {
                 cover = .about
@@ -282,7 +285,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.muted)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("IN/OUT について")
+            .accessibilityLabel("しふとらっくについて")
         }
         .padding(ScreenInsets.settings)
         .frame(maxWidth: .infinity, alignment: .leading)

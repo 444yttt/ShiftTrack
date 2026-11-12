@@ -1,21 +1,12 @@
 import SwiftUI
 
-/// Redrawn stand-in for the reference wordmark. The IPA logo image is not bundled.
+/// App name shown at the top of the main tabs.
 struct InOutWordmark: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: -6) {
-            HStack(spacing: 0) {
-                Image(systemName: "arrow.down")
-                    .designFont(16, weight: .black)
-                Text("in")
-                Image(systemName: "arrow.up")
-                    .designFont(16, weight: .black)
-            }
-            Text("OUT")
-        }
-        .designFont(22, weight: .black)
-        .foregroundStyle(Theme.ink)
-        .accessibilityLabel("しふとらっく")
+        Text("しふとらっく")
+            .designFont(24, weight: .black, design: .rounded)
+            .foregroundStyle(Theme.ink)
+            .accessibilityLabel("しふとらっく")
     }
 }
 

@@ -73,6 +73,9 @@ struct WorkplaceDirectoryScreen: View {
                     .presentationBackground(Theme.background)
             }
         }
+        .onChange(of: showGuide) { _, on in
+            ScreenDim.shared.isOn = on
+        }
         .overlay {
             if showGuide {
                 ZStack {

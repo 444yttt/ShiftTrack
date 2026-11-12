@@ -1,3 +1,4 @@
+import Observation
 import SwiftUI
 
 /// Tab order: 一覧, カレンダー, 勤務先, 年収, 設定.
@@ -333,12 +334,24 @@ extension View {
 /// Content that scrolls up under the status bar and notch would show through the
 /// clock. This paints the top safe area in the paper colour so scrolled content
 /// ends at the safe-area edge instead.
+@Observable
+final class ScreenDim {
+    static let shared = ScreenDim()
+    /// True while a coach-mark overlay dims the screen.
+    var isOn = false
+}
+
 struct TopSafeAreaCover: ViewModifier {
     func body(content: Content) -> some View {
         content.overlay(alignment: .top) {
             GeometryReader { proxy in
-                Theme.background
-                    .frame(height: proxy.safeAreaInsets.top)
+                ZStack {
+                    Theme.background
+                    if ScreenDim.shared.isOn {
+                        Color.black.opacity(0.28)
+                    }
+                }
+                .frame(height: proxy.safeAreaInsets.top)
             }
             .ignoresSafeArea()
             .allowsHitTesting(false)
