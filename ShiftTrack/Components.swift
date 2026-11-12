@@ -57,7 +57,7 @@ struct LimeCapsuleButton: View {
             Text(title)
                 .font(.body.weight(.bold))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(isEnabled ? Theme.ink : Theme.ink2)
+                .foregroundStyle(isEnabled ? Theme.onSignal : Theme.ink2)
                 .frame(maxWidth: fillWidth ? .infinity : nil, minHeight: fillWidth ? 52 : 44)
                 .padding(.horizontal, Space.m)
                 .background(isEnabled ? Theme.signal : Theme.sunken, in: Capsule())
@@ -249,7 +249,6 @@ struct DarkSheetModifier: ViewModifier {
             .presentationCornerRadius(Radius.hero)
             .toolbarBackground(Theme.paper, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 

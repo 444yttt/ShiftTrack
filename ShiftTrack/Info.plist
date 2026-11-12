@@ -17,10 +17,6 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
-	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleDarkContent</string>
 	<key>NSCameraUsageDescription</key>
 	<string>勤務先のカードやシフト表を撮影します。画像は端末内で処理し、サーバーには送信しません。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

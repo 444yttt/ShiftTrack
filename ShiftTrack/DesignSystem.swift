@@ -507,7 +507,7 @@ struct PrimaryButton: View {
                     .multilineTextAlignment(.center)
             }
             .font(.body.weight(.bold))
-            .foregroundStyle(isEnabled ? Theme.ink : Theme.ink2)
+            .foregroundStyle(isEnabled ? Theme.onSignal : Theme.ink2)
             .frame(maxWidth: .infinity, minHeight: 52)
             .padding(.horizontal, Space.m)
             .background(isEnabled ? Theme.signal : Theme.sunken, in: Capsule())
@@ -612,7 +612,7 @@ struct IconButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.body.weight(.bold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(prominent ? Theme.onSignal : Theme.ink)
                 .frame(width: 44, height: 44)
                 .background(prominent ? Theme.signal : Theme.surface, in: Circle())
                 .overlay {
@@ -638,7 +638,7 @@ struct ChipButton: View {
         Button(action: action) {
             Text(title)
                 .font(AppFont.label)
-                .foregroundStyle(selected ? Color.white : Theme.ink)
+                .foregroundStyle(selected ? Theme.onInk : Theme.ink)
                 .lineLimit(1)
                 .padding(.horizontal, Space.m)
                 .frame(minHeight: 44)
@@ -669,7 +669,7 @@ struct QuickActionTile: View {
             VStack(spacing: 6) {
                 Image(systemName: systemImage)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(enabled ? Theme.ink : Theme.ink2)
+                    .foregroundStyle(enabled ? Theme.onSignal : Theme.ink2)
                     .frame(width: 48, height: 48)
                     .background(enabled ? Theme.signal : Theme.sunken, in: Circle())
                     .overlay {
@@ -826,7 +826,7 @@ struct StatusChip: View {
     var body: some View {
         Text(text)
             .font(AppFont.badge)
-            .foregroundStyle(Theme.ink)
+            .foregroundStyle(emphasized ? Theme.onSignal : Theme.ink)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(emphasized ? Theme.signal : Theme.sunken, in: Capsule())
