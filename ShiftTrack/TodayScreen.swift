@@ -43,12 +43,20 @@ struct TodayScreen: View {
         }
     }
 
+    /// The live pay needs a tick every second only while a shift today has not
+    /// ended. Otherwise the clock (shown to the minute) needs 30 seconds.
+    private var tickSeconds: Double {
+        let now = Date()
+        let live = shifts.contains { Calendar.current.isDateInToday($0.date) && !$0.hasEnded(now: now) }
+        return live ? 1 : 30
+    }
+
     private var settings: AppSettings? { settingsRows.first }
     private var weekStartsOnMonday: Bool { settings?.weekStartsOnMonday ?? false }
     private var includeTransport: Bool { settings?.includeTransport ?? true }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        TimelineView(.periodic(from: .now, by: tickSeconds)) { context in
             let now = max(context.date, resumedAt)
             ScreenScroll {
                 HStack(spacing: 10) {
