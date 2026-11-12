@@ -9,13 +9,14 @@ enum ThemeHex {
     static let card: UInt = 0xFFFFFF
     /// Sunken fields and off chips.
     static let cardRaised: UInt = 0xECE9E1
-    static let tabBar: UInt = 0x161616
     /// Signal lime. A fill colour only; never text on a light surface.
     static let lime: UInt = 0xC8F04B
     static let ink: UInt = 0x161616
-    /// Secondary text: 6.6:1 on paper, 6.1:1 on sunken.
+    /// Secondary text: 6.6:1 on paper, 6.1:1 on sunken. Also the unselected
+    /// tab bar items before iOS 26.
     static let muted: UInt = 0x55555C
-    /// Accent text, links and the switch “on” track: 7.0:1 on paper.
+    /// Accent text, links, the switch “on” track and the selected tab bar
+    /// item (the app tint): 7.0:1 on paper.
     static let accentText: UInt = 0x3D5A0A
     static let danger: UInt = 0xB3261E
     /// Control outlines (fields, secondary buttons): 3.5:1 on white, 3.2:1 on paper.
@@ -44,7 +45,6 @@ enum Theme {
     static let cardRaised = sunken
     static let chip = surface
     static let dayFilled = ink
-    static let tabBar = Color(hex: ThemeHex.tabBar)
     static let lime = signal
     static let muted = ink2
     static let accentText = signalInk

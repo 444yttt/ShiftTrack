@@ -11,8 +11,9 @@ redesign; the PR description summarises what was actually finished.
 2. **Every control has a visible label.** A picker, stepper or text field never appears without a
    text label next to or above it. Helper text explains what a setting changes.
 3. **Readable by default.** All text pairs meet WCAG 2.x AA (4.5:1); control boundaries and switch
-   states meet 3:1 (WCAG 1.4.11). Text uses Dynamic Type text styles (up to AX3 in content, the tab
-   bar caps at xxxLarge and offers the large-content viewer). Every tap target is at least 44×44 pt.
+   states meet 3:1 (WCAG 1.4.11). Text uses Dynamic Type text styles (up to AX3 in content; the
+   system tab bar keeps its own sizes and long-press large-content viewer). Every tap target is at
+   least 44×44 pt.
    Motion stops with “Reduce Motion”.
 4. **Numbers you watch are dot-matrix.** The clock, shift times and money that changes live are set
    in Doto (Google Fonts, SIL OFL 1.1). Everything you *read* is the system font.
@@ -23,12 +24,17 @@ redesign; the PR description summarises what was actually finished.
 
 ## 2. Navigation map
 
-Custom floating tab bar (ink capsule, the selected tab is a lime pill). Identifiers `tab.*` are kept
-for UI tests; the order changes to match how often each tab is used.
+The standard system tab bar (`TabView`), anchored to the bottom safe area at the system height,
+per Apple’s Human Interface Guidelines. Each screen is a scroll view, so content scrolls under the
+bar and its last row can be scrolled clear of it. The selected item uses the app tint (`signalInk`);
+before iOS 26 the bar keeps the default blurred background and unselected items use `ink2`
+(the default grey is under 4.5:1); iOS 26 draws its own glass bar. UI tests find tabs by title in
+`app.tabBars`. The order changes to match how often each tab is used. (An earlier build of this
+redesign had a custom floating capsule; owner feedback on build 22 was that it sat too high.)
 
 ```
 Root  ─ tab bar ─────────────────────────────────────────────────────────────
-├─ ホーム        tab.today       TodayScreen
+├─ ホーム        TodayScreen
 │   ├─ sheet  シフトを追加 / シフトの詳細      ShiftEditorView
 │   │          └─ sheet 開始の時刻 / 終了の時刻 (TimeAdjustSheet), 日付を変更
 │   ├─ sheet  勤務先を登録                    WorkplaceWizard        (no workplace yet)
@@ -39,7 +45,7 @@ Root  ─ tab bar ────────────────────�
 │   ├─ sheet  パターンを作る / 編集 / 一覧       ShiftPartEditor, ShiftPartList
 │   ├─ sheet  ヘルプ                          HelpSheet
 │   └─ out    マップ / 電話 / メッセージ (system apps)
-├─ カレンダー    tab.calendar    CalendarScreen
+├─ カレンダー    CalendarScreen
 │   ├─ sheet  シフトを追加 (方法を選ぶ) → 1件ずつ入力   ShiftAddChooser → ShiftEditorView
 │   ├─ sheet  シフトの詳細                    ShiftEditorView
 │   ├─ sheet  パターンを作る / 編集 / 一覧       ShiftPartEditor, ShiftPartList
@@ -47,20 +53,20 @@ Root  ─ tab bar ────────────────────�
 │   ├─ sheet  希望                            RequestEditorView
 │   ├─ sheet  シフト表を取り込む → 候補を確認     ImportFlowView (chooser → review → CandidateEditor)
 │   └─ sheet  ヘルプ
-├─ 給料          tab.income      IncomeScreen
+├─ 給料          IncomeScreen
 │   ├─ sheet  目標を変える → 翌月以降にも使うか   GoalEditorSheet → confirmation dialog
 │   ├─ sheet  支給の見込み → 期間の詳細          PayPeriodsView → PayPeriodDetailView
 │   ├─ sheet  月の内訳                        PayBreakdownScreen
 │   ├─ sheet  年収の壁                        WallsScreen
 │   ├─ sheet  年収の目安                      IncomeGuideScreen
 │   └─ sheet  ヘルプ
-├─ 勤務先        tab.workplaces  WorkplaceDirectoryScreen
+├─ 勤務先        WorkplaceDirectoryScreen
 │   ├─ sheet  勤務先を登録 (3 steps) → 写真・リンクから読む   WorkplaceWizard → WorkplaceImportView
 │   ├─ sheet  勤務先を編集                     WorkplaceEditorView
 │   ├─ sheet  パターンを作る / 編集              ShiftPartEditor
 │   ├─ sheet  メッセージを作る                  MessageComposerSheet
 │   └─ sheet  ヘルプ
-└─ 設定          tab.settings    SettingsScreen
+└─ 設定          SettingsScreen
     ├─ sheet  連絡メッセージのひな形             MessageTemplateEditor
     ├─ sheet  フォントのライセンス               LicenseSheet
     └─ out    設定アプリ (location / notifications)
@@ -82,12 +88,12 @@ wizard.
 | `paper` | `#F4F2EC` | screen background | ink 16.2:1 |
 | `surface` | `#FFFFFF` | cards, sheets’ cards | ink 18.1, ink2 7.4 |
 | `sunken` | `#ECE9E1` | fields, inset chips, off chips | ink 14.9, ink2 6.1 |
-| `ink` | `#161616` | primary text, selected chips, tab bar | — |
+| `ink` | `#161616` | primary text, selected chips | — |
 | `ink2` | `#55555C` | secondary text, helper text | 6.6 on paper, 6.1 on sunken |
 | `line` | `#E2DED5` | hairline separators (decorative) | — |
 | `stroke` | `#8C887E` | control outlines (fields, secondary buttons) | 3.5 on surface, 3.2 on paper (≥3:1) |
-| `signal` | `#C8F04B` | primary button fill, selected tab pill, progress fill | ink on signal 13.8 |
-| `signalInk` | `#3D5A0A` | links/accent text, switch “on” track | 7.0 on paper, 7.9 on surface, 6.5 vs off track |
+| `signal` | `#C8F04B` | primary button fill, progress fill | ink on signal 13.8 |
+| `signalInk` | `#3D5A0A` | links/accent text, switch “on” track, selected tab item | 7.0 on paper, 7.9 on surface, 6.5 vs off track |
 | `danger` | `#B3261E` | errors, destructive text | 5.8 on paper, 5.4 on sunken |
 
 Rules: lime is never a text colour on light surfaces. Switches use `signalInk` for “on” so the

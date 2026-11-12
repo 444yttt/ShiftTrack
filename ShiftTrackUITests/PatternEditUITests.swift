@@ -11,8 +11,8 @@ final class PatternEditUITests: XCTestCase {
         app.launchArguments = ["-UITestingReset"]
         app.launch()
 
-        XCTAssertTrue(app.buttons["tab.workplaces"].waitForExistence(timeout: 12))
-        app.buttons["tab.workplaces"].tap()
+        XCTAssertTrue(app.tab("勤務先").waitForExistence(timeout: 12))
+        app.tab("勤務先").tap()
         app.buttons["勤務先を追加"].tap()
         let name = app.textFields["field.名前"]
         XCTAssertTrue(name.waitForExistence(timeout: 6))
@@ -29,7 +29,7 @@ final class PatternEditUITests: XCTestCase {
         app.buttons["wizard.finish"].tap()
         XCTAssertTrue(app.buttons["workplace.card"].waitForExistence(timeout: 6))
 
-        app.buttons["tab.calendar"].tap()
+        app.tab("カレンダー").tap()
         let add = app.buttons["calendar.part.add"]
         scrollTo(app, add)
         add.tap()

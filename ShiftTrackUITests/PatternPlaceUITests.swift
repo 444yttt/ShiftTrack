@@ -11,13 +11,13 @@ final class PatternPlaceUITests: XCTestCase {
         app.launchArguments = ["-UITestingReset"]
         app.launch()
 
-        let today = app.buttons["tab.today"]
+        let today = app.tab("ホーム")
         XCTAssertTrue(today.waitForExistence(timeout: 12))
         let clock = app.staticTexts["today.clock"]
         XCTAssertTrue(clock.waitForExistence(timeout: 8))
         let clockBefore = clock.label
 
-        app.buttons["tab.workplaces"].tap()
+        app.tab("勤務先").tap()
         app.buttons["勤務先を追加"].tap()
         let name = app.textFields["field.名前"]
         XCTAssertTrue(name.waitForExistence(timeout: 6))
@@ -30,7 +30,7 @@ final class PatternPlaceUITests: XCTestCase {
         app.buttons["wizard.finish"].tap()
         XCTAssertTrue(app.buttons["workplace.card"].waitForExistence(timeout: 6))
 
-        app.buttons["tab.calendar"].tap()
+        app.tab("カレンダー").tap()
         shot("10-calendar-before-part")
         let days = monthDays(app)
         XCTAssertGreaterThanOrEqual(days.count, 3)
@@ -97,7 +97,7 @@ final class PatternPlaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "10:00")).firstMatch.waitForExistence(timeout: 4))
         XCTAssertEqual(app.buttons.matching(identifier: "calendar.shift").count, 1)
 
-        app.buttons["tab.today"].tap()
+        app.tab("ホーム").tap()
         XCTAssertEqual(clock.label, clockBefore)
         tapIdentifier(app, "today.daychip.朝")
         shot("16-today-daychip")

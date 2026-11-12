@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Tabs, left to right. Identifiers stay `tab.*` for the UI tests.
+/// Tabs of the system tab bar, left to right. UI tests find them by title
+/// (`app.tabBars.buttons["カレンダー"]`).
 enum AppTab: Int, CaseIterable, Identifiable {
     case list, calendar, income, workplaces, settings
     var id: Int { rawValue }
@@ -14,81 +15,29 @@ enum AppTab: Int, CaseIterable, Identifiable {
         }
     }
 
+    /// Outline names; the tab bar shows the filled variant itself.
     var symbol: String {
         switch self {
-        case .list: "house.fill"
+        case .list: "house"
         case .calendar: "calendar"
-        case .income: "yensign.circle.fill"
-        case .workplaces: "building.2.fill"
-        case .settings: "gearshape.fill"
-        }
-    }
-
-    var accessibilityID: String {
-        switch self {
-        case .list: "tab.today"
-        case .calendar: "tab.calendar"
-        case .income: "tab.income"
-        case .workplaces: "tab.workplaces"
-        case .settings: "tab.settings"
+        case .income: "yensign.circle"
+        case .workplaces: "building.2"
+        case .settings: "gearshape"
         }
     }
 }
 
-/// Floating ink capsule. The selected tab is a lime pill with an ink symbol and
-/// a lime label (13.8:1 on the bar). Labels stop growing at xxxLarge; a long
-/// press shows the large content viewer at accessibility sizes.
-struct CustomTabBar: View {
-    @Binding var selection: AppTab
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(AppTab.allCases) { tab in
-                let selected = selection == tab
-                Button {
-                    if reduceMotion {
-                        selection = tab
-                    } else {
-                        withAnimation(Motion.chip) { selection = tab }
-                    }
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 17, weight: .semibold))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(selected ? Theme.ink : Color.white.opacity(0.78))
-                            .frame(width: 48, height: 30)
-                            .background(selected ? Theme.signal : Color.clear, in: Capsule())
-                        Text(tab.title)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(selected ? Theme.signal : Color.white.opacity(0.78))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel(tab.title)
-                .accessibilityIdentifier(tab.accessibilityID)
-                .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
-                .accessibilityShowsLargeContentViewer {
-                    Label(tab.title, systemImage: tab.symbol)
-                }
-            }
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(Theme.tabBar, in: Capsule())
-        .shadow(color: Color.black.opacity(0.12), radius: 10, y: 4)
-        // The bar sits in the bottom safe-area inset, so it already clears the home indicator.
-        .padding(.horizontal, Space.m)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
-        .background(Theme.paper)
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .sensoryFeedback(.selection, trigger: selection)
+extension View {
+    /// One tab of the root `TabView`: paper fills the whole tab (it shows through
+    /// the bar's material), the status bar gets its cover, and the bar item is
+    /// the standard title + SF Symbol.
+    func appTab(_ tab: AppTab) -> some View {
+        self
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.paper)
+            .topSafeAreaCover()
+            .tabItem { Label(tab.title, systemImage: tab.symbol) }
+            .tag(tab)
     }
 }
 

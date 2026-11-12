@@ -11,7 +11,7 @@ final class ShellUITests: XCTestCase {
         app.launchArguments = ["-UITestingReset"]
         app.launch()
 
-        let today = app.buttons["tab.today"]
+        let today = app.tab("ホーム")
         XCTAssertTrue(today.waitForExistence(timeout: 12))
         let clock = app.staticTexts["today.clock"]
         XCTAssertTrue(clock.waitForExistence(timeout: 8))
@@ -24,7 +24,7 @@ final class ShellUITests: XCTestCase {
         XCTAssertEqual(clock.label, clockBefore)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "いま稼いだお給料")).firstMatch.exists)
 
-        app.buttons["tab.calendar"].tap()
+        app.tab("カレンダー").tap()
         shot("02-calendar")
         app.buttons["calendar.nextMonth"].tap()
         let back = app.buttons["calendar.thisMonth"]
@@ -32,7 +32,7 @@ final class ShellUITests: XCTestCase {
         back.tap()
         XCTAssertFalse(back.exists)
 
-        app.buttons["tab.workplaces"].tap()
+        app.tab("勤務先").tap()
         shot("03-workplaces-empty")
         app.buttons["勤務先を追加"].tap()
         let name = app.textFields["field.名前"]
@@ -65,7 +65,7 @@ final class ShellUITests: XCTestCase {
         shot("04-patterns")
         app.buttons["patterns.close"].tap()
 
-        app.buttons["tab.today"].tap()
+        app.tab("ホーム").tap()
         XCTAssertEqual(clock.label, clockBefore)
         app.buttons["＋シフトを追加"].tap()
         let start = app.buttons["開始"]
@@ -87,7 +87,7 @@ final class ShellUITests: XCTestCase {
             editorBar.buttons["キャンセル"].tap()
         }
 
-        app.buttons["tab.income"].tap()
+        app.tab("給料").tap()
         shot("06-income")
         let walls = app.buttons["income.walls"]
         XCTAssertTrue(walls.waitForExistence(timeout: 6))
@@ -96,7 +96,7 @@ final class ShellUITests: XCTestCase {
         shot("07-walls")
         app.buttons["walls.close"].tap()
 
-        app.buttons["tab.settings"].tap()
+        app.tab("設定").tap()
         shot("08-settings")
         XCTAssertFalse(app.staticTexts["勤務先の設定"].exists)
         XCTAssertFalse(app.otherElements["guide.card"].exists)
@@ -111,7 +111,7 @@ final class ShellUITests: XCTestCase {
         XCTAssertTrue(app.buttons["settings.location"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.calendar"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.switches["settings.reminders"].waitForExistence(timeout: 4))
-        app.buttons["tab.today"].tap()
+        app.tab("ホーム").tap()
         XCTAssertEqual(clock.label, clockBefore)
     }
 

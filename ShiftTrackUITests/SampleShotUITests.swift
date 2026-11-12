@@ -6,7 +6,7 @@ final class SampleShotUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestingSample"]
         app.launch()
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.tab("ホーム").waitForExistence(timeout: 15))
         if app.buttons["閉じる"].waitForExistence(timeout: 2) {
             shot(app, "guide")
             app.buttons["閉じる"].tap()
@@ -31,11 +31,11 @@ final class SampleShotUITests: XCTestCase {
         shot(app, "add-shift")
         editor.buttons["キャンセル"].tap()
 
-        app.buttons["tab.calendar"].tap()
+        app.tab("カレンダー").tap()
         show(app.buttons["calendar.nextMonth"])
         shot(app, "calendar")
 
-        app.buttons["tab.workplaces"].tap()
+        app.tab("勤務先").tap()
         show(app.buttons["workplace.add"])
         shot(app, "workplaces")
         show(app.buttons["workplace.card"])
@@ -47,7 +47,7 @@ final class SampleShotUITests: XCTestCase {
         shot(app, "pattern-editor")
         app.buttons["pattern.editor.close"].tap()
 
-        app.buttons["tab.settings"].tap()
+        app.tab("設定").tap()
         if app.buttons["おわり"].waitForExistence(timeout: 2) {
             shot(app, "settings-guide")
             app.buttons["おわり"].tap()

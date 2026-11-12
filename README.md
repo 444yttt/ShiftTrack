@@ -41,7 +41,7 @@ GitHub Actions でもビルドを確認できます。`main` と `cursor/shifttr
 ## 読みやすさ
 
 - 文字は WCAG AA（4.5:1）以上、スイッチや入力欄の枠は 3:1 以上の組み合わせだけを使います。ライムは塗りの色で、文字には使いません。表は `ShiftTrackTests/ThemeContrastTests.swift` と `docs/design/redesign.md` にあります。
-- 文字は Dynamic Type に合わせて大きくなります（最大 AX3。タブバーは xxxLarge まで、長押しで拡大表示）。押せる所は 44pt 以上です。アニメーションは「視差効果を減らす」で止まります。
+- 文字は Dynamic Type に合わせて大きくなります（最大 AX3）。タブバーは iOS 標準のもので、画面の下端に付き、長押しで拡大表示できます。押せる所は 44pt 以上です。アニメーションは「視差効果を減らす」で止まります。
 - 時計・シフトの時刻・金額の点の文字は Google Fonts の Doto（SIL Open Font License 1.1、`ShiftTrack/Fonts/OFL.txt`）です。VoiceOver には「14時5分」のように読み上げる文を渡しています。
 
 ## シフト表から取り込む
