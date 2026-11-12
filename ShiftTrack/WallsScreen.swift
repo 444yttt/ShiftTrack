@@ -1,8 +1,10 @@
 import SwiftData
 import SwiftUI
 
+/// 年収の壁. This year's income estimate against the common thresholds.
 struct WallsScreen: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Query private var settingsRows: [AppSettings]
     @State private var expanded: Int?
@@ -19,66 +21,66 @@ struct WallsScreen: View {
         let forecast = totals.forecastYen
         let next = IncomeWalls.all.first { forecast < $0.yen }
 
-        return ScreenScroll {
-            HStack {
+        return NavigationStack {
+            ScreenScroll(spacing: Space.m) {
                 Text("年収の壁")
-                    .designFont(16, weight: .black)
+                    .font(AppFont.screenTitle)
                     .foregroundStyle(Theme.ink)
+                    .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("walls.title")
-                Spacer()
-                Button("閉じる") { dismiss() }
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.accentText)
-                    .accessibilityIdentifier("walls.close")
-                HelpButton { showHelp = true }
-            }
-            .padding(.top, 8)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("今年の給料見込")
-                    .designFont(16, weight: .medium)
-                    .foregroundStyle(Theme.muted)
-                Text(Formatters.yen(forecast))
-                    .designFont(16, weight: .black)
-                    .foregroundStyle(Theme.accentText)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                if let next {
-                    Text("次の壁（\(next.title)）まで \(Formatters.yen(next.yen - forecast))")
-                        .designFont(16, weight: .medium)
-                        .foregroundStyle(Theme.ink)
-                } else {
-                    Text("表示している壁はすべて超えています")
-                        .designFont(16, weight: .medium)
-                        .foregroundStyle(Theme.ink)
+                    .padding(.top, Space.xs)
+                Card(spacing: Space.xs) {
+                    Text("\(year)年に入る給料の見込み")
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.ink2)
+                    DotoText("¥" + Formatters.yenDigits(forecast), size: 36, spoken: "\(forecast)円")
+                    if let next {
+                        Text("次の壁（\(next.title)・\(next.subtitle)）まで あと\(Formatters.yen(next.yen - forecast))")
+                            .font(AppFont.rowTitle)
+                            .foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("表示している壁はすべて超えています")
+                            .font(AppFont.rowTitle)
+                            .foregroundStyle(Theme.ink)
+                    }
+                    Text(includeTransport ? "交通費を含めた見込みです。" : "交通費を含めない見込みです。")
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.ink2)
                 }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .padding(.top, 12)
-
-            VStack(spacing: 12) {
+                SectionHeader(title: "壁ごとの近さ", detail: "押すと説明が開きます。")
                 ForEach(IncomeWalls.all) { wall in
                     wallCard(wall, forecast: forecast)
                 }
+                InfoNote(text: IncomeWalls.disclaimer)
             }
-            .padding(.top, 4)
-
-            Text(IncomeWalls.disclaimer)
-                .designFont(16)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 4)
-        }
-        .background(Theme.background)
-        .accessibilityIdentifier("walls.screen")
-        .sheet(isPresented: $showHelp) {
-            HelpSheet(
-                title: "年収の壁",
-                paragraphs: IncomeWalls.all.map { "\($0.title) \($0.subtitle)。\($0.detail)" } + [IncomeWalls.disclaimer]
-            )
+            .background(Theme.paper)
+            .navigationTitle("年収の壁")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.signalInk)
+                        .accessibilityIdentifier("walls.close")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showHelp = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                    .foregroundStyle(Theme.signalInk)
+                    .accessibilityLabel("ヘルプ")
+                }
+            }
+            .darkSheet()
+            .accessibilityIdentifier("walls.screen")
+            .sheet(isPresented: $showHelp) {
+                HelpSheet(
+                    title: "年収の壁について",
+                    paragraphs: IncomeWalls.all.map { "\($0.title)（\($0.subtitle)）：\($0.detail)" } + [IncomeWalls.disclaimer]
+                )
+            }
         }
     }
 
@@ -86,49 +88,49 @@ struct WallsScreen: View {
         let ratio = Double(forecast) / Double(wall.yen)
         let open = expanded == wall.yen
         return Button {
-            expanded = open ? nil : wall.yen
+            if reduceMotion {
+                expanded = open ? nil : wall.yen
+            } else {
+                withAnimation(Motion.layout) { expanded = open ? nil : wall.yen }
+            }
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(wall.title)
-                            .designFont(16, weight: .bold)
+                        Text("\(wall.title)円")
+                            .font(AppFont.rowTitle)
                             .foregroundStyle(Theme.ink)
                         Text(wall.subtitle)
-                            .designFont(16)
-                            .foregroundStyle(Theme.muted)
+                            .font(AppFont.helper)
+                            .foregroundStyle(Theme.ink2)
                     }
-                    Spacer()
+                    Spacer(minLength: Space.xs)
                     Text(Formatters.percent(ratio, decimals: false))
-                        .designFont(16, weight: .bold)
-                        .foregroundStyle(Theme.accentText)
+                        .font(AppFont.value.weight(.bold))
+                        .foregroundStyle(ratio >= 1 ? Theme.danger : Theme.ink)
+                    Image(systemName: open ? "chevron.up" : "chevron.down")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Theme.ink2)
+                        .accessibilityHidden(true)
                 }
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Theme.track)
-                        Capsule()
-                            .fill(Theme.lime)
-                            .frame(width: proxy.size.width * min(1, max(0, ratio)))
-                    }
-                }
-                .frame(height: 8)
+                ProgressBar(value: ratio, label: "\(wall.title)円に対する見込み")
                 if open {
                     Text(wall.detail)
-                        .designFont(16)
-                        .foregroundStyle(Theme.muted)
+                        .font(AppFont.body)
+                        .foregroundStyle(Theme.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(Space.m)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityValue(open ? "説明を表示中" : "")
     }
 }
 
+/// Plain help for a screen: one card per paragraph.
 struct HelpSheet: View {
     var title: String
     var paragraphs: [String]
@@ -136,24 +138,34 @@ struct HelpSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenScroll {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(paragraphs, id: \.self) { paragraph in
+            ScreenScroll(spacing: Space.s) {
+                ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                        Text("\(index + 1)")
+                            .font(AppFont.label.monospacedDigit())
+                            .foregroundStyle(Theme.ink)
+                            .frame(width: 26, height: 26)
+                            .background(Theme.signal, in: Circle())
+                            .accessibilityHidden(true)
                         Text(paragraph)
-                            .designFont(15)
+                            .font(AppFont.body)
                             .foregroundStyle(Theme.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .padding(Space.m)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 }
-                .padding(.top, 8)
+                .padding(.top, Space.xxs)
             }
-            .background(Theme.background)
+            .background(Theme.paper)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.accentText)
+                        .foregroundStyle(Theme.signalInk)
+                        .accessibilityIdentifier("help.close")
                 }
             }
             .darkSheet()

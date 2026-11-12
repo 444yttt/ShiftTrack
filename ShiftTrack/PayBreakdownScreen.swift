@@ -1,186 +1,169 @@
 import SwiftData
 import SwiftUI
 
+/// 月の内訳: one month of work (by work date) split into base, premium,
+/// transport and 天引・手当, with the paydays the money arrives on. Amounts
+/// come from the same engine as the rest of the app.
 struct PayBreakdownScreen: View {
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
+    @Query private var settingsRows: [AppSettings]
     @Environment(\.dismiss) private var dismiss
     @State private var anchor = Date()
 
-    private var calendar: Calendar { ShiftOverlap.tokyo }
+    private var includeTransport: Bool { settingsRows.first?.includeTransport ?? true }
 
-    var body: some View {
-        let slices = monthSlices
-        let base = slices.reduce(0) { $0 + $1.baseYen }
-        let transport = slices.reduce(0) { $0 + $1.transportYen }
-        let adjustment = slices.reduce(0) { $0 + $1.adjustmentYen }
-        let total = base + transport + adjustment
-        return ScreenScroll {
-            HStack {
-                Text("\(calendar.component(.month, from: anchor))月の給与")
-                    .designFont(16, weight: .black)
-                Spacer()
-                Button("閉じる") { dismiss() }
-                    .foregroundStyle(Theme.accentText)
-            }
-            Text("支給見込み")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            Text(Formatters.yen(total))
-                .designFont(34, weight: .semibold, design: .rounded, digits: true)
-                .foregroundStyle(Theme.ink)
-            Text("深夜・休日の割増は、この内訳では分けていません。今日の見込とは別の計算です。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            composition(base: base, transport: transport, adjustment: adjustment)
-            row("基本給", yen: base, signed: false)
-            row("交通費", yen: transport, signed: true)
-            row("天引・手当", yen: adjustment, signed: true)
-            Text("勤務先別")
-                .designFont(17, weight: .semibold)
-                .padding(.top, SpacingTokens.annualIncome[2])
-            ForEach(workplaceTotals(slices), id: \.id) { place in
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
-                            .designFont(16)
-                        Text(Formatters.hours(place.minutes))
-                            .designFont(13)
-                            .foregroundStyle(Theme.muted)
-                    }
-                    Spacer()
-                    Text(Formatters.yen(place.yen))
-                        .designFont(16, weight: .semibold, design: .rounded, digits: true)
-                }
-                .padding(.vertical, SpacingTokens.annualIncome[0])
-            }
-            Text("入金予定")
-                .designFont(17, weight: .semibold)
-                .padding(.top, SpacingTokens.annualIncome[2])
-            ForEach(PayBreakdown.groupedByPayday(slices), id: \.day.key) { group in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(group.day.month)月\(group.day.day)日")
-                        .designFont(17, weight: .semibold)
-                    Text(Formatters.yen(group.slices.reduce(0) { $0 + $1.total }))
-                        .designFont(20, weight: .semibold, design: .rounded, digits: true)
-                    ForEach(group.slices) { slice in
-                        Text("\(slice.workplaceName)  \(Formatters.yen(slice.total))")
-                            .designFont(13)
-                            .foregroundStyle(Theme.muted)
-                    }
-                }
-                .padding(.vertical, SpacingTokens.annualIncome[0])
-            }
-            live
-        }
-        .background(Theme.background)
+    private struct Line: Identifiable {
+        var id: UUID
+        var workplaceID: UUID
+        var workplaceName: String
+        var minutes: Int
+        var base: Int
+        var premium: Int
+        var transport: Int
+        var adjustment: Int
+        var payday: Date
+        var total: Int { base + premium + transport + adjustment }
     }
 
-    private var monthSlices: [PaySlice] {
-        let month = calendar.component(.month, from: anchor)
-        let year = calendar.component(.year, from: anchor)
+    private var lines: [Line] {
+        let calendar = Calendar.current
         return shifts.compactMap { shift in
-            guard let place = shift.workplace else { return nil }
-            let day = LocalDay.from(shift.date, calendar: calendar)
-            guard day.year == year, day.month == month else { return nil }
-            let history = place.wageHistory.map {
-                WagePoint(day: LocalDay.from($0.at, calendar: calendar), yen: $0.hourlyWage)
-            }
-            return PayBreakdown.slice(
-                PayShiftInput(
-                    shiftID: shift.uuid,
-                    workplaceID: place.uuid,
-                    workplaceName: place.name,
-                    day: day,
-                    minutes: PayMath.workedMinutes(start: shift.startMinutes, end: shift.endMinutes, breakMinutes: shift.breakMinutes),
-                    hourlyFallback: place.hourlyWage,
-                    history: history,
-                    transport: place.transportAllowance,
-                    adjustment: shift.adjustmentYen,
-                    closingDay: place.closingDay,
-                    paydayDay: place.paydayDay,
-                    monthOffset: place.paydayMonthOffset
-                ),
-                calendar: calendar
+            guard let place = shift.workplace,
+                  calendar.isDate(shift.date, equalTo: anchor, toGranularity: .month) else { return nil }
+            let wage = PayMath.wageParts(shift)
+            return Line(
+                id: shift.uuid,
+                workplaceID: place.uuid,
+                workplaceName: place.name,
+                minutes: shift.workedMinutes,
+                base: wage.base,
+                premium: wage.premium,
+                transport: includeTransport ? max(0, place.transportAllowance) : 0,
+                adjustment: shift.adjustmentYen,
+                payday: PaySchedule.payday(for: shift.date, workplace: place)
             )
         }
     }
 
-    private func workplaceTotals(_ slices: [PaySlice]) -> [(id: UUID, name: String, minutes: Int, yen: Int)] {
+    var body: some View {
+        let rows = lines
+        let base = rows.reduce(0) { $0 + $1.base }
+        let premium = rows.reduce(0) { $0 + $1.premium }
+        let transport = rows.reduce(0) { $0 + $1.transport }
+        let adjustment = rows.reduce(0) { $0 + $1.adjustment }
+        let total = max(0, base + premium + transport + adjustment)
+        let month = Calendar.current.component(.month, from: anchor)
+        return NavigationStack {
+            ScreenScroll(spacing: Space.m) {
+                HStack(spacing: Space.xs) {
+                    monthButton("chevron.left", label: "前の月", delta: -1)
+                    Spacer(minLength: 0)
+                    DotoText(Formatters.dotoMonth(anchor), size: 28, spoken: Formatters.monthTitle(anchor))
+                    Spacer(minLength: 0)
+                    monthButton("chevron.right", label: "次の月", delta: 1)
+                }
+                .padding(.top, Space.xs)
+                Card(spacing: Space.xs) {
+                    Text("\(month)月に働いた分の見込み")
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.ink2)
+                    DotoText("¥" + Formatters.yenDigits(total), size: 36, spoken: "\(total)円")
+                    RowDivider()
+                    ValueRow(title: "基本の給料", value: Formatters.yen(base))
+                    ValueRow(title: "割増（深夜・休日・残業）", value: Formatters.yen(premium))
+                    ValueRow(title: includeTransport ? "交通費" : "交通費（含めない設定）", value: Formatters.yen(transport))
+                    ValueRow(title: "天引・手当", value: (adjustment < 0 ? "−" : "") + Formatters.yen(abs(adjustment)))
+                    InfoNote(text: "働いた日で数えています。給料タブの金額は給料日の月で数えるので、月がずれることがあります。税金・社会保険は計算していません。")
+                }
+                SectionHeader(title: "勤務先ごと")
+                if rows.isEmpty {
+                    EmptyState(systemImage: "calendar", message: "この月に働くシフトはありません")
+                } else {
+                    Card(spacing: Space.xs) {
+                        ForEach(workplaceTotals(rows), id: \.id) { place in
+                            HStack(alignment: .firstTextBaseline) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(place.name)
+                                        .font(AppFont.rowTitle)
+                                        .foregroundStyle(Theme.ink)
+                                    Text(Formatters.hours(place.minutes))
+                                        .font(AppFont.helper)
+                                        .foregroundStyle(Theme.ink2)
+                                }
+                                Spacer(minLength: Space.xs)
+                                Text(Formatters.yen(place.yen))
+                                    .font(AppFont.value.weight(.bold))
+                                    .foregroundStyle(Theme.ink)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    SectionHeader(title: "入金の予定")
+                    Card(spacing: Space.xs) {
+                        ForEach(paydays(rows), id: \.day) { group in
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(Formatters.longDay(group.day))
+                                    .font(AppFont.rowTitle)
+                                    .foregroundStyle(Theme.ink)
+                                Spacer(minLength: Space.xs)
+                                Text(Formatters.yen(group.yen))
+                                    .font(AppFont.value.weight(.bold))
+                                    .foregroundStyle(Theme.ink)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+            }
+            .background(Theme.paper)
+            .navigationTitle("月の内訳")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.signalInk)
+                }
+            }
+            .darkSheet()
+        }
+    }
+
+    private func workplaceTotals(_ rows: [Line]) -> [(id: UUID, name: String, minutes: Int, yen: Int)] {
         var order: [UUID] = []
         var names: [UUID: String] = [:]
         var minutes: [UUID: Int] = [:]
         var yen: [UUID: Int] = [:]
-        for slice in slices {
-            if names[slice.workplaceID] == nil { order.append(slice.workplaceID) }
-            names[slice.workplaceID] = slice.workplaceName
-            minutes[slice.workplaceID, default: 0] += slice.minutes
-            yen[slice.workplaceID, default: 0] += slice.total
+        for row in rows {
+            if names[row.workplaceID] == nil { order.append(row.workplaceID) }
+            names[row.workplaceID] = row.workplaceName
+            minutes[row.workplaceID, default: 0] += row.minutes
+            yen[row.workplaceID, default: 0] += row.total
         }
         return order.map { ($0, names[$0] ?? "", minutes[$0] ?? 0, yen[$0] ?? 0) }
     }
 
-    @ViewBuilder
-    private func composition(base: Int, transport: Int, adjustment: Int) -> some View {
-        let parts = [base, max(0, transport), max(0, adjustment)].filter { $0 > 0 }
-        if parts.count > 1 {
-            let sum = parts.reduce(0, +)
-            HStack(spacing: 2) {
-                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                    Rectangle()
-                        .fill(Theme.lime.opacity(part == base ? 1 : 0.45))
-                        .frame(width: max(4, 280 * CGFloat(part) / CGFloat(max(sum, 1))), height: 10)
-                }
-            }
-            .clipShape(Capsule())
+    private func paydays(_ rows: [Line]) -> [(day: Date, yen: Int)] {
+        let calendar = Calendar.current
+        var totals: [Date: Int] = [:]
+        for row in rows {
+            totals[calendar.startOfDay(for: row.payday), default: 0] += row.total
         }
+        return totals.keys.sorted().map { ($0, totals[$0] ?? 0) }
     }
 
-    private func row(_ title: String, yen: Int, signed: Bool) -> some View {
-        HStack {
-            Text(title)
-                .designFont(16)
-            Spacer()
-            Text(signed && yen > 0 ? "+\(Formatters.yen(yen))" : Formatters.yen(yen))
-                .designFont(16, weight: .semibold, design: .rounded, digits: true)
-        }
-        .padding(.vertical, 10)
-    }
-
-    private var live: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let active = shifts.first { shift in
-                guard let start = shiftStart(shift), let end = shiftEnd(shift) else { return false }
-                return context.date >= start && context.date < end
+    private func monthButton(_ symbol: String, label: String, delta: Int) -> some View {
+        Button {
+            if let next = Calendar.current.date(byAdding: .month, value: delta, to: anchor) {
+                anchor = next
             }
-            if let active, let start = shiftStart(active) {
-                let elapsed = Int(context.date.timeIntervalSince(start))
-                let yen = LiveEarnings.yen(elapsedSeconds: elapsed, breakSeconds: 0, hourlyYen: active.workplace?.hourlyWage ?? 0)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("勤務中")
-                        .designFont(13)
-                        .foregroundStyle(Theme.muted)
-                    Text(Formatters.yen(yen))
-                        .designFont(38, weight: .semibold, design: .rounded, digits: true)
-                        .contentTransition(.numericText())
-                        .animation(.snappy(duration: 0.18), value: yen)
-                    Text("休憩の時刻が無い分は引いていません。表示は切り捨てです。")
-                        .designFont(13)
-                        .foregroundStyle(Theme.muted)
-                }
-                .padding(.top, SpacingTokens.annualIncome[1])
-            }
+        } label: {
+            Image(systemName: symbol)
+                .font(.body.weight(.bold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 44, height: 44)
+                .background(Theme.sunken, in: Circle())
         }
-    }
-
-    private func shiftStart(_ shift: WorkShift) -> Date? {
-        let day = calendar.startOfDay(for: shift.date)
-        return calendar.date(byAdding: .minute, value: shift.startMinutes, to: day)
-    }
-
-    private func shiftEnd(_ shift: WorkShift) -> Date? {
-        guard let start = shiftStart(shift) else { return nil }
-        var minutes = shift.endMinutes - shift.startMinutes
-        if minutes <= 0 { minutes += 24 * 60 }
-        return calendar.date(byAdding: .minute, value: minutes, to: start)
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(label)
     }
 }
