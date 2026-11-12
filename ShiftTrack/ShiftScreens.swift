@@ -1408,15 +1408,30 @@ struct ShiftEditorView: View {
     }
 
     private func yenField(_ prompt: String, text: Binding<String>, signed: Bool = false) -> some View {
-        HStack(spacing: 6) {
-            Text("¥")
-                .designFont(16, weight: .bold)
-                .foregroundStyle(Theme.muted)
-            TextField(prompt, text: text)
-                .keyboardType(signed ? .numbersAndPunctuation : .numberPad)
-                .designFont(16, weight: .bold)
-                .focused($typing)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text("¥")
+                    .designFont(16, weight: .bold)
+                    .foregroundStyle(Theme.muted)
+                TextField(prompt, text: text)
+                    .keyboardType(signed ? .numbersAndPunctuation : .numberPad)
+                    .designFont(16, weight: .bold)
+                    .focused($typing)
+            }
+            // Shows the amount with separators so a long number can be checked at a glance.
+            if let preview = yenPreview(text.wrappedValue, signed: signed) {
+                Text(preview)
+                    .designFont(13, weight: .medium)
+                    .foregroundStyle(Theme.muted)
+            }
         }
+    }
+
+    private func yenPreview(_ raw: String, signed: Bool) -> String? {
+        let digits = raw.filter(\.isNumber)
+        guard let value = Int(digits) else { return nil }
+        let negative = signed && (raw.hasPrefix("-") || raw.hasPrefix("−"))
+        return (negative ? "−" : "") + Formatters.yen(value)
     }
 
     private var parsedCustom: Int? {
