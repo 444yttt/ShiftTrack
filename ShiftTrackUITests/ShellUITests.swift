@@ -78,10 +78,10 @@ final class ShellUITests: XCTestCase {
         let cancel = app.buttons["time.cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 4))
         cancel.tap()
-        if !waitUntilGone(timeBar, timeout: 3) {
+        if !waitUntilGone(timeBar, timeout: 8), cancel.exists {
             cancel.tap()
-            XCTAssertTrue(waitUntilGone(timeBar, timeout: 8))
         }
+        XCTAssertTrue(waitUntilGone(timeBar, timeout: 8))
         let editorBar = app.navigationBars["シフトを追加"]
         if editorBar.waitForExistence(timeout: 2) {
             editorBar.buttons["キャンセル"].tap()
