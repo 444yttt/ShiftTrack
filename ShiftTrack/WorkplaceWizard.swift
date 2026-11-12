@@ -137,7 +137,7 @@ struct WorkplaceWizard: View {
         HStack(alignment: .top, spacing: Space.s) {
             Image(systemName: systemImage)
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.onSignal)
                 .frame(width: 56, height: 56)
                 .background(Theme.signal, in: Circle())
                 .accessibilityHidden(true)

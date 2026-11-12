@@ -6,8 +6,8 @@ import UIKit
 struct ShiftTrackApp: App {
     init() {
         FontRegistry.ensureDoto()
-        let paper = Self.uiColor(ThemeHex.background)
-        let ink = Self.uiColor(ThemeHex.ink)
+        let paper = Self.named("Paper", fallback: ThemeHex.background)
+        let ink = Self.named("Ink", fallback: ThemeHex.ink)
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = paper
@@ -26,8 +26,8 @@ struct ShiftTrackApp: App {
         // small labels.
         if #unavailable(iOS 26.0) {
             let item = UITabBarItemAppearance()
-            let muted = Self.uiColor(ThemeHex.muted)
-            let accent = Self.uiColor(ThemeHex.accentText)
+            let muted = Self.named("Ink2", fallback: ThemeHex.muted)
+            let accent = Self.named("SignalInk", fallback: ThemeHex.accentText)
             item.normal.iconColor = muted
             item.normal.titleTextAttributes = [.foregroundColor: muted]
             item.selected.iconColor = accent
@@ -42,8 +42,9 @@ struct ShiftTrackApp: App {
         }
     }
 
-    private static func uiColor(_ hex: UInt) -> UIColor {
-        UIColor(
+    /// Named colours resolve per appearance. The fallback is the light hex.
+    private static func named(_ name: String, fallback hex: UInt) -> UIColor {
+        UIColor(named: name) ?? UIColor(
             red: CGFloat((hex >> 16) & 0xFF) / 255,
             green: CGFloat((hex >> 8) & 0xFF) / 255,
             blue: CGFloat(hex & 0xFF) / 255,
@@ -55,7 +56,6 @@ struct ShiftTrackApp: App {
         WindowGroup {
             RootView()
                 .environment(\.locale, Locale(identifier: "ja_JP"))
-                .preferredColorScheme(.light)
                 .tint(Theme.accentText)
                 .dynamicTypeSize(...DynamicTypeSize.accessibility3)
         }
@@ -261,5 +261,4 @@ enum PreviewStore {
     RootView()
         .modelContainer(PreviewStore.container)
         .environment(\.locale, Locale(identifier: "ja_JP"))
-        .preferredColorScheme(.light)
 }

@@ -180,15 +180,15 @@ struct TodayScreen: View {
             VStack(spacing: 2) {
                 Text(weekdayMark(date))
                     .font(AppFont.helper)
-                    .foregroundStyle(selected ? Color.white : Theme.ink2)
+                    .foregroundStyle(selected ? Theme.onInk : (isToday ? Theme.onSignal : Theme.ink2))
                 Text("\(calendar.component(.day, from: date))")
                     .font(.body.weight(.bold).monospacedDigit())
-                    .foregroundStyle(selected ? Color.white : Theme.ink)
+                    .foregroundStyle(selected ? Theme.onInk : (isToday ? Theme.onSignal : Theme.ink))
                 Circle()
                     .fill(dotColor ?? Color.clear)
                     .overlay {
                         if dotColor != nil {
-                            Circle().stroke(selected ? Color.white : Theme.ink.opacity(0.35), lineWidth: 1)
+                            Circle().stroke(selected ? Theme.onInk : Theme.ink.opacity(0.35), lineWidth: 1)
                         }
                     }
                     .frame(width: 7, height: 7)

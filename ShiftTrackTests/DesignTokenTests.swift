@@ -84,6 +84,32 @@ final class DesignTokenTests: XCTestCase {
         XCTAssertNil(WorkplaceContact.phoneReason(for: place))
     }
 
+    func testDarkPairsClearTheContrastFloors() {
+        func ratio(_ hex: UInt, _ other: UInt) -> Double {
+            func lum(_ value: UInt) -> Double {
+                func channel(_ shift: UInt) -> Double {
+                    let c = Double((value >> shift) & 0xFF) / 255
+                    return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+                }
+                return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+            }
+            let hi = max(lum(hex), lum(other))
+            let lo = min(lum(hex), lum(other))
+            return (hi + 0.05) / (lo + 0.05)
+        }
+        let paper = ThemeDarkHex.background
+        let surface = ThemeDarkHex.card
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.ink, paper), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.muted, paper), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.muted, surface), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.accentText, paper), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.danger, paper), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.stroke, surface), 3)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.onInk, ThemeDarkHex.ink), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeHex.ink, ThemeDarkHex.lime), 4.5)
+        XCTAssertGreaterThan(ratio(ThemeDarkHex.saturday, paper), 4.5)
+    }
+
     func testMessageTemplatePreviewFillsEveryToken() {
         let preview = MessageTemplate.preview(LateMessageFill.polite)
         XCTAssertFalse(preview.contains("{"))

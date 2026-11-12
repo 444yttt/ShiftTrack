@@ -738,7 +738,7 @@ struct WeekdaySelector: View {
                 } label: {
                     Text(names[day])
                         .font(AppFont.label)
-                        .foregroundStyle(on ? Color.white : Theme.ink)
+                        .foregroundStyle(on ? Theme.onInk : Theme.ink)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(on ? Theme.ink : Theme.surface, in: Capsule())
                         .overlay(Capsule().stroke(on ? Theme.ink : Theme.stroke, lineWidth: 1))

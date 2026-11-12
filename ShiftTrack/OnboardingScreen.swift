@@ -110,7 +110,7 @@ struct OnboardingScreen: View {
     private func symbolHero(_ name: String) -> some View {
         Image(systemName: name)
             .font(.system(size: 44, weight: .semibold))
-            .foregroundStyle(Theme.ink)
+            .foregroundStyle(Theme.onSignal)
             .frame(width: 104, height: 104)
             .background(Theme.signal, in: Circle())
             .frame(maxWidth: .infinity)
