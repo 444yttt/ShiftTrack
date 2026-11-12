@@ -31,6 +31,11 @@ enum PayWindows {
         }
     }
 
+    /// Week pay with no weekday. Month-end (`paydayDay == 0`) stays a real payday.
+    static func needsPaydaySetup(_ workplace: Workplace) -> Bool {
+        workplace.payCycle == .week && workplace.payWeekday == 0
+    }
+
     static func recent(_ workplace: Workplace, now: Date = .now, count: Int = 6, calendar: Calendar = .current) -> [PayWindow] {
         var windows: [PayWindow] = []
         var cursor = now
@@ -88,6 +93,9 @@ struct PayPeriodsView: View {
             List {
                 if shown.isEmpty {
                     Text("勤務先はまだ登録されていません")
+                }
+                if shown.contains(where: PayWindows.needsPaydaySetup) {
+                    Text("支払日が未設定です。「支払い」で設定すると、支給日が出ます。")
                 }
                 ForEach(shown) { workplace in
                     Section(workplace.name) {
@@ -479,6 +487,7 @@ struct LateTemplateList: View {
                         LateMessageComposer()
                     }
                     Button("最初の文章に戻す") {
+                        UserDefaults.standard.removeObject(forKey: LateMessageFill.templateKey)
                         UserDefaults.standard.removeObject(forKey: LateMessageComposer.storageKey)
                     }
                 }
@@ -487,7 +496,9 @@ struct LateTemplateList: View {
                         Text("勤務先はまだ登録されていません")
                     }
                     ForEach(workplaces) { workplace in
-                        Text(workplace.name)
+                        NavigationLink(workplace.name) {
+                            LateMessageComposer(addressee: workplace.name)
+                        }
                     }
                 }
             }
@@ -517,7 +528,10 @@ struct LateMessageComposer: View {
     @State private var reason = "電車の遅延のため"
     @State private var minutes = 15
     @State private var ending = "分ほど遅れます"
+    @State private var template = LateMessageFill.polite
     @State private var saved = false
+
+    var addressee: String = ""
 
     /// Each section can be omitted on its own. All four are shown until a branch hides one.
     var hiddenSections: Set<LateMessageSection> = []
@@ -551,16 +565,38 @@ struct LateMessageComposer: View {
                     .designFont(13)
                     .foregroundStyle(Theme.muted)
             }
+            Text(LateMessageFill.explanation)
+                .designFont(13)
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("宛名")
+                .designFont(16, weight: .bold)
+            Text(addressee.isEmpty ? "宛名なし" : addressee)
+                .designFont(16)
+                .accessibilityIdentifier("late.addressee")
+            TextField("文章の型", text: $template, axis: .vertical)
+                .designFont(16)
+                .padding(12)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityIdentifier("late.template")
             Text(draft)
                 .designFont(16, weight: .bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityIdentifier("late.preview")
             Text("選んだ理由と分数を、この文章にします。送信はしません。")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
+            HStack(spacing: 8) {
+                Button("申し訳ありません。") { template = LateMessageFill.polite }
+                Button("すみません。") { template = LateMessageFill.casual }
+            }
+            .designFont(13, weight: .bold)
             Button("保存") {
+                UserDefaults.standard.set(template, forKey: LateMessageFill.templateKey)
                 UserDefaults.standard.set(draft, forKey: Self.storageKey)
                 saved = true
             }
@@ -581,17 +617,21 @@ struct LateMessageComposer: View {
         .background(Theme.background)
         .navigationTitle("遅刻の連絡")
         .onAppear {
-            if let stored = UserDefaults.standard.string(forKey: Self.storageKey), !stored.isEmpty {
-                saved = false
+            if let stored = UserDefaults.standard.string(forKey: LateMessageFill.templateKey), !stored.isEmpty {
+                template = stored
             }
         }
     }
 
-    private var draft: String {
+    private var delayText: String {
         if ending == "ごろになります" {
-            return "\(reason)、\(minutes)分後\(ending)"
+            return "\(minutes)分後\(ending)"
         }
-        return "\(reason)、\(minutes)\(ending)"
+        return "\(minutes)\(ending)"
+    }
+
+    private var draft: String {
+        LateMessageFill.apply(template: template, addressee: addressee, reason: reason, delay: delayText)
     }
 }
 

@@ -23,6 +23,7 @@ struct TodayScreen: View {
         case part
         case unconfirmed
         case periods
+        case todos(UUID)
 
         var id: String {
             switch self {
@@ -30,6 +31,7 @@ struct TodayScreen: View {
             case .part: "part"
             case .unconfirmed: "unconfirmed"
             case .periods: "periods"
+            case .todos(let id): "todos-\(id.uuidString)"
             }
         }
     }
@@ -141,6 +143,9 @@ struct TodayScreen: View {
                 }
             case .periods:
                 PayPeriodsView()
+            case .todos(let id):
+                TodoEditor(shiftID: id)
+                    .presentationBackground(Theme.background)
             }
         }
     }
@@ -240,14 +245,13 @@ struct TodayScreen: View {
     }
 
     private var todoLine: some View {
-        let items = shifts
-            .filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
-            .flatMap(\.todos)
+        let dayShifts = shifts.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
+        let items = dayShifts.flatMap(\.todos)
         return VStack(alignment: .leading, spacing: 6) {
             Text("\(Formatters.monthDayWeekday(day))のやること")
                 .font(.system(size: 16, weight: .bold))
             if items.isEmpty {
-                Text("この日のやることはありません。シフトの「編集」から追加できます。")
+                Text(dayShifts.isEmpty ? "この日のやることはありません。" : "この日のやることはありません。下から追加できます。")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
             } else {
@@ -261,6 +265,13 @@ struct TodayScreen: View {
                             .font(.system(size: 14))
                     }
                 }
+            }
+            ForEach(dayShifts) { shift in
+                Button("やることを追加") { sheet = .todos(shift.uuid) }
+                    .buttonStyle(PressableStyle())
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityIdentifier("today.todo.add")
             }
         }
         .padding(16)
