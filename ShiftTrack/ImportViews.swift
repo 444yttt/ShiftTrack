@@ -38,7 +38,7 @@ struct ImportFlowView: View {
                 }
             }
         }
-        .background(Theme.background)
+        .background(Theme.paper)
         .onDisappear { router.noteHandled() }
     }
 }
@@ -55,105 +55,91 @@ struct ImportChooserView: View {
     @State private var error = ""
 
     var body: some View {
-        ScreenScroll {
-            Text(IntelligenceAvailability.statusText)
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 4)
-
-            if let imageData, let image = UIImage(data: imageData) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .padding(.top, 12)
-            }
-
-            HStack(spacing: 8) {
-                PhotosPicker(selection: $photoItem, matching: .images) {
-                    label("写真を選ぶ", systemImage: "photo")
+        ScreenScroll(spacing: Space.m) {
+            InfoNote(text: IntelligenceAvailability.statusText)
+                .padding(.top, Space.xs)
+            SectionHeader(title: "写真から読む", detail: "シフト表の写真を選ぶか撮ります。文字はこの端末の中で読み取ります。")
+            Card {
+                if let imageData, let image = UIImage(data: imageData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .accessibilityLabel("選んだシフト表の画像")
                 }
-                .buttonStyle(.plain)
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button {
-                        showCamera = true
-                    } label: {
-                        label("撮影", systemImage: "camera")
+                HStack(spacing: Space.xs) {
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        label("写真を選ぶ", systemImage: "photo")
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("import.photo")
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button {
+                            showCamera = true
+                        } label: {
+                            label("撮影する", systemImage: "camera")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("import.camera")
+                    }
                 }
             }
-            .padding(.top, 12)
-
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $text)
-                    .designFont(16)
+            SectionHeader(title: "文字から読む", detail: "シフト表の文字を貼り付けるか、書きます。1行に1件です。")
+            Card {
+                Text("シフト表の文字")
+                    .font(AppFont.label)
                     .foregroundStyle(Theme.ink)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 160)
-                    .padding(10)
-                if text.isEmpty {
-                    Text(placeholder)
-                        .designFont(16)
-                        .foregroundStyle(Theme.muted)
-                        .padding(16)
-                        .allowsHitTesting(false)
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $text)
+                        .font(AppFont.body)
+                        .foregroundStyle(Theme.ink)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 160)
+                        .padding(8)
+                        .accessibilityLabel("シフト表の文字")
+                        .accessibilityIdentifier("import.text")
+                    if text.isEmpty {
+                        Text(placeholder)
+                            .font(AppFont.body)
+                            .foregroundStyle(Theme.ink2)
+                            .padding(14)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+                TextLinkButton(title: "コピーした文字を貼る", systemImage: "doc.on.clipboard", identifier: "import.paste") {
+                    if let clip = UIPasteboard.general.string, !clip.isEmpty {
+                        text = clip
+                    }
+                }
+                if !assumption.isEmpty {
+                    InfoNote(text: assumption)
                 }
             }
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .padding(.top, 12)
-
-            if !assumption.isEmpty {
-                Text(assumption)
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-            }
-
-            Button {
-                if let clip = UIPasteboard.general.string, !clip.isEmpty {
-                    text = clip
-                }
-            } label: {
-                Text("コピーした文字を貼る")
-                    .designFont(16, weight: .medium)
-                    .foregroundStyle(Theme.accentText)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-
             if !error.isEmpty {
-                Text(error)
-                    .designFont(13)
-                    .foregroundStyle(Theme.behind)
-                    .padding(.top, 8)
+                InfoNote(text: error, tone: .error)
             }
-
             if working {
-                ProgressView()
-                    .tint(Theme.accentText)
+                ProgressView("読み取っています…")
+                    .tint(Theme.signalInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 16)
             } else {
-                LimeCapsuleButton(title: "読み取る", fillWidth: true, designSize: 16) {
+                PrimaryButton(title: "読み取って候補を見る", identifier: "import.read") {
                     Task { await extract() }
                 }
-                .padding(.top, 16)
                 .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageData == nil)
-                .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageData == nil ? 0.4 : 1)
             }
         }
-        .background(Theme.background)
+        .background(Theme.paper)
         .navigationTitle("シフト表を取り込む")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("閉じる") { dismiss() }
-                    .foregroundStyle(Theme.accentText)
+                    .foregroundStyle(Theme.signalInk)
             }
         }
         .darkSheet()
@@ -176,14 +162,14 @@ struct ImportChooserView: View {
     private func label(_ title: String, systemImage: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
+                .accessibilityHidden(true)
             Text(title)
         }
-        .designFont(16, weight: .bold)
+        .font(AppFont.label)
         .foregroundStyle(Theme.ink)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Theme.card)
-        .clipShape(Capsule())
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
     }
 
     private var placeholder: String {
@@ -256,56 +242,36 @@ struct ImportReviewView: View {
     }
 
     var body: some View {
-        ScreenScroll {
-            Text(pending.message)
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+        ScreenScroll(spacing: Space.m) {
+            InfoNote(text: pending.message)
+                .padding(.top, Space.xs)
             if pending.candidates.isEmpty {
-                Text("候補がありません")
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.ink)
-                    .padding(.top, 20)
+                EmptyState(systemImage: "doc.text.magnifyingglass", message: "候補がありません")
             } else {
-                VStack(spacing: 10) {
-                    ForEach($pending.candidates) { $candidate in
-                        candidateRow($candidate)
-                    }
+                SectionHeader(title: "候補 \(pending.candidates.count)件", detail: "チェックを外した行は保存しません。行を押すと直せます。")
+                ForEach($pending.candidates) { $candidate in
+                    candidateRow($candidate)
                 }
-                .padding(.top, 12)
             }
-
             if !savedNote.isEmpty {
-                Text(savedNote)
-                    .designFont(13)
-                    .foregroundStyle(Theme.accentText)
-                    .padding(.top, 8)
+                InfoNote(text: savedNote, systemImage: "checkmark.circle")
             }
-
-            LimeCapsuleButton(title: "選択した \(selectedCount) 件を保存", fillWidth: true, designSize: 16) {
+            PrimaryButton(title: "選んだ \(selectedCount) 件を保存", identifier: "import.save") {
                 save()
             }
-            .padding(.top, 16)
             .disabled(selectedCount == 0)
-            .opacity(selectedCount == 0 ? 0.4 : 1)
-
-            Button("候補を破棄") {
+            DestructiveButton(title: "候補を捨てる", identifier: "import.discard") {
                 ImportRouter.shared.discard()
                 dismiss()
             }
-            .designFont(16, weight: .medium)
-            .foregroundStyle(Theme.behind)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 8)
         }
-        .background(Theme.background)
+        .background(Theme.paper)
         .navigationTitle("候補を確認")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("戻る") { onBack() }
-                    .foregroundStyle(Theme.accentText)
+                    .foregroundStyle(Theme.signalInk)
             }
         }
         .darkSheet()
@@ -323,34 +289,47 @@ struct ImportReviewView: View {
     private var selectedCount: Int { pending.candidates.filter(\.included).count }
 
     private func candidateRow(_ candidate: Binding<ImportCandidate>) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        let value = candidate.wrappedValue
+        return HStack(alignment: .center, spacing: Space.s) {
             Button {
                 candidate.wrappedValue.included.toggle()
             } label: {
-                Image(systemName: candidate.wrappedValue.included ? "checkmark.circle.fill" : "circle")
-                    .designFont(22)
-                    .foregroundStyle(candidate.wrappedValue.included ? Theme.lime : Theme.muted)
+                Image(systemName: value.included ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
+                    .foregroundStyle(value.included ? Theme.signalInk : Theme.ink2)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(candidate.wrappedValue.workplaceName.isEmpty ? "勤務先未設定" : candidate.wrappedValue.workplaceName)
-                    .designFont(16, weight: .bold)
-                    .foregroundStyle(Theme.ink)
-                Text("\(Formatters.monthDayWeekday(candidate.wrappedValue.date))  \(Formatters.clock(candidate.wrappedValue.startMinutes))–\(Formatters.clock(candidate.wrappedValue.endMinutes))  休憩\(candidate.wrappedValue.breakMinutes)分\(candidate.wrappedValue.breakFollowsRules ? "（規則）" : "（入力）")")
-                    .designFont(13)
-                    .foregroundStyle(Theme.muted)
-                Text(candidate.wrappedValue.createWorkplace ? "新規の勤務先として追加" : "既存の勤務先")
-                    .designFont(13, weight: .medium)
-                    .foregroundStyle(Theme.accentText)
+            .accessibilityLabel(value.included ? "保存する" : "保存しない")
+            .accessibilityAddTraits(value.included ? [.isSelected, .isButton] : .isButton)
+            Button {
+                editingID = value.id
+            } label: {
+                HStack(spacing: Space.xs) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(value.workplaceName.isEmpty ? "勤務先が未設定" : value.workplaceName)
+                            .font(AppFont.rowTitle)
+                            .foregroundStyle(Theme.ink)
+                        Text("\(Formatters.monthDayWeekday(value.date))  \(Formatters.clock(value.startMinutes))–\(Formatters.clock(value.endMinutes))  休憩\(value.breakMinutes)分\(value.breakFollowsRules ? "（決まりから）" : "")")
+                            .font(AppFont.helper.monospacedDigit())
+                            .foregroundStyle(Theme.ink2)
+                        Text(value.createWorkplace ? "新しい勤務先として追加します" : "登録済みの勤務先に入れます")
+                            .font(AppFont.helper.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    Spacer(minLength: Space.xs)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Theme.ink2)
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
             }
-            Spacer()
-            Button("編集") { editingID = candidate.wrappedValue.id }
-                .designFont(16, weight: .medium)
-                .foregroundStyle(Theme.accentText)
+            .buttonStyle(RowButtonStyle())
+            .accessibilityHint("押すと直せます")
         }
-        .padding(14)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(Space.s)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 
     private func matchWorkplaces() {
@@ -477,44 +456,49 @@ struct CandidateEditor: View {
 
     var body: some View {
         NavigationStack {
-            ScreenScroll {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("勤務先")
-                        .designFont(13, weight: .medium)
-                        .foregroundStyle(Theme.muted)
-                    TextField("勤務先の名前", text: $candidate.workplaceName)
-                        .designFont(16, weight: .medium)
-                        .foregroundStyle(Theme.ink)
-                        .focused($typing)
-                    Picker("登録方法", selection: $candidate.createWorkplace) {
-                        Text("この名前で追加").tag(true)
-                        Text("既存の勤務先").tag(false)
+            ScreenScroll(spacing: Space.m) {
+                Card {
+                    LabeledField(label: "勤務先の名前", text: $candidate.workplaceName, prompt: "例：架空茶房 北窓", identifier: "candidate.name")
+                    SegmentedRow(label: "入れ方", selection: $candidate.createWorkplace, identifier: "candidate.mode") {
+                        Text("この名前で新しく追加").tag(true)
+                        Text("登録済みから選ぶ").tag(false)
                     }
-                    .pickerStyle(.segmented)
                     if !candidate.createWorkplace {
-                        Picker("勤務先", selection: workplaceBinding) {
+                        PickerRow(label: "勤務先", selection: workplaceBinding, identifier: "candidate.workplace") {
                             Text("選んでください").tag(Optional<UUID>.none)
                             ForEach(workplaces) { workplace in
                                 Text(workplace.name).tag(Optional(workplace.uuid))
                             }
                         }
-                        .tint(Theme.accentText)
                     }
-                    DatePicker("日付", selection: $candidate.date, displayedComponents: .date)
-                        .environment(\.locale, Locale(identifier: "ja_JP"))
-                    HStack(alignment: .top, spacing: 10) {
+                }
+                .padding(.top, Space.xs)
+                Card {
+                    DatePicker(selection: $candidate.date, displayedComponents: .date) {
+                        Text("日付")
+                            .font(AppFont.body)
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .environment(\.locale, Locale(identifier: "ja_JP"))
+                    .tint(Theme.signalInk)
+                    .frame(minHeight: 44)
+                    HStack(alignment: .top, spacing: Space.xs) {
                         MinutesTimePicker(title: "開始", minutes: $candidate.startMinutes)
                         MinutesTimePicker(title: "終了", minutes: $candidate.endMinutes)
                     }
                     .onChange(of: candidate.startMinutes) { _, _ in refreshCandidateBreak() }
                     .onChange(of: candidate.endMinutes) { _, _ in refreshCandidateBreak() }
+                }
+                Card {
                     if ruleWorkplace?.payIsDaily == true {
-                        Text("日給の勤務先では、休憩時間は給料から引きません。")
-                            .designFont(13)
-                            .foregroundStyle(Theme.muted)
+                        InfoNote(text: "日給の勤務先では、休憩で給料は減りません。")
                     } else {
-                        Toggle("休憩を規則から入れる", isOn: candidateBreakFollows)
-                            .tint(Theme.accentText)
+                        ToggleRow(
+                            title: "勤務先の決まりで休憩を入れる",
+                            helper: "オフにすると、下で選んだ休憩を使います。",
+                            isOn: candidateBreakFollows,
+                            identifier: "candidate.breakRules"
+                        )
                         BreakMinutesControl(minutes: candidateBreakEntry, range: 0...600)
                     }
                     if PayMath.workedMinutes(
@@ -522,28 +506,25 @@ struct CandidateEditor: View {
                         end: candidate.endMinutes,
                         breakMinutes: candidate.breakMinutes
                     ) == 0 {
-                        Text("開始と終了が同じだと、この行は保存されません。")
-                            .designFont(13)
-                            .foregroundStyle(Theme.behind)
+                        InfoNote(text: "働く時間が0分になるため、この行は保存されません。開始と終了を確かめてください。", tone: .error)
                     }
                 }
-                .padding(14)
-                .background(Theme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .foregroundStyle(Theme.ink)
             }
-            .background(Theme.background)
-            .navigationTitle("候補を編集")
+            .background(Theme.paper)
+            .navigationTitle("候補を直す")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完了") { dismiss() }
-                        .foregroundStyle(Theme.accentText)
+                        .foregroundStyle(Theme.signalInk)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完了") { typing = false }
-                        .foregroundStyle(Theme.accentText)
+                    Button("閉じる") {
+                        typing = false
+                        Keyboard.dismiss()
+                    }
+                    .foregroundStyle(Theme.signalInk)
                 }
             }
             .darkSheet()

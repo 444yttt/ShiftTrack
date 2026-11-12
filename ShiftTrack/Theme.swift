@@ -81,34 +81,6 @@ enum AppFont {
     static let value = Font.body.weight(.semibold).monospacedDigit()
 }
 
-/// Design size passed to `scaledValueForValue:`. At the default content size the
-/// drawn size is this number. Dynamic Type changes it. Which string uses which
-/// number was not identified, so the choice follows the screenshot.
-struct DesignFont: ViewModifier {
-    var weight: Font.Weight
-    var design: Font.Design
-    var digits: Bool
-    @ScaledMetric(relativeTo: .body) private var size: CGFloat = 16
-
-    init(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) {
-        self.weight = weight
-        self.design = design
-        self.digits = digits
-        self._size = ScaledMetric(wrappedValue: size, relativeTo: .body)
-    }
-
-    func body(content: Content) -> some View {
-        let base = Font.system(size: size, weight: weight, design: design)
-        return content.font(digits ? base.monospacedDigit() : base)
-    }
-}
-
-extension View {
-    func designFont(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) -> some View {
-        modifier(DesignFont(size, weight: weight, design: design, digits: digits))
-    }
-}
-
 extension Color {
     init(hex: UInt, alpha: Double = 1) {
         self.init(
