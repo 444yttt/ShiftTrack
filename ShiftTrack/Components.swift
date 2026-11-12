@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Tabs of the system tab bar, left to right. UI tests find them by title
 /// (`app.tabBars.buttons["カレンダー"]`).
-enum AppTab: Int, CaseIterable, Identifiable {
+enum AppTab: Int, Hashable, CaseIterable, Identifiable {
     case list, calendar, income, workplaces, settings
-    var id: Int { rawValue }
+    var id: AppTab { self }
     var title: String {
         switch self {
         case .list: "ホーム"
@@ -222,8 +222,12 @@ struct FilterChipBar: View {
 }
 
 /// Scrolling page with the standard gutter and a leading-aligned column.
+/// On a regular width the column stays a reading measure, centered, so cards
+/// do not stretch across an iPad in either orientation. The scroll view itself
+/// stays full width and the screen's paper background fills the margins.
 struct ScreenScroll<Content: View>: View {
     var spacing: CGFloat = Space.s
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -231,9 +235,10 @@ struct ScreenScroll<Content: View>: View {
             VStack(alignment: .leading, spacing: spacing) {
                 content
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Space.gutter)
             .padding(.bottom, Space.xl)
+            .frame(maxWidth: sizeClass == .regular ? Readable.column : .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)

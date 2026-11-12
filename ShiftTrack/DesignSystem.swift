@@ -24,6 +24,12 @@ enum Radius {
     static let hero: CGFloat = 28
 }
 
+/// Reading measure for regular-width windows (iPad portrait and landscape,
+/// and any other regular size class). Compact phones keep the full width.
+enum Readable {
+    static let column: CGFloat = 680
+}
+
 // MARK: - Containers
 
 /// White card. The one container style for grouped content.

@@ -91,20 +91,43 @@ struct RootView: View {
         && !ProcessInfo.processInfo.arguments.contains("-UITestingSample")
 
     var body: some View {
-        // The standard tab bar, anchored to the bottom safe area. Each screen is a
-        // scroll view, so its content scrolls under the bar and its last row can
-        // still be scrolled clear of it.
-        TabView(selection: $tab) {
-            TodayScreen()
-                .appTab(.list)
-            CalendarScreen()
-                .appTab(.calendar)
-            IncomeScreen()
-                .appTab(.income)
-            WorkplaceDirectoryScreen()
-                .appTab(.workplaces)
-            SettingsScreen()
-                .appTab(.settings)
+        // iPhone keeps the bottom tab bar. iPad uses a sidebar in both
+        // orientations so the sections stay a tap away while the detail column
+        // stays a reading measure (see `ScreenScroll`).
+        Group {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                NavigationSplitView {
+                    List(selection: sidebarSelection) {
+                        ForEach(AppTab.allCases) { item in
+                            Label(item.title, systemImage: item.symbol)
+                                .tag(item)
+                                .accessibilityIdentifier("pad.tab.\(item.title)")
+                        }
+                    }
+                    .navigationTitle("しふとらっく")
+                    .listStyle(.sidebar)
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 300)
+                } detail: {
+                    padDetail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Theme.paper)
+                        .topSafeAreaCover()
+                }
+                .navigationSplitViewStyle(.balanced)
+            } else {
+                TabView(selection: $tab) {
+                    TodayScreen()
+                        .appTab(.list)
+                    CalendarScreen()
+                        .appTab(.calendar)
+                    IncomeScreen()
+                        .appTab(.income)
+                    WorkplaceDirectoryScreen()
+                        .appTab(.workplaces)
+                    SettingsScreen()
+                        .appTab(.settings)
+                }
+            }
         }
         .background {
             ShiftEndPulse()
@@ -183,6 +206,20 @@ struct RootView: View {
                 await ShiftNoticeRefresh.apply(shifts: current)
                 await ShiftMirrorRefresh.apply(shifts: current)
             }
+        }
+    }
+
+    private var sidebarSelection: Binding<AppTab?> {
+        Binding(get: { tab }, set: { if let value = $0 { tab = value } })
+    }
+
+    @ViewBuilder private var padDetail: some View {
+        switch tab {
+        case .list: TodayScreen()
+        case .calendar: CalendarScreen()
+        case .income: IncomeScreen()
+        case .workplaces: WorkplaceDirectoryScreen()
+        case .settings: SettingsScreen()
         }
     }
 

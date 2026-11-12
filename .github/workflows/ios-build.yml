@@ -69,3 +69,47 @@ jobs:
           name: ui-screenshots
           path: /tmp/shifttrack-shots
           if-no-files-found: ignore
+
+  ipad:
+    name: iPad Simulator
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and test on iPad
+        run: |
+          set -euo pipefail
+          udid=$(python3 - <<'PY'
+          import json, subprocess
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+          devices = []
+          for runtime, rows in json.loads(raw).get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for device in rows:
+                  if device.get("isAvailable", True) and device.get("name", "").startswith("iPad"):
+                      devices.append(device["udid"])
+          if not devices:
+              raise SystemExit("no iPad simulator")
+          print(devices[-1])
+          PY
+          )
+          rm -rf /tmp/shifttrack-shots
+          mkdir -p /tmp/shifttrack-shots
+          xcodebuild test \
+            -project ShiftTrack.xcodeproj \
+            -scheme ShiftTrack \
+            -destination "id=${udid}" \
+            -only-testing:ShiftTrackTests \
+            -only-testing:ShiftTrackUITests/IPadShotUITests \
+            -resultBundlePath "$RUNNER_TEMP/ShiftTrack-iPad.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload iPad screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots-ipad
+          path: /tmp/shifttrack-shots
+          if-no-files-found: ignore
