@@ -241,33 +241,31 @@ struct PatternBreakEditor: View {
     @Binding var modeRaw: Int
     @Binding var fixedMinutes: Int
     @Binding var rules: [InOutRecovered.BreakRule]
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var mode: PatternBreakMode { PatternBreak.mode(modeRaw) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("休憩")
-                .designFont(15, weight: .bold)
-                .foregroundStyle(Theme.ink)
-            if dynamicTypeSize.isAccessibilitySize {
-                Picker("休憩のきめ方", selection: $modeRaw) { options }
-                    .pickerStyle(.menu)
-            } else {
-                Picker("休憩のきめ方", selection: $modeRaw) { options }
-                    .pickerStyle(.segmented)
+        VStack(alignment: .leading, spacing: Space.s) {
+            SegmentedRow(label: "休憩の決め方", selection: $modeRaw, helper: PatternBreak.detail(mode), identifier: "pattern.breakMode") {
+                ForEach(PatternBreakMode.allCases) { item in
+                    Text(item.title).tag(item.rawValue)
+                }
             }
-            Text(PatternBreak.detail(mode))
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
             switch mode {
             case .fixed:
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach([0, 30, 45, 60], id: \.self) { minutes in
-                            quick(minutes)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("よく使う長さ")
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.ink)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Space.xs) {
+                            ForEach([0, 30, 45, 60], id: \.self) { minutes in
+                                ChipButton(title: minutes == 0 ? "なし" : "\(minutes)分", selected: fixedMinutes == minutes) {
+                                    fixedMinutes = minutes
+                                }
+                            }
                         }
+                        .padding(.vertical, 2)
                     }
                 }
                 BreakMinutesControl(minutes: $fixedMinutes, range: 0...600)
@@ -278,30 +276,6 @@ struct PatternBreakEditor: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder private var options: some View {
-        ForEach(PatternBreakMode.allCases) { item in
-            Text(item.title).tag(item.rawValue)
-        }
-    }
-
-    private func quick(_ minutes: Int) -> some View {
-        let selected = fixedMinutes == minutes
-        return Button {
-            fixedMinutes = minutes
-        } label: {
-            Text(minutes == 0 ? "なし" : "\(minutes)分")
-                .designFont(14, weight: .bold)
-                .foregroundStyle(selected ? Color.white : Theme.ink)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 44)
-                .background(selected ? Theme.ink : Theme.card)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(selected ? Theme.ink : Theme.border, lineWidth: 1))
-        }
-        .buttonStyle(PressableStyle())
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -337,96 +311,79 @@ struct ShiftPartEditor: View {
 
     var body: some View {
         NavigationStack {
-            ScreenScroll {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(existing == nil
-                         ? "よく使う時間を、パターンにして登録します。"
+            ScreenScroll(spacing: Space.m) {
+                InfoNote(text: existing == nil
+                         ? "よく入る時間をパターンにします。カレンダーやホームから、1回押すだけで置けます。"
                          : "変えた内容は、これから置くシフトに使われます。すでに置いたシフトは変わりません。")
-                        .designFont(14)
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    TextField("パターンの名前（例：遅番）", text: $name)
-                        .focused($typing)
-                        .submitLabel(.done)
-                        .designFont(17, weight: .medium)
-                        .foregroundStyle(Theme.ink)
-                        .padding(14)
-                        .frame(minHeight: 52)
-                        .background(Theme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.border, lineWidth: 1))
-                        .accessibilityIdentifier("field.パターン名")
+                    .padding(.top, Space.xs)
+                Card {
+                    LabeledField(label: "パターンの名前（必須）", text: $name, prompt: "例：遅番", identifier: "field.パターン名")
                     if workplaces.isEmpty {
-                        Text("先に勤務先を1件追加してください。")
-                            .designFont(14)
-                            .foregroundStyle(Theme.muted)
+                        InfoNote(text: "先に勤務先を1件登録してください。", tone: .warning)
                     } else {
                         workplacePicker
-                        HStack(alignment: .top, spacing: 10) {
+                    }
+                }
+                if !workplaces.isEmpty {
+                    SectionHeader(title: "時間")
+                    Card {
+                        HStack(alignment: .top, spacing: Space.xs) {
                             MinutesTimePicker(title: "開始", minutes: $startMinute)
                             MinutesTimePicker(title: "終了", minutes: $endMinute)
                         }
-                        Text(endsNextDay
-                             ? "終了が開始と同じか早いので、翌日の終了として置きます。"
-                             : "同じ日の中で置きます。")
-                            .designFont(13)
-                            .foregroundStyle(Theme.muted)
+                        InfoNote(text: endsNextDay
+                                 ? "終了が開始と同じか早いので、翌日に終わるシフトとして置きます。"
+                                 : "同じ日の中で終わるシフトとして置きます。")
+                    }
+                    SectionHeader(title: "休憩")
+                    Card {
                         PatternBreakEditor(modeRaw: $breakModeRaw, fixedMinutes: $breakMinutes, rules: $rules)
-                            .surfaceCard()
+                    }
+                    SectionHeader(title: "見た目とやること")
+                    Card {
                         colorRow
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("やること（1行に1つ）")
-                                .designFont(14, weight: .medium)
-                                .foregroundStyle(Theme.muted)
-                            TextField("改行で複数", text: $todoText, axis: .vertical)
-                                .lineLimit(2...6)
-                                .focused($typing)
-                                .designFont(17)
-                                .foregroundStyle(Theme.ink)
-                                .padding(ScreenInsets.todo)
-                                .background(Theme.card)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.border, lineWidth: 1))
-                                .accessibilityIdentifier("field.やること")
-                            Text("置いたシフトには、やることが未完了で入ります。設定でオンにするとリマインダーにも入ります。")
-                                .designFont(13)
-                                .foregroundStyle(Theme.muted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    if !error.isEmpty {
-                        Text(error)
-                            .designFont(14, weight: .medium)
-                            .foregroundStyle(Theme.behind)
-                    }
-                    if existing != nil {
-                        Button("このパターンを削除") { confirmDelete = true }
-                            .designFont(16, weight: .bold)
-                            .foregroundStyle(Theme.destructive)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .accessibilityIdentifier("pattern.delete")
+                        LabeledField(
+                            label: "やること（1行に1つ）",
+                            text: $todoText,
+                            prompt: "例：レジ締め",
+                            helper: "置いたシフトに、未完了のやることとして入ります。設定でオンにするとリマインダーにも入ります。",
+                            identifier: "field.やること",
+                            multiline: true
+                        )
                     }
                 }
-                .padding(.top, 8)
+                if !error.isEmpty {
+                    InfoNote(text: error, tone: .error)
+                }
+                if existing != nil {
+                    DestructiveButton(title: "このパターンを削除", identifier: "pattern.delete") {
+                        confirmDelete = true
+                    }
+                }
             }
-            .background(Theme.background)
+            .background(Theme.paper)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                LimeCapsuleButton(title: existing == nil ? "保存" : "変更を保存", fillWidth: true, identifier: "pattern.save", designSize: 17, action: save)
+                PrimaryButton(title: existing == nil ? "保存" : "変更を保存", identifier: "pattern.save", action: save)
                     .disabled(workplaces.isEmpty)
                     .padding(.horizontal, Space.gutter)
-                    .padding(.vertical, 10)
-                    .background(Theme.background)
+                    .padding(.vertical, Space.xs)
+                    .background(Theme.paper)
             }
             .navigationTitle(existing == nil ? "パターンを作る" : "パターンを編集")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.signalInk)
                         .accessibilityIdentifier("pattern.editor.close")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完了") { typing = false }
+                    Button("完了") {
+                        typing = false
+                        Keyboard.dismiss()
+                    }
+                    .foregroundStyle(Theme.signalInk)
                 }
             }
             .darkSheet()
@@ -444,68 +401,62 @@ struct ShiftPartEditor: View {
         if workplaces.count <= 4 {
             VStack(alignment: .leading, spacing: 6) {
                 Text("勤務先")
-                    .designFont(14, weight: .medium)
-                    .foregroundStyle(Theme.muted)
+                    .font(AppFont.label)
+                    .foregroundStyle(Theme.ink)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.xs) {
                         ForEach(workplaces) { workplace in
-                            let selected = workplaceID == workplace.uuid
-                            Button {
+                            ChipButton(title: workplace.name, selected: workplaceID == workplace.uuid) {
                                 workplaceID = workplace.uuid
-                            } label: {
-                                Text(workplace.name)
-                                    .designFont(15, weight: .bold)
-                                    .foregroundStyle(selected ? Color.white : Theme.ink)
-                                    .padding(.horizontal, 16)
-                                    .frame(minHeight: 44)
-                                    .background(selected ? Theme.ink : Theme.card)
-                                    .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(selected ? Theme.ink : Theme.border, lineWidth: 1))
                             }
-                            .buttonStyle(PressableStyle())
-                            .accessibilityAddTraits(selected ? .isSelected : [])
                         }
                     }
+                    .padding(.vertical, 2)
                 }
             }
         } else {
-            Picker("勤務先", selection: $workplaceID) {
+            PickerRow(label: "勤務先", selection: $workplaceID, identifier: "pattern.workplace") {
                 ForEach(workplaces) { workplace in
                     Text(workplace.name).tag(Optional(workplace.uuid))
                 }
             }
-            .tint(Theme.accentText)
         }
     }
 
     private var colorRow: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("色")
-                .designFont(14, weight: .medium)
-                .foregroundStyle(Theme.muted)
+            Text("カレンダーでの色")
+                .font(AppFont.label)
+                .foregroundStyle(Theme.ink)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(Theme.palette, id: \.self) { hex in
+                HStack(spacing: Space.xxs) {
+                    ForEach(Array(Theme.palette.enumerated()), id: \.element) { index, hex in
                         let selected = colorHex == hex
                         Button {
                             colorHex = hex
                         } label: {
                             Circle()
                                 .fill(Color(hexString: hex))
-                                .frame(width: 36, height: 36)
-                                .overlay(Circle().stroke(Theme.ink.opacity(0.35), lineWidth: 1))
+                                .frame(width: 34, height: 34)
+                                .overlay(Circle().stroke(Theme.ink.opacity(0.3), lineWidth: 1))
                                 .overlay {
                                     if selected {
                                         Image(systemName: "checkmark")
-                                            .font(.system(size: 14, weight: .black))
-                                            .foregroundStyle(hex == "111111" ? Color.white : Theme.ink)
+                                            .font(.footnote.weight(.black))
+                                            .foregroundStyle(Color.readable(onHex: hex))
+                                    }
+                                }
+                                .padding(3)
+                                .overlay {
+                                    if selected {
+                                        Circle().stroke(Theme.ink, lineWidth: 2)
                                     }
                                 }
                                 .frame(width: 44, height: 44)
                         }
                         .buttonStyle(PressableStyle())
-                        .accessibilityLabel("色 \(hex)")
-                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        .accessibilityLabel("色 \(index + 1)")
+                        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
                     }
                 }
             }
@@ -611,29 +562,28 @@ struct ShiftPartList: View {
 
     var body: some View {
         NavigationStack {
-            ScreenScroll {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("パターンを選んで編集できます。削除しても、すでに置いたシフトは残ります。")
-                        .designFont(14)
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ForEach(parts.filter { !$0.hidden }) { part in
-                        card(part)
-                    }
-                    LimeCapsuleButton(title: "パターンを作る", fillWidth: true, identifier: "partlist.add") {
-                        editing = PartRoute(partID: nil)
-                    }
-                    .disabled(workplaces.isEmpty)
-                    .padding(.top, 6)
+            ScreenScroll(spacing: Space.s) {
+                InfoNote(text: "パターンを選ぶと編集できます。消しても、すでに置いたシフトは残ります。")
+                    .padding(.top, Space.xs)
+                let visible = parts.filter { !$0.hidden }
+                if visible.isEmpty {
+                    EmptyState(systemImage: "square.stack", message: "パターンはまだありません")
                 }
-                .padding(.top, 8)
+                ForEach(visible) { part in
+                    card(part)
+                }
+                PrimaryButton(title: "パターンを作る", systemImage: "plus", identifier: "partlist.add") {
+                    editing = PartRoute(partID: nil)
+                }
+                .disabled(workplaces.isEmpty)
             }
-            .background(Theme.background)
+            .background(Theme.paper)
             .navigationTitle("パターンの一覧")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.signalInk)
                         .accessibilityIdentifier("partlist.close")
                 }
             }
@@ -661,35 +611,34 @@ struct ShiftPartList: View {
 
     private func card(_ part: ShiftPart) -> some View {
         let workplace = workplaces.first { $0.uuid == part.workplaceUUID }
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        return Card(spacing: Space.xs) {
+            HStack(spacing: Space.xs) {
                 Circle()
                     .fill(Color(hexString: part.colorHex))
-                    .frame(width: 12, height: 12)
+                    .frame(width: 14, height: 14)
                     .overlay(Circle().stroke(Theme.ink.opacity(0.35), lineWidth: 1))
+                    .accessibilityHidden(true)
                 Text(part.name)
-                    .designFont(17, weight: .bold)
+                    .font(AppFont.rowTitle)
                     .foregroundStyle(Theme.ink)
             }
-            Text("\(workplace?.name ?? "勤務先なし")  \(Formatters.clock(part.startMinute))–\(Formatters.clock(part.endMinute))")
-                .designFont(14)
-                .foregroundStyle(Theme.muted)
+            Text("\(workplace?.name ?? "勤務先なし")・\(Formatters.clock(part.startMinute))–\(Formatters.clock(part.endMinute))")
+                .font(AppFont.helper.monospacedDigit())
+                .foregroundStyle(Theme.ink2)
             Text(PatternBreak.summary(modeRaw: part.breakModeRaw, fixedMinutes: part.breakMinutes, customRulesRaw: part.breakRulesRaw))
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            HStack(spacing: 10) {
-                SecondaryPillButton(title: "編集", systemImage: "pencil", identifier: "partlist.edit.\(part.name)") {
+                .font(AppFont.helper)
+                .foregroundStyle(Theme.ink2)
+            HStack(spacing: Space.xs) {
+                SecondaryButton(title: "編集", systemImage: "pencil", fillWidth: false, identifier: "partlist.edit.\(part.name)") {
                     editing = PartRoute(partID: part.uuid)
                 }
+                Spacer(minLength: 0)
                 Button("削除") { deleting = part }
-                    .designFont(15, weight: .bold)
-                    .foregroundStyle(Theme.destructive)
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, 8)
+                    .font(AppFont.label)
+                    .foregroundStyle(Theme.danger)
+                    .frame(minWidth: 44, minHeight: 44)
                     .accessibilityIdentifier("partlist.delete.\(part.name)")
             }
         }
-        .surfaceCard()
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.border, lineWidth: 1))
     }
 }
