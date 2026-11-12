@@ -100,6 +100,7 @@ struct WorkplaceEditorView: View {
     @State private var error = ""
     @State private var confirmDelete = false
     @State private var showTemplate = false
+    @State private var showWageHistory = false
     @State private var loaded = false
     @FocusState private var typing: Bool
 
@@ -165,6 +166,9 @@ struct WorkplaceEditorView: View {
             }
             .sheet(isPresented: $showTemplate) {
                 MessageTemplateEditor()
+            }
+            .sheet(isPresented: $showWageHistory) {
+                WageHistoryEditor(entries: $wageHistory, currentWage: max(0, Int(wageText.filter(\.isNumber)) ?? 0))
             }
             .alert("この勤務先を削除しますか？", isPresented: $confirmDelete) {
                 Button("削除", role: .destructive) { deleteWorkplace() }
@@ -289,9 +293,24 @@ struct WorkplaceEditorView: View {
                     YenField(
                         label: "時給",
                         text: $wageText,
-                        helper: "ホームの「いままでの稼ぎ」と、給料の見込みに使います。",
+                        helper: "履歴がない日は、この時給で計算します。",
                         identifier: "field.時給"
                     )
+                    RowDivider()
+                    Button {
+                        showWageHistory = true
+                    } label: {
+                        NavRow(
+                            systemImage: "clock.arrow.circlepath",
+                            title: "時給の履歴",
+                            subtitle: wageHistory.isEmpty
+                                ? "日付を入れると、その日以降のシフトに使います。"
+                                : "\(wageHistory.count)件。シフトの日に有効な時給で計算します。",
+                            value: nil
+                        )
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .accessibilityIdentifier("workplace.wageHistory")
                 }
                 YenField(
                     label: "交通費（1回あたり）",
