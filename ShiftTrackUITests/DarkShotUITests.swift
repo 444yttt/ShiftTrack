@@ -16,36 +16,48 @@ final class DarkShotUITests: XCTestCase {
         app.launchArguments = ["-UITestingSample"]
         app.launch()
 
-        let home = app.staticTexts["today.greeting"]
-        XCTAssertTrue(home.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.tab("ホーム").waitForExistence(timeout: 15))
+        if app.buttons["閉じる"].waitForExistence(timeout: 2) {
+            app.buttons["閉じる"].tap()
+        }
+        show(app.staticTexts["架空茶房 北窓"])
+        XCTAssertTrue(app.staticTexts["today.earned"].waitForExistence(timeout: 8))
         shot(app, "dark-home")
 
+        app.buttons["today.add"].tap()
+        let editor = app.navigationBars["シフトを追加"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 6))
+        shot(app, "dark-add-shift")
+        editor.buttons["キャンセル"].tap()
+
         app.tab("カレンダー").tap()
-        XCTAssertTrue(app.navigationBars["カレンダー"].waitForExistence(timeout: 5))
+        show(app.buttons["calendar.nextMonth"])
         shot(app, "dark-calendar")
 
-        app.tab("ホーム").tap()
-        app.buttons["today.add"].tap()
-        XCTAssertTrue(app.navigationBars["シフトを追加"].waitForExistence(timeout: 5))
-        shot(app, "dark-add-shift")
-        app.buttons["キャンセル"].tap()
-
         app.tab("設定").tap()
-        XCTAssertTrue(app.navigationBars["設定"].waitForExistence(timeout: 5))
+        if app.buttons["おわり"].waitForExistence(timeout: 2) {
+            app.buttons["おわり"].tap()
+        }
+        show(app.buttons["settings.messages"])
         shot(app, "dark-settings")
 
         app.tab("勤務先").tap()
-        XCTAssertTrue(app.staticTexts["架空茶房 北窓"].waitForExistence(timeout: 5))
+        show(app.buttons["workplace.add"])
         shot(app, "dark-workplaces")
 
+        show(app.buttons["workplace.edit.架空茶房 北窓"])
         app.buttons["workplace.edit.架空茶房 北窓"].tap()
-        XCTAssertTrue(app.navigationBars["勤務先を編集"].waitForExistence(timeout: 5))
+        let workplaceEditor = app.navigationBars["勤務先を編集"]
+        XCTAssertTrue(workplaceEditor.waitForExistence(timeout: 6))
         shot(app, "dark-workplace-edit")
-        app.buttons["キャンセル"].tap()
+        workplaceEditor.buttons["キャンセル"].tap()
 
+        show(app.buttons["workplace.card"])
+        app.buttons["workplace.card"].tap()
         show(app.buttons["workplace.pattern.add"])
         app.buttons["workplace.pattern.add"].tap()
-        XCTAssertTrue(app.navigationBars["パターンを作る"].waitForExistence(timeout: 5))
+        let patternEditor = app.navigationBars["パターンを作る"]
+        XCTAssertTrue(patternEditor.waitForExistence(timeout: 6))
         shot(app, "dark-pattern-editor")
     }
 
