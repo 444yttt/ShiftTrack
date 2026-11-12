@@ -25,18 +25,41 @@ enum ThemeHex {
     static let line: UInt = 0xE2DED5
 }
 
+/// Dark variants of `ThemeHex`. The asset catalogue uses the same numbers.
+enum ThemeDarkHex {
+    static let background: UInt = 0x141412
+    static let card: UInt = 0x22211E
+    static let cardRaised: UInt = 0x2C2C28
+    static let lime: UInt = 0xC8F04B
+    static let ink: UInt = 0xF4F2EC
+    static let muted: UInt = 0xC9C4B8
+    static let accentText: UInt = 0xD6F56A
+    static let danger: UInt = 0xFF9B8E
+    static let stroke: UInt = 0xA39E92
+    static let line: UInt = 0x3C3A34
+    static let onInk: UInt = 0x161616
+    static let saturday: UInt = 0x8EB4FF
+}
+
 enum Theme {
-    // Semantic names used by the redesigned screens.
-    static let paper = Color(hex: ThemeHex.background)
-    static let surface = Color(hex: ThemeHex.card)
-    static let sunken = Color(hex: ThemeHex.cardRaised)
-    static let ink = Color(hex: ThemeHex.ink)
-    static let ink2 = Color(hex: ThemeHex.muted)
-    static let signal = Color(hex: ThemeHex.lime)
-    static let signalInk = Color(hex: ThemeHex.accentText)
-    static let stroke = Color(hex: ThemeHex.stroke)
-    static let line = Color(hex: ThemeHex.line)
-    static let danger = Color(hex: ThemeHex.danger)
+    // Asset-catalog colours. Each set has a light and a dark variant, so the
+    // same name follows the system appearance. Light values match `ThemeHex`.
+    static let paper = Color("Paper")
+    static let surface = Color("Surface")
+    static let sunken = Color("Sunken")
+    static let ink = Color("Ink")
+    static let ink2 = Color("Ink2")
+    static let signal = Color("Signal")
+    static let signalInk = Color("SignalInk")
+    static let stroke = Color("Stroke")
+    static let line = Color("Line")
+    static let danger = Color("Danger")
+    /// Text drawn on an ink-coloured fill. White in light mode, near-black in dark mode.
+    static let onInk = Color("OnInk")
+    /// Text and icons drawn on the lime fill. The lime does not change, so this stays dark.
+    static let onSignal = Color(hex: ThemeHex.ink)
+    /// Saturday numerals. The light blue is too dark on the dark paper.
+    static let saturday = Color("Saturday")
     static let onDark = Color.white
 
     // Older names, kept so every screen reads the same tokens.
@@ -104,7 +127,9 @@ extension Color {
             return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
         }
         let luminance = 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
-        return luminance > 0.18 ? Theme.ink : Color.white
+        // Fixed inks. `Theme.ink` flips with the appearance, which would put
+        // light text on a light workplace colour.
+        return luminance > 0.18 ? Color(hex: ThemeHex.ink) : Color.white
     }
 
     init(hexString: String) {

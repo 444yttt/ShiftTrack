@@ -187,12 +187,10 @@ struct CalendarScreen: View {
 
     private static let sundayRed = Theme.danger
     /// Saturday blue: 6.6:1 on white.
-    private static let saturdayBlue = Color(hex: 0x2557B8)
-
     private func weekdayColor(symbol: String) -> Color {
         switch symbol {
         case "日": Self.sundayRed
-        case "土": Self.saturdayBlue
+        case "土": Theme.saturday
         default: Theme.ink2
         }
     }
@@ -207,7 +205,9 @@ struct CalendarScreen: View {
         let payday = isPayday(day)
         let request = hasOpenRequest(day)
         let weekday = calendar.component(.weekday, from: day)
-        let numberColor: Color = selected ? .white : (weekday == 1 ? Self.sundayRed : (weekday == 7 ? Self.saturdayBlue : Theme.ink))
+        let numberColor: Color = selected
+            ? Theme.onInk
+            : (isToday ? Theme.onSignal : (weekday == 1 ? Self.sundayRed : (weekday == 7 ? Theme.saturday : Theme.ink)))
         return Button {
             guard !calendarDragging else { return }
             let start = calendar.startOfDay(for: day)
@@ -224,7 +224,7 @@ struct CalendarScreen: View {
                     ForEach(colors.prefix(3), id: \.self) { hex in
                         Circle()
                             .fill(Color(hexString: hex))
-                            .overlay(Circle().stroke(selected ? Color.white : Theme.ink.opacity(0.35), lineWidth: 1))
+                            .overlay(Circle().stroke(selected ? Theme.onInk : Theme.ink.opacity(0.35), lineWidth: 1))
                             .frame(width: 7, height: 7)
                     }
                 }
@@ -233,12 +233,12 @@ struct CalendarScreen: View {
                     if payday {
                         Text("給")
                             .font(AppFont.badge)
-                            .foregroundStyle(selected ? Theme.signal : Theme.signalInk)
+                            .foregroundStyle(selected ? Theme.onInk : Theme.signalInk)
                     }
                     if request {
                         Text("希")
                             .font(AppFont.badge)
-                            .foregroundStyle(selected ? Color.white : Theme.ink)
+                            .foregroundStyle(selected ? Theme.onInk : Theme.ink)
                     }
                 }
                 .frame(height: 14)
@@ -258,7 +258,7 @@ struct CalendarScreen: View {
                 if picked {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption2)
-                        .foregroundStyle(selected ? Theme.signal : Theme.ink)
+                        .foregroundStyle(selected ? Theme.onInk : Theme.ink)
                         .padding(2)
                         .accessibilityHidden(true)
                 }

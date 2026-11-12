@@ -224,7 +224,7 @@ struct ShiftPartSection: View {
             Spacer(minLength: Space.xs)
             Text(gathering ? "選んだ日に置く" : "置く")
                 .font(AppFont.label)
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.onSignal)
                 .padding(.horizontal, Space.s)
                 .frame(minHeight: 36)
                 .background(Theme.signal, in: Capsule())

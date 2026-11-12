@@ -1402,7 +1402,7 @@ struct TimeAdjustSheet: View {
         } label: {
             Text(label)
                 .font(.body.weight(.bold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.onSignal)
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .background(Theme.signal, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         }

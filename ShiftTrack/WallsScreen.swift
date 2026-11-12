@@ -143,7 +143,7 @@ struct HelpSheet: View {
                     HStack(alignment: .firstTextBaseline, spacing: Space.s) {
                         Text("\(index + 1)")
                             .font(AppFont.label.monospacedDigit())
-                            .foregroundStyle(Theme.ink)
+                            .foregroundStyle(Theme.onSignal)
                             .frame(width: 26, height: 26)
                             .background(Theme.signal, in: Circle())
                             .accessibilityHidden(true)
