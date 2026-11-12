@@ -150,6 +150,20 @@ enum ShiftSpeech {
     static func line(name: String, schedule: String, yen: String) -> String {
         "\(name)、\(schedule)、\(yen)"
     }
+
+    /// What VoiceOver reads for a shift row: workplace, date and time, estimate, to-dos.
+    static func card(_ shift: WorkShift, includeTransport: Bool) -> String {
+        var text = line(
+            name: shift.workplace?.name ?? "勤務先なし",
+            schedule: shift.scheduleLabel,
+            yen: Formatters.yen(shift.estimatedYen(includeTransport: includeTransport))
+        )
+        let todos = shift.todos.map(\.title)
+        if !todos.isEmpty {
+            text += "、やること " + todos.joined(separator: "、")
+        }
+        return text
+    }
 }
 
 /// One shift in a list: colour bar, workplace, date and time, to-dos, estimate.
@@ -208,7 +222,7 @@ struct ShiftCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ShiftSpeech.line(name: workplaceName, schedule: shift.scheduleLabel, yen: yenText))
+        .accessibilityLabel(ShiftSpeech.card(shift, includeTransport: includeTransport))
         .accessibilityHint("押すと編集できます")
     }
 }
