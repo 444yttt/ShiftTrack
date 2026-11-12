@@ -670,9 +670,11 @@ struct ShiftNowCard: View {
                     .foregroundStyle(Theme.ink2)
                 DotoText("¥" + Formatters.yenDigits(total), size: 32, spoken: "この勤務の見込み \(total)円")
                     .accessibilityIdentifier("today.estimate")
-                Text("はじまりまで あと\(Formatters.remaining(startsIn))")
-                    .font(AppFont.helper)
-                    .foregroundStyle(Theme.ink2)
+                if startsIn < 24 * 3_600 {
+                    Text("はじまりまで あと\(Formatters.remaining(startsIn))")
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.ink2)
+                }
             }
         case .finished:
             VStack(alignment: .leading, spacing: Space.xxs) {
