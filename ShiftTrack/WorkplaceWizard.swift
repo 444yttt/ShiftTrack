@@ -1,118 +1,87 @@
 import SwiftData
 import SwiftUI
 
-/// Three registration steps from the reference screenshots.
-/// Illustrations are drawn stand-ins. Photo import uses the existing on-device reader.
+/// Three short steps to register a workplace: the store, the pay, and an
+/// optional usual shift. Everything can be changed later in the editor.
 struct WorkplaceWizard: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
+    @Query private var settingsRows: [AppSettings]
 
     @State private var step = 1
+    // 1. お店
     @State private var name = ""
     @State private var place = ""
     @State private var phone = ""
-    @State private var wage = ""
-    @State private var effectiveFrom = Date()
-    @State private var night = true
-    @State private var overtime = true
-    @State private var legalBreak = true
-    @State private var patternName = ""
-    @State private var startMinute = 17 * 60
-    @State private var endMinute = 22 * 60
-    @State private var weekdays: Set<Int> = []
-    @AppStorage(ShiftNoticeRefresh.beforeKey) private var notify = false
     @State private var hours = ""
     @State private var officialURL = ""
     @State private var latitude = 0.0
     @State private var longitude = 0.0
     @State private var hasCoordinate = false
     @State private var showImport = false
+    // 2. 給料
+    @State private var wage = ""
+    @State private var transport = ""
+    @State private var closingDay = 0
+    @State private var paydayOffset = 1
+    @State private var paydayDay = 25
+    @State private var night = true
+    @State private var overtime = true
+    @State private var legalBreak = true
+    // 3. いつものシフト
+    @State private var patternName = ""
+    @State private var startMinute = 17 * 60
+    @State private var endMinute = 22 * 60
+    @State private var weekdays: Set<Int> = []
+    @AppStorage(ShiftNoticeRefresh.beforeKey) private var notify = false
+    @State private var error = ""
+    @State private var loaded = false
+    @FocusState private var typing: Bool
+
+    private let steps = ["お店", "給料", "いつものシフト"]
 
     var body: some View {
-        VStack(spacing: 0) {
-            progress
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if step == 1 { stepOne }
-                    if step == 2 { stepTwo }
-                    if step == 3 { stepThree }
+        NavigationStack {
+            VStack(spacing: 0) {
+                progress
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.m) {
+                        switch step {
+                        case 1: stepOne
+                        case 2: stepTwo
+                        default: stepThree
+                        }
+                        if !error.isEmpty {
+                            InfoNote(text: error, tone: .error)
+                        }
+                    }
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.bottom, Space.xl)
                 }
-                .padding(16)
+                .scrollDismissesKeyboard(.interactively)
+                footer
             }
-            footer
-        }
-        .background(Theme.background)
-    }
-
-    private var progress: some View {
-        HStack(spacing: 8) {
-            ForEach(1...3, id: \.self) { index in
-                Text(String(format: "%02d", index))
-                    .designFont(13, weight: .bold)
-                    .foregroundStyle(step == index ? Theme.ink : Theme.muted)
-                    .frame(width: 36, height: 36)
-                    .background(step == index ? Theme.lime : (index < step ? Theme.ink : Theme.cardRaised))
-                    .foregroundStyle(index < step ? Color.white : Theme.ink)
-                    .clipShape(Circle())
-                if index < 3 {
-                    Capsule().fill(Theme.cardRaised).frame(height: 3)
+            .background(Theme.paper)
+            .navigationTitle("勤務先を登録")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(Theme.signalInk)
+                        .accessibilityIdentifier("wizard.close")
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") {
+                        typing = false
+                        Keyboard.dismiss()
+                    }
+                        .foregroundStyle(Theme.signalInk)
                 }
             }
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .designFont(14, weight: .bold)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.cardRaised)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("閉じる")
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-    }
-
-    private var stepOne: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ShopPlaceholder()
-            Text("勤務先を登録")
-                .designFont(16, weight: .black)
-            Text("働いているお店の名前を入れます。住所と電話番号は、道順や遅刻の連絡に使います。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            Text("マップで探す")
-                .designFont(13, weight: .bold)
-            HStack {
-                RoundedRectangle(cornerRadius: 14).fill(Theme.cardRaised).frame(height: 48)
-                Button {
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .frame(width: 48, height: 48)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .overlay { Circle().stroke(Theme.ink, lineWidth: 1) }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("検索")
-            }
-            field("店舗名", text: $name, identifier: "field.名前")
-            field("住所", text: $place, identifier: "field.住所")
-            field("連絡先", text: $phone, identifier: "field.連絡先")
-            Button {
-                showImport = true
-            } label: {
-                Text("写真から読み取る")
-                    .designFont(16, weight: .bold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.white)
-                    .clipShape(Capsule())
-                    .overlay { Capsule().stroke(Theme.ink, lineWidth: 1.5) }
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("wizard.photo")
+            .darkSheet()
+            .onAppear(perform: load)
             .sheet(isPresented: $showImport) {
                 WorkplaceImportView { draft in
                     if !draft.name.isEmpty { name = draft.name }
@@ -128,192 +97,245 @@ struct WorkplaceWizard: View {
         }
     }
 
+    // MARK: Progress and footer
+
+    private var progress: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text("ステップ \(step) / \(steps.count)：\(steps[step - 1])")
+                .font(AppFont.label)
+                .foregroundStyle(Theme.ink)
+                .accessibilityIdentifier("wizard.step")
+            HStack(spacing: Space.xxs) {
+                ForEach(1...steps.count, id: \.self) { index in
+                    Capsule()
+                        .fill(index <= step ? Theme.signalInk : Theme.sunken)
+                        .frame(height: 6)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, Space.gutter)
+        .padding(.vertical, Space.s)
+    }
+
+    private var footer: some View {
+        HStack(spacing: Space.s) {
+            SecondaryButton(title: step == 1 ? "やめる" : "戻る", identifier: "wizard.back") {
+                error = ""
+                if step == 1 { dismiss() } else { step -= 1 }
+            }
+            PrimaryButton(title: step == steps.count ? "登録する" : "次へ", identifier: step == steps.count ? "wizard.finish" : "wizard.next") {
+                advance()
+            }
+        }
+        .padding(.horizontal, Space.gutter)
+        .padding(.vertical, Space.s)
+        .background(Theme.paper)
+    }
+
+    private func header(systemImage: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            Image(systemName: systemImage)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 56, height: 56)
+                .background(Theme.signal, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(AppFont.screenTitle)
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Text(detail)
+                    .font(AppFont.body)
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, Space.xs)
+    }
+
+    // MARK: Steps
+
+    private var stepOne: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            header(
+                systemImage: "storefront",
+                title: "働くお店",
+                detail: "名前だけでも登録できます。住所と電話番号を入れると、ホームの「地図」「電話」「メッセージ」が使えます。"
+            )
+            Card {
+                LabeledField(label: "お店の名前（必須）", text: $name, prompt: "例：架空茶房 北窓", identifier: "field.名前")
+                    .focused($typing)
+                LabeledField(label: "住所（任意）", text: $place, prompt: "例：架空県北窓町1-2", identifier: "field.住所")
+                    .focused($typing)
+                LabeledField(label: "電話番号（任意）", text: $phone, prompt: "例：03-0000-0000", keyboard: .phonePad, identifier: "field.電話番号")
+                    .focused($typing)
+            }
+            SecondaryButton(title: "ショップカードの写真や地図のリンクから読む", systemImage: "text.viewfinder", identifier: "wizard.photo") {
+                showImport = true
+            }
+            InfoNote(text: "読み取りはこの端末の中で行い、入れる前に結果を確かめられます。")
+        }
+    }
+
     private var stepTwo: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PayPlaceholder()
-            Text("お給料の決まり")
-                .designFont(16, weight: .black)
-            Text("お給料の見込みの計算に使います。あとから勤務先の画面で直せます。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            HStack {
-                Text("時給")
-                Spacer()
-                TextField("0", text: $wage)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 80)
-                    .accessibilityIdentifier("field.時給")
-                Text("円")
+        VStack(alignment: .leading, spacing: Space.m) {
+            header(
+                systemImage: "yensign",
+                title: "給料の決まり",
+                detail: "見込みの計算に使います。あとから勤務先の編集で変えられます。"
+            )
+            Card {
+                YenField(label: "時給", text: $wage, prompt: "例：1200", helper: "ホームの「いままでの稼ぎ」に使います。", identifier: "field.時給")
+                YenField(label: "交通費（1回あたり）", text: $transport, prompt: "0", identifier: "field.交通費")
             }
-            .padding(14)
-            .background(Theme.cardRaised)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            DatePicker("適用開始日", selection: $effectiveFrom, displayedComponents: .date)
-            HStack {
-                Text("締め日")
-                Spacer()
-                Text("末日")
-                    .foregroundStyle(Theme.muted)
+            SectionHeader(title: "締め日と給料日")
+            Card {
+                PickerRow(label: "締め日", selection: $closingDay, identifier: "wizard.closingDay") {
+                    Text("末日").tag(0)
+                    ForEach(1...30, id: \.self) { Text("\($0)日").tag($0) }
+                }
+                PickerRow(label: "給料日の月", selection: $paydayOffset, identifier: "wizard.paydayMonth") {
+                    Text("締めた月").tag(0)
+                    Text("翌月").tag(1)
+                    Text("翌々月").tag(2)
+                }
+                PickerRow(label: "給料日", selection: $paydayDay, identifier: "wizard.paydayDay") {
+                    Text("末日").tag(0)
+                    ForEach(1...31, id: \.self) { Text("\($0)日").tag($0) }
+                }
+                InfoNote(text: PaySummary.monthly(closingDay: closingDay, paydayDay: paydayDay, monthOffset: paydayOffset))
             }
-            .padding(14)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            toggleRow("深夜割増（22時〜5時）", isOn: $night)
-            Text(night ? "25%" : "0%")
-                .designFont(13, weight: .bold)
-                .foregroundStyle(Theme.muted)
-            toggleRow("残業割増（1日8時間超）", isOn: $overtime)
-            Text(overtime ? "25%" : "0%")
-                .designFont(13, weight: .bold)
-                .foregroundStyle(Theme.muted)
-            toggleRow("休憩", isOn: $legalBreak)
-            Text("法律で決まった休憩で計算します（6時間を超えたら45分、8時間を超えたら60分）。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
+            SectionHeader(title: "割増と休憩")
+            Card(spacing: Space.s) {
+                ToggleRow(title: "深夜（22時〜5時）に25%上乗せ", helper: "法律で決まっている深夜の割増です。", isOn: $night, identifier: "wizard.night")
+                RowDivider()
+                ToggleRow(title: "1日8時間を超えた分に25%上乗せ", helper: "残業の割増です。", isOn: $overtime, identifier: "wizard.overtime")
+                RowDivider()
+                ToggleRow(title: "法定の休憩を入れる", helper: "6時間を超える勤務は45分、8時間を超える勤務は60分の休憩を初期値にします。", isOn: $legalBreak, identifier: "wizard.break")
+            }
         }
     }
 
     private var stepThree: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CalendarPlaceholder()
-            Text("いつものシフト")
-                .designFont(16, weight: .black)
-            Text("毎週決まって入るシフトがあれば入れます。なければそのまま「はじめる」で進めます。")
-                .designFont(13)
-                .foregroundStyle(Theme.muted)
-            field("シフト名", text: $patternName, identifier: "field.シフト名")
-            HStack {
-                Text("開始")
-                Spacer()
-                MinutesTimePicker(title: "開始", minutes: $startMinute)
-            }
-            HStack {
-                Text("終了")
-                Spacer()
-                MinutesTimePicker(title: "終了", minutes: $endMinute)
-            }
-            Text("毎週入る曜日")
-                .designFont(13, weight: .bold)
-            HStack {
-                ForEach(Array(["日", "月", "火", "水", "木", "金", "土"].enumerated()), id: \.offset) { index, label in
-                    let weekday = index + 1
-                    Button(label) {
-                        if weekdays.contains(weekday) { weekdays.remove(weekday) } else { weekdays.insert(weekday) }
-                    }
-                    .designFont(13, weight: .bold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(weekdays.contains(weekday) ? Theme.ink : Color.white)
-                    .foregroundStyle(weekdays.contains(weekday) ? Color.white : Theme.ink)
-                    .clipShape(Circle())
-                    .overlay { Circle().stroke(Theme.ink, lineWidth: 1) }
+        VStack(alignment: .leading, spacing: Space.m) {
+            header(
+                systemImage: "calendar.badge.clock",
+                title: "いつものシフト（任意）",
+                detail: "よく入る時間をパターンにしておくと、カレンダーやホームから1回で置けます。なければ空のまま登録できます。"
+            )
+            Card {
+                LabeledField(label: "パターンの名前", text: $patternName, prompt: "例：遅番", identifier: "field.シフト名")
+                    .focused($typing)
+                HStack(alignment: .top, spacing: Space.xs) {
+                    MinutesTimePicker(title: "開始", minutes: $startMinute)
+                    MinutesTimePicker(title: "終了", minutes: $endMinute)
                 }
+                WeekdayPicker(label: "毎週入る曜日（任意）", days: $weekdays, helper: "選ぶと「曜日で入れる」の型にもなります。")
             }
-            toggleRow("シフトの前に通知", isOn: $notify)
+            Card {
+                ToggleRow(title: "シフトの前に知らせる", helper: "開始の30分前に通知します。設定でいつでも変えられます。", isOn: $notify, identifier: "wizard.notify")
+            }
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Button(step == 1 ? "スキップ" : "戻る") {
-                if step == 1 { dismiss() } else { step -= 1 }
-            }
-            .designFont(16, weight: .bold)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Theme.cardRaised)
-            .clipShape(Capsule())
-            Button(step == 3 ? "はじめる" : (step == 1 ? "追加して次へ" : "次へ")) {
-                if step < 3 { step += 1 } else { save() }
-            }
-            .designFont(16, weight: .bold)
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Theme.ink)
-            .clipShape(Capsule())
-            .accessibilityIdentifier(step == 3 ? "wizard.finish" : "wizard.next")
-        }
-        .padding(16)
-    }
+    // MARK: Actions
 
-    private func field(_ title: String, text: Binding<String>, identifier: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .designFont(13, weight: .bold)
-            TextField(title, text: text)
-                .designFont(16)
-                .padding(14)
-                .background(Theme.cardRaised)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .accessibilityIdentifier(identifier)
+    private func load() {
+        guard !loaded else { return }
+        loaded = true
+        if let settings = settingsRows.first {
+            wage = settings.defaultHourlyWage > 0 ? String(settings.defaultHourlyWage) : ""
+            transport = String(settings.defaultTransportAllowance)
         }
     }
 
-    private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            Text(title)
-                .designFont(16, weight: .bold)
+    private func advance() {
+        typing = false
+        switch step {
+        case 1:
+            guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                error = WorkplaceEditorCheck.emptyName
+                return
+            }
+            error = ""
+            step = 2
+        case 2:
+            guard (Int(wage.filter(\.isNumber)) ?? 0) > 0 else {
+                error = "時給を入れてください。"
+                return
+            }
+            error = ""
+            step = 3
+        default:
+            save()
         }
-        .tint(Theme.accentText)
-        .padding(14)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            dismiss()
+            step = 1
+            error = WorkplaceEditorCheck.emptyName
             return
         }
-        let wageValue = Int(wage.filter(\.isNumber)) ?? 0
+        let wageValue = min(100_000, Int(wage.filter(\.isNumber)) ?? 0)
+        let used = Set(workplaces.map(\.colorHex))
         let workplace = Workplace(
             name: trimmed,
-            colorHex: "C6F24E",
+            colorHex: Theme.palette.first { !used.contains($0) } ?? Theme.palette[workplaces.count % Theme.palette.count],
             hourlyWage: wageValue,
-            transportAllowance: 0
+            transportAllowance: min(100_000, Int(transport.filter(\.isNumber)) ?? 0)
         )
-        workplace.place = place
-        workplace.notes = phone
-        workplace.phone = phone
+        workplace.place = place.trimmingCharacters(in: .whitespacesAndNewlines)
+        workplace.phone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         workplace.openingHours = hours
         workplace.officialURL = officialURL
         workplace.latitude = latitude
         workplace.longitude = longitude
         workplace.hasMapCoordinate = hasCoordinate
-        workplace.closingDay = 0
+        workplace.closingDay = closingDay
+        workplace.paydayMonthOffset = paydayOffset
+        workplace.paydayDay = paydayDay
         workplace.customBreaks = !legalBreak
-        workplace.wageHistory = [Workplace.WageHistoryEntry(at: effectiveFrom, hourlyWage: wageValue)]
         workplace.nightPayEnabled = night
+        workplace.nightWage = 0
         workplace.nightRatePercent = night ? 25 : 0
         workplace.overtimeEnabled = overtime
+        workplace.overtimeAfterMinutes = 8 * 60
+        workplace.overtimeExtra = 0
         workplace.overtimeRatePercent = overtime ? 25 : 0
         context.insert(workplace)
         let patternTitle = patternName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !patternTitle.isEmpty {
-            let part = ShiftPart(
+            context.insert(ShiftPart(
                 name: patternTitle,
                 workplaceUUID: workplace.uuid,
                 startMinute: startMinute,
                 endMinute: endMinute,
-                breakMinutes: 0
-            )
-            context.insert(part)
+                breakMinutes: 0,
+                colorHex: workplace.colorHex,
+                breakModeRaw: legalBreak ? PatternBreakMode.workplace.rawValue : PatternBreakMode.fixed.rawValue
+            ))
             if !weekdays.isEmpty {
-                let pattern = ShiftPattern(
+                context.insert(ShiftPattern(
                     name: patternTitle,
                     workplaceUUID: workplace.uuid,
                     startMinutes: startMinute,
                     endMinutes: endMinute,
                     breakMinutes: 0,
-                    weekdays: weekdays
-                )
-                context.insert(pattern)
+                    weekdays: weekdays,
+                    breakModeRaw: legalBreak ? PatternBreakMode.workplace.rawValue : PatternBreakMode.fixed.rawValue
+                ))
             }
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            self.error = "保存できませんでした。少し待ってから、もう一度試してください。"
+            return
+        }
         if notify {
             Task { _ = await SettingsAccess.requestNotifications() }
         }

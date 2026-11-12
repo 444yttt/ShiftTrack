@@ -1,100 +1,75 @@
 import SwiftData
 import SwiftUI
 
-/// Workplace cards follow the reference screenshots: a black card, wage in Doto,
-/// and an expanding pattern list. Creating a workplace opens the 3-step wizard.
+/// 勤務先. One white card per workplace: pay, payday rhythm, working contact
+/// actions, and its shift patterns. New workplaces go through the wizard.
 struct WorkplaceDirectoryScreen: View {
     private enum Sheet: Identifiable {
         case wizard
         case edit(UUID)
-        case partNew
+        case partNew(UUID)
         case partEdit(UUID)
+        case message(UUID)
+        case help
 
         var id: String {
             switch self {
             case .wizard: "wizard"
             case .edit(let id): "edit-\(id.uuidString)"
-            case .partNew: "part-new"
+            case .partNew(let id): "part-new-\(id.uuidString)"
             case .partEdit(let id): "part-\(id.uuidString)"
+            case .message(let id): "message-\(id.uuidString)"
+            case .help: "help"
             }
         }
     }
 
+    @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query(sort: \ShiftPart.createdAt) private var parts: [ShiftPart]
     @State private var sheet: Sheet?
     @State private var expanded: UUID?
-    @State private var showGuide = false
 
     var body: some View {
-        ScreenScroll {
-            HStack {
-                InOutWordmark()
-                Spacer()
-                HelpButton { showGuide = true }
+        ScreenScroll(spacing: Space.m) {
+            ScreenHeader(title: "勤務先", subtitle: workplaces.isEmpty ? nil : "\(workplaces.count)件") {
+                HelpButton { sheet = .help }
             }
             if workplaces.isEmpty {
-                Text("勤務先はまだありません。1件追加すると、シフトと収入の見込みが使えます。")
-                    .designFont(14)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 12)
-                    .accessibilityIdentifier("workplaces.title")
+                EmptyState(
+                    systemImage: "building.2",
+                    message: "勤務先はまだありません。登録すると、シフトと給料の見込みが使えるようになります。"
+                )
+                .accessibilityIdentifier("workplaces.title")
             } else {
-                VStack(spacing: 12) {
-                    ForEach(workplaces) { workplace in
-                        workplaceCard(workplace)
-                    }
+                ForEach(workplaces) { workplace in
+                    workplaceCard(workplace)
                 }
-                .padding(.top, 12)
-                Text("勤務先")
-                    .font(.system(size: 1))
-                    .foregroundStyle(Theme.background)
-                    .accessibilityIdentifier("workplaces.title")
             }
-
-            LimeCapsuleButton(title: "勤務先を追加", fillWidth: true, identifier: "workplace.add") {
+            PrimaryButton(title: "勤務先を追加", systemImage: "plus", identifier: "workplace.add") {
                 sheet = .wizard
             }
-            .padding(.top, 12)
         }
-        .background(Theme.background)
+        .background(Theme.paper)
         .sheet(item: $sheet) { destination in
             switch destination {
             case .wizard:
                 WorkplaceWizard()
             case .edit(let id):
                 WorkplaceEditorView(existingID: id)
-            case .partNew:
-                ShiftPartEditor()
-                    .presentationBackground(Theme.background)
+            case .partNew(let id):
+                ShiftPartEditor(presetWorkplaceID: id)
+                    .presentationBackground(Theme.paper)
             case .partEdit(let id):
                 ShiftPartEditor(partID: id)
-                    .presentationBackground(Theme.background)
-            }
-        }
-        .onChange(of: showGuide) { _, on in
-            ScreenDim.shared.isOn = on
-        }
-        .overlay {
-            if showGuide {
-                ZStack {
-                    Color.black.opacity(0.28).ignoresSafeArea()
-                    GuideCard(
-                        page: 1,
-                        total: GuideCopy.workplaces.count,
-                        text: GuideCopy.workplaces[0],
-                        onBack: nil,
-                        onNext: {
-                            GuideMemory.mark("workplaces")
-                            showGuide = false
-                        },
-                        onClose: {
-                            GuideMemory.mark("workplaces")
-                            showGuide = false
-                        }
-                    )
+                    .presentationBackground(Theme.paper)
+            case .message(let id):
+                if let place = workplaces.first(where: { $0.uuid == id }) {
+                    MessageComposerSheet(workplace: place)
                 }
+            case .help:
+                HelpSheet(title: "勤務先について", paragraphs: HelpCopy.workplaces)
             }
         }
     }
@@ -102,124 +77,108 @@ struct WorkplaceDirectoryScreen: View {
     private func workplaceCard(_ workplace: Workplace) -> some View {
         let open = expanded == workplace.uuid
         let mine = parts.filter { $0.workplaceUUID == workplace.uuid && !$0.hidden }
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        let mapReason = WorkplaceContact.mapReason(for: workplace)
+        let phoneReason = WorkplaceContact.phoneReason(for: workplace)
+        return Card(spacing: Space.s) {
+            HStack(spacing: Space.s) {
                 Circle()
                     .fill(workplace.color)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
+                    .overlay(Circle().stroke(Theme.ink.opacity(0.2), lineWidth: 1))
                     .overlay {
                         Text(String(workplace.name.prefix(1)))
-                            .designFont(18, weight: .bold)
+                            .font(.headline)
                             .foregroundStyle(Color.readable(onHex: workplace.colorHex))
                     }
-                Text(workplace.name)
-                    .designFont(18, weight: .bold)
-                    .foregroundStyle(Color.white)
-                Spacer()
-                Menu {
-                    Button("編集") { sheet = .edit(workplace.uuid) }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundStyle(Color.white)
-                        .frame(width: 44, height: 44)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workplace.name)
+                        .font(AppFont.rowTitle)
+                        .foregroundStyle(Theme.ink)
+                    if !workplace.genre.isEmpty {
+                        Text(workplace.genre)
+                            .font(AppFont.helper)
+                            .foregroundStyle(Theme.ink2)
+                    }
+                }
+                Spacer(minLength: Space.xs)
+                SecondaryButton(title: "編集", systemImage: "pencil", fillWidth: false, identifier: "workplace.edit.\(workplace.name)") {
+                    sheet = .edit(workplace.uuid)
                 }
             }
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("時給")
-                    .designFont(13)
-                    .foregroundStyle(Color.white.opacity(0.8))
-                Text(yenBody(workplace.hourlyWage))
-                    .font(.doto(28))
-                    .foregroundStyle(Theme.lime)
-                Text("円")
-                    .foregroundStyle(Color.white)
+            HStack(spacing: Space.xs) {
+                StatTile(
+                    title: workplace.payIsDaily ? "日給" : "時給",
+                    value: Formatters.yen(workplace.payIsDaily ? workplace.dailyWage : workplace.hourlyWage)
+                )
+                StatTile(title: "交通費（1回）", value: Formatters.yen(workplace.transportAllowance))
             }
+            Label(PayWindows.phrase(workplace), systemImage: "calendar.badge.clock")
+                .font(AppFont.helper)
+                .foregroundStyle(Theme.ink2)
             if !workplace.place.isEmpty {
-                Label(workplace.place, systemImage: "mappin")
-                    .designFont(12)
-                    .foregroundStyle(Color.white.opacity(0.85))
+                Label(workplace.place, systemImage: "mappin.and.ellipse")
+                    .font(AppFont.helper)
+                    .foregroundStyle(Theme.ink2)
                     .lineLimit(2)
             }
-            HStack(spacing: 8) {
-                capsule("MAP")
-                capsule("電話")
-                capsule("メッセージ")
+            HStack(alignment: .top, spacing: Space.xs) {
+                QuickActionTile(title: "地図", systemImage: "map.fill", disabledReason: mapReason, identifier: "workplace.action.map.\(workplace.name)") {
+                    if let url = WorkplaceContact.mapURL(for: workplace) { openURL(url) }
+                }
+                QuickActionTile(title: "電話", systemImage: "phone.fill", disabledReason: phoneReason, identifier: "workplace.action.phone.\(workplace.name)") {
+                    if let url = WorkplaceContact.telURL(workplace.phone) { openURL(url) }
+                }
+                QuickActionTile(title: "メッセージ", systemImage: "message.fill", disabledReason: phoneReason, identifier: "workplace.action.message.\(workplace.name)") {
+                    sheet = .message(workplace.uuid)
+                }
             }
+            RowDivider()
+            Button {
+                if reduceMotion {
+                    expanded = open ? nil : workplace.uuid
+                } else {
+                    withAnimation(Motion.layout) { expanded = open ? nil : workplace.uuid }
+                }
+            } label: {
+                HStack {
+                    Text(mine.isEmpty ? "シフトパターン（まだありません）" : "シフトパターン \(mine.count)件")
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.ink)
+                    Spacer(minLength: Space.xs)
+                    Image(systemName: open ? "chevron.up" : "chevron.down")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Theme.ink2)
+                        .accessibilityHidden(true)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowButtonStyle())
+            .accessibilityLabel("\(workplace.name)のシフトパターン")
+            .accessibilityValue(open ? "開いています" : "閉じています")
+            .accessibilityIdentifier(open ? "patterns.close" : "workplace.card")
             if open {
                 Text("シフトパターン")
-                    .designFont(13)
-                    .foregroundStyle(Color.white.opacity(0.8))
+                    .font(AppFont.helper)
+                    .foregroundStyle(Theme.ink2)
                     .accessibilityIdentifier("patterns.heading")
                 ForEach(mine) { part in
                     Button {
                         sheet = .partEdit(part.uuid)
                     } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("\(Formatters.clock(part.startMinute))〜\(Formatters.clock(part.endMinute))  \(part.name)")
-                                    .designFont(15, weight: .bold)
-                                    .foregroundStyle(Theme.ink)
-                                Text(PatternBreak.summary(modeRaw: part.breakModeRaw, fixedMinutes: part.breakMinutes, customRulesRaw: part.breakRulesRaw))
-                                    .designFont(13)
-                                    .foregroundStyle(Theme.muted)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(Theme.muted)
-                        }
-                        .padding(14)
-                        .frame(minHeight: 56)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        NavRow(
+                            title: part.name,
+                            subtitle: "\(Formatters.clock(part.startMinute))〜\(Formatters.clock(part.endMinute))・\(PatternBreak.summary(modeRaw: part.breakModeRaw, fixedMinutes: part.breakMinutes, customRulesRaw: part.breakRulesRaw))"
+                        )
                     }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityLabel("\(part.name)を編集")
+                    .buttonStyle(RowButtonStyle())
+                    .accessibilityHint("押すと編集します")
                 }
-                Button {
-                    sheet = .partNew
-                } label: {
-                    Label("パターンを追加", systemImage: "plus")
-                        .designFont(15, weight: .bold)
-                        .foregroundStyle(Theme.ink)
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 44)
-                        .background(Theme.lime)
-                        .clipShape(Capsule())
+                SecondaryButton(title: "パターンを追加", systemImage: "plus", identifier: "workplace.pattern.add") {
+                    sheet = .partNew(workplace.uuid)
                 }
-                .buttonStyle(PressableStyle())
-                .accessibilityIdentifier("workplace.pattern.add")
             }
-            Button {
-                expanded = open ? nil : workplace.uuid
-            } label: {
-                // Recovered names are chevron.up / chevron.down. Which bit means open is unrecovered.
-                // A collapsed card in the screenshot shows the downward chevron.
-                Image(systemName: open ? "chevron.up" : "chevron.down")
-                    .designFont(14, weight: .bold)
-                    .foregroundStyle(Color.white)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(open ? "patterns.close" : "workplace.card")
-            .accessibilityLabel("\(workplace.name)のパターン")
         }
-        .padding(16)
-        .background(Theme.ink)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-    }
-
-    private func capsule(_ title: String) -> some View {
-        Text(title)
-            .designFont(13, weight: .bold)
-            .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .clipShape(Capsule())
-    }
-
-    private func yenBody(_ value: Int) -> String {
-        let body = Formatters.yen(value)
-        return body.hasPrefix("¥") ? String(body.dropFirst()) : body
     }
 }

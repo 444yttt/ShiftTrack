@@ -833,6 +833,15 @@ struct StatusChip: View {
     }
 }
 
+/// Ends text editing wherever the focus is (fields wrapped in `LabeledField`
+/// are not bound to a screen's own focus state).
+enum Keyboard {
+    @MainActor
+    static func dismiss() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
 /// Button style for whole rows: dims a little while pressed.
 struct RowButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduce

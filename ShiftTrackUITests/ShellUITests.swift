@@ -44,10 +44,10 @@ final class ShellUITests: XCTestCase {
         } else if app.buttons["完了"].exists {
             app.buttons["完了"].tap()
         }
-        app.swipeUp()
-        app.buttons["追加して次へ"].tap()
-        app.buttons["次へ"].tap()
-        app.buttons["はじめる"].tap()
+        // The wizard: お店 → 給料 (the default wage is filled in) → いつものシフト.
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.finish"].tap()
         let card = app.buttons.matching(identifier: "workplace.card").firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 6))
         let saveButton = app.buttons["完了する"]

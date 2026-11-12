@@ -298,7 +298,10 @@ struct SettingsScreen: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("完了") { focused = false }
+                Button("完了") {
+                    focused = false
+                    Keyboard.dismiss()
+                }
             }
         }
     }

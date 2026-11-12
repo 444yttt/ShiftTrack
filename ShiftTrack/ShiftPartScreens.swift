@@ -308,6 +308,8 @@ struct PatternBreakEditor: View {
 /// Create or edit a pattern. Pass `partID` to edit; nil creates.
 struct ShiftPartEditor: View {
     var partID: UUID? = nil
+    /// Workplace chosen when a new pattern is started from a workplace card.
+    var presetWorkplaceID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
@@ -524,7 +526,7 @@ struct ShiftPartEditor: View {
             colorHex = existing.colorHex
             todoText = existing.defaultTodos.map(\.title).joined(separator: "\n")
         } else if workplaceID == nil {
-            workplaceID = workplaces.first?.uuid
+            workplaceID = presetWorkplaceID ?? workplaces.first?.uuid
         }
     }
 

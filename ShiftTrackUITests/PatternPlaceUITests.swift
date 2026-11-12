@@ -24,10 +24,10 @@ final class PatternPlaceUITests: XCTestCase {
         name.tap()
         name.typeText("店")
         dismissKeyboard(app)
-        app.swipeUp()
-        app.buttons["追加して次へ"].tap()
-        app.buttons["次へ"].tap()
-        app.buttons["はじめる"].tap()
+        // The wizard: お店 → 給料 (the default wage is filled in) → いつものシフト.
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.next"].tap()
+        app.buttons["wizard.finish"].tap()
         XCTAssertTrue(app.buttons["workplace.card"].waitForExistence(timeout: 6))
 
         app.buttons["tab.calendar"].tap()

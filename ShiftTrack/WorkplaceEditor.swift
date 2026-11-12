@@ -149,7 +149,10 @@ struct WorkplaceEditorView: View {
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完了") { typing = false }
+                    Button("完了") {
+                        typing = false
+                        Keyboard.dismiss()
+                    }
                         .foregroundStyle(Theme.signalInk)
                 }
             }
