@@ -7,6 +7,7 @@ import Testing
 /// this cannot load a file that binary produced. The schema change itself is
 /// only `breakModeRaw = 0` and `breakRulesRaw = ""` on `ShiftPart` and
 /// `ShiftPattern`. Workplace, shift, and the older pattern fields are unchanged.
+@MainActor
 struct Build20StoreTests {
     @Test
     func reopeningKeepsRowsAndLeavesNewBreakFieldsAtTheirDefaults() throws {
