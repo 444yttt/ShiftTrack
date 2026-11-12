@@ -30,9 +30,10 @@ enum ShiftTodoCodec {
 /// rolls the end to the next day when the raw start minute is greater than
 /// or equal to the raw end minute. `defaultTodos` are copied with `done = 0`.
 ///
-/// The optional break passed into placement is empty, and this path does not
-/// read `ShiftPart.breakMinutes` or call break selection. New rows store 0
-/// and `breakFollowsRules = false`. The editor's rule-based break is unchanged.
+/// Break: the reference path stored none. This app lets each pattern carry its
+/// own break (fixed minutes, the workplace's rules, or rules of its own), so
+/// `ShiftPartCommit` resolves it with `PatternBreak` and hands the result to
+/// `outcome`. Callers that pass nothing still get 0 minutes.
 ///
 /// Overlap `0x100016734` is not recovered past the text 「のシフトがあります」.
 /// A day that already has this part id adds no clash. A day with any other
@@ -40,6 +41,13 @@ enum ShiftTodoCodec {
 /// is not committed. Travel time and clock overlap are not applied.
 enum ShiftPartPlace {
     static let clashText = "のシフトがあります"
+
+    /// Line shown after a tap on a pattern.
+    static func placedNote(count: Int) -> String {
+        count == 0
+            ? "0件置きました。同じパターンがある日には、追加しません。"
+            : "\(count)件置きました。"
+    }
     static let saveFailedText = "保存できませんでした。もう一度お試しください。"
 
     struct Existing: Equatable {
@@ -126,6 +134,8 @@ enum ShiftPartPlace {
         todos: [ShiftTodoCodec.Item],
         days: [Date],
         existing: [Existing],
+        breakMinutes: Int = 0,
+        breakFollowsRules: Bool = false,
         calendar: Calendar = .current
     ) -> Outcome {
         let days = uniqueDays(days, calendar: calendar)
@@ -151,8 +161,8 @@ enum ShiftPartPlace {
                 partID: partID,
                 startMinutes: resolved.start.minutes,
                 endMinutes: resolved.end.minutes,
-                breakMinutes: 0,
-                breakFollowsRules: false,
+                breakMinutes: breakMinutes,
+                breakFollowsRules: breakFollowsRules,
                 endAddsOneDay: resolved.endAddsOneDay,
                 startDate: resolved.start.date,
                 endDate: resolved.end.date,
@@ -210,6 +220,16 @@ enum ShiftPartCommit {
     struct Result {
         var outcome: ShiftPartPlace.Outcome
         var failure: String?
+        /// The rows this call added, so the caller can offer 「取り消す」.
+        var inserted: [WorkShift] = []
+    }
+
+    /// Removes shifts a pattern tap just added.
+    static func undo(_ shifts: [WorkShift], context: ModelContext) {
+        for shift in shifts {
+            context.delete(shift)
+        }
+        try? context.save()
     }
 
     static func apply(
@@ -221,6 +241,14 @@ enum ShiftPartCommit {
         calendar: Calendar = .current
     ) -> Result {
         let workplaceID = workplaces.contains(where: { $0.uuid == part.workplaceUUID }) ? part.workplaceUUID : nil
+        let resolvedBreak = PatternBreak.resolve(
+            modeRaw: part.breakModeRaw,
+            fixedMinutes: part.breakMinutes,
+            customRulesRaw: part.breakRulesRaw,
+            startMinutes: ShiftPartPlace.clock(part.startMinute).minutes,
+            endMinutes: ShiftPartPlace.clock(part.endMinute).minutes,
+            workplace: workplaces.first(where: { $0.uuid == part.workplaceUUID })
+        )
         let outcome = ShiftPartPlace.outcome(
             partID: part.uuid,
             workplaceID: workplaceID,
@@ -229,6 +257,8 @@ enum ShiftPartCommit {
             todos: part.defaultTodos,
             days: days,
             existing: shifts.map { ShiftPartPlace.Existing(day: $0.date, partID: $0.partID) },
+            breakMinutes: resolvedBreak.minutes,
+            breakFollowsRules: resolvedBreak.followsRules,
             calendar: calendar
         )
         guard case .placed(let drafts) = outcome else {
@@ -243,8 +273,8 @@ enum ShiftPartCommit {
                 date: draft.day,
                 startMinutes: draft.startMinutes,
                 endMinutes: draft.endMinutes,
-                breakMinutes: 0,
-                breakFollowsRules: false,
+                breakMinutes: draft.breakMinutes,
+                breakFollowsRules: draft.breakFollowsRules,
                 partID: draft.partID,
                 patternEndOnNextDay: draft.endAddsOneDay,
                 todosRaw: ShiftTodoCodec.encode(draft.todos),
@@ -264,6 +294,6 @@ enum ShiftPartCommit {
             }
             return Result(outcome: outcome, failure: ShiftPartPlace.saveFailedText)
         }
-        return Result(outcome: outcome, failure: nil)
+        return Result(outcome: outcome, failure: nil, inserted: inserted)
     }
 }

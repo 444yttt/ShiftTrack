@@ -13,6 +13,7 @@ struct TodayScreen: View {
     @State private var sheet: TodaySheet?
     @State private var pendingPlace: ShiftPartPlace.Pending?
     @State private var placeNote = ""
+    @State private var lastPlaced: [WorkShift] = []
     /// Bumped when the app becomes active. The recovered 30-second and
     /// 1-second schedules were not tied to this timeline.
     @State private var resumedAt = Date.distantPast
@@ -21,6 +22,8 @@ struct TodayScreen: View {
     private enum TodaySheet: Identifiable {
         case editor(EditorRoute)
         case part
+        case partEdit(UUID)
+        case partList
         case unconfirmed
         case periods
         case todos(UUID)
@@ -29,6 +32,8 @@ struct TodayScreen: View {
             switch self {
             case .editor(let route): "editor-\(route.id)"
             case .part: "part"
+            case .partEdit(let id): "part-\(id.uuidString)"
+            case .partList: "part-list"
             case .unconfirmed: "unconfirmed"
             case .periods: "periods"
             case .todos(let id): "todos-\(id.uuidString)"
@@ -44,14 +49,27 @@ struct TodayScreen: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let now = max(context.date, resumedAt)
             ScreenScroll {
-                HStack {
+                HStack(spacing: 10) {
                     InOutWordmark()
                     Spacer()
+                    Button {
+                        sheet = .editor(EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid))
+                    } label: {
+                        Image(systemName: "plus")
+                            .designFont(18, weight: .bold)
+                            .foregroundStyle(Theme.ink)
+                            .frame(width: 44, height: 44)
+                            .background(Theme.lime)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("シフトを追加")
+                    .accessibilityIdentifier("today.add")
                     HelpButton { showGuide = true }
                 }
                 HStack {
                     Text("今週のシフト")
-                        .font(.system(size: 16, weight: .bold))
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.ink)
                     Spacer()
                     weekButton("chevron.left") { moveWeek(-1) }
@@ -61,7 +79,7 @@ struct TodayScreen: View {
                 weekStrip
                     .highPriorityGesture(weekSwipe)
                 Text(Formatters.longDay(day))
-                    .font(.system(size: 16, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 12)
                 Text(clock(now).replacingOccurrences(of: ":", with: "∶"))
@@ -93,7 +111,10 @@ struct TodayScreen: View {
                     onCreate: { sheet = .part },
                     onDayChip: { place($0) },
                     onPatternRow: { place($0) },
-                    onClosePending: { pendingPlace = nil }
+                    onClosePending: { pendingPlace = nil },
+                    onEdit: { sheet = .partEdit($0.uuid) },
+                    onManage: { sheet = .partList },
+                    onUndo: lastPlaced.isEmpty ? nil : { undoPlace() }
                 )
             }
         }
@@ -137,6 +158,12 @@ struct TodayScreen: View {
             case .part:
                 ShiftPartEditor()
                     .presentationBackground(Theme.background)
+            case .partEdit(let id):
+                ShiftPartEditor(partID: id)
+                    .presentationBackground(Theme.background)
+            case .partList:
+                ShiftPartList()
+                    .presentationBackground(Theme.background)
             case .unconfirmed:
                 UnconfirmedList(shifts: shifts.filter(\.needsAttendanceCheck)) { shift in
                     sheet = .editor(EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid))
@@ -158,6 +185,7 @@ struct TodayScreen: View {
             workplaces: workplaces,
             context: modelContext
         )
+        lastPlaced = result.inserted
         if let failure = result.failure {
             placeNote = failure
             pendingPlace = nil
@@ -166,33 +194,39 @@ struct TodayScreen: View {
         switch result.outcome {
         case .pending(let pending):
             pendingPlace = pending
-            placeNote = "追加した件数 0"
+            placeNote = "追加できませんでした（0件）。"
         case .missingWorkplace:
             pendingPlace = nil
-            placeNote = "勤務先がないので、どの日にも置いていません。"
+            placeNote = "勤務先がないので、置けませんでした。"
         case .placed(let drafts):
             pendingPlace = nil
-            placeNote = "置いた件数 \(drafts.count)。同じパターンの日は足していません。休憩は0分のままです。"
+            placeNote = ShiftPartPlace.placedNote(count: drafts.count)
         }
+    }
+
+    private func undoPlace() {
+        ShiftPartCommit.undo(lastPlaced, context: modelContext)
+        lastPlaced = []
+        placeNote = "取り消しました。"
     }
 
     private func header(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("今日")
-                .font(.system(size: 28, weight: .black))
+                .designFont(28, weight: .black)
                 .foregroundStyle(Theme.ink)
                 .accessibilityIdentifier("today.title")
             Text(Formatters.longDay(Date()))
-                .font(.system(size: 14, weight: .medium))
+                .designFont(14, weight: .medium)
                 .foregroundStyle(Theme.muted)
                 .accessibilityIdentifier("today.clock")
             Text(clock(now))
-                .font(.system(size: 14, weight: .medium))
+                .designFont(14, weight: .medium)
                 .foregroundStyle(Theme.muted)
                 .accessibilityIdentifier("today.time")
             if !Calendar.current.isDateInToday(day) {
                 Text("下に出しているのは \(Formatters.longDay(day))")
-                    .font(.system(size: 13, weight: .medium))
+                    .designFont(13, weight: .medium)
                     .foregroundStyle(Theme.ink)
             }
         }
@@ -219,7 +253,7 @@ struct TodayScreen: View {
                             .font(.doto(18))
                             .foregroundStyle(filled ? Theme.lime : Theme.ink)
                         Text(weekdayMark(date))
-                            .font(.system(size: 11, weight: .medium))
+                            .designFont(11, weight: .medium)
                             .foregroundStyle(filled ? Color.white.opacity(0.8) : Theme.muted)
                     }
                     .frame(maxWidth: .infinity)
@@ -249,10 +283,10 @@ struct TodayScreen: View {
         let items = dayShifts.flatMap(\.todos)
         return VStack(alignment: .leading, spacing: 6) {
             Text("\(Formatters.monthDayWeekday(day))のやること")
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
             if items.isEmpty {
                 Text(dayShifts.isEmpty ? "この日のやることはありません。" : "この日のやることはありません。下から追加できます。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
             } else {
                 ForEach(items) { item in
@@ -262,14 +296,14 @@ struct TodayScreen: View {
                                 .foregroundStyle(Theme.ink)
                         }
                         Text(item.title)
-                            .font(.system(size: 14))
+                            .designFont(14)
                     }
                 }
             }
             ForEach(dayShifts) { shift in
                 Button("やることを追加") { sheet = .todos(shift.uuid) }
                     .buttonStyle(PressableStyle())
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(14, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .accessibilityIdentifier("today.todo.add")
             }
@@ -301,7 +335,7 @@ struct TodayScreen: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("今日のお給料")
-                        .font(.system(size: 13, weight: .medium))
+                        .designFont(13, weight: .medium)
                         .foregroundStyle(Color.white)
                     Text(yenBody(todayYen) + " 円")
                         .font(.doto(28))
@@ -310,7 +344,7 @@ struct TodayScreen: View {
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
                     Text("見込み")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Color.white.opacity(0.8))
                 }
                 .padding(14)
@@ -319,13 +353,13 @@ struct TodayScreen: View {
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 VStack(alignment: .leading, spacing: 8) {
                     Text("今月のお給料")
-                        .font(.system(size: 13, weight: .medium))
+                        .designFont(13, weight: .medium)
                     Text(yenBody(monthYen(now: now)) + " 円")
                         .font(.doto(28))
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
                     Text("\(monthDays)日・\(Formatters.hours(monthMinutes))")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                 }
                 .padding(14)
@@ -354,12 +388,12 @@ struct TodayScreen: View {
     private func rowLink(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .medium))
+                .designFont(15, weight: .medium)
             Spacer()
             Text(value)
-                .font(.system(size: 15, weight: .bold))
+                .designFont(15, weight: .bold)
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .bold))
+                .designFont(12, weight: .bold)
                 .foregroundStyle(Theme.muted)
         }
         .padding(.horizontal, 16)
@@ -373,7 +407,7 @@ struct TodayScreen: View {
             sheet = .editor(EditorRoute(shiftID: nil, date: day, workplaceID: workplaces.first?.uuid))
         } label: {
             Text("+  シフトを追加")
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
@@ -397,7 +431,7 @@ struct TodayScreen: View {
             if rows.isEmpty {
                 VStack(spacing: 16) {
                     Text("この日のシフトはありません")
-                        .font(.system(size: 16, weight: .medium))
+                        .designFont(16, weight: .medium)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
                     addShiftButton
@@ -428,24 +462,25 @@ struct TodayScreen: View {
                     .frame(width: 42, height: 42)
                     .overlay {
                         Text(String((shift.workplace?.name ?? "?").prefix(1)))
-                            .font(.system(size: 18, weight: .bold))
+                            .designFont(18, weight: .bold)
+                            .foregroundStyle(Color.readable(onHex: shift.workplace?.colorHex ?? "C6F24E"))
                     }
                 Text(shift.workplace?.name ?? "勤務先")
-                    .font(.system(size: 18, weight: .bold))
+                    .designFont(18, weight: .bold)
                 Spacer()
                 Image(systemName: "ellipsis")
                     .foregroundStyle(Theme.muted)
             }
             HStack {
                 Text(Formatters.monthDayWeekday(shift.date))
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
                 Spacer()
                 Button {
                     sheet = .editor(EditorRoute(shiftID: shift.uuid, date: shift.date, workplaceID: shift.workplace?.uuid))
                 } label: {
                     Label("編集", systemImage: "pencil")
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Theme.cardRaised)
@@ -459,7 +494,7 @@ struct TodayScreen: View {
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                 Text(String(format: "%.1f時間", hours))
-                    .font(.system(size: 14))
+                    .designFont(14)
                     .foregroundStyle(Theme.muted)
             }
             if case .amount(let amount) = evaluation(for: shift, now: now) {
@@ -468,27 +503,46 @@ struct TodayScreen: View {
                     .accessibilityIdentifier("today.doto")
             }
             Text(LivePay.line(phase, evaluation: evaluation(for: shift, now: now)))
-                .font(.system(size: 12))
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
-                miniAction("MAP")
-                miniAction("電話")
-                miniAction("メッセージ")
-            }
+            contactActions(for: shift.workplace)
         }
         .padding(14)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
-    private func miniAction(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 13, weight: .bold))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Theme.cardRaised)
-            .clipShape(Capsule())
+    /// Map, phone and message open only when the workplace has that information.
+    @ViewBuilder private func contactActions(for workplace: Workplace?) -> some View {
+        if let workplace {
+            let phone = workplace.phone.filter { $0.isNumber || $0 == "+" }
+            let query = (workplace.place.isEmpty ? workplace.name : workplace.place)
+            let mapURL = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+                .flatMap { URL(string: "https://maps.apple.com/?q=\($0)") }
+            HStack(spacing: 8) {
+                if let mapURL {
+                    miniAction("地図", systemImage: "map", url: mapURL)
+                }
+                if !phone.isEmpty, let tel = URL(string: "tel:\(phone)") {
+                    miniAction("電話", systemImage: "phone", url: tel)
+                }
+                if !phone.isEmpty, let sms = URL(string: "sms:\(phone)") {
+                    miniAction("メッセージ", systemImage: "message", url: sms)
+                }
+            }
+        }
+    }
+
+    private func miniAction(_ title: String, systemImage: String, url: URL) -> some View {
+        Link(destination: url) {
+            Label(title, systemImage: systemImage)
+                .designFont(14, weight: .bold)
+                .foregroundStyle(Theme.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Theme.cardRaised)
+                .clipShape(Capsule())
+        }
     }
 
     private var weekSwipe: some Gesture {
@@ -526,7 +580,7 @@ struct TodayScreen: View {
     private func weekButton(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(width: 32, height: 32)
         }

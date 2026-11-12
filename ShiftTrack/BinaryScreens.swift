@@ -212,12 +212,12 @@ struct PayPeriodDetailView: View {
     var body: some View {
         ScreenScroll {
             Text(PayWindows.rangeTitle(window))
-                .font(.system(size: 22, weight: .black))
+                .designFont(22, weight: .black)
             Text("支給日 \(PayPeriodRow.dayText(window.payday))")
             Text("支給の見込み \(Formatters.yen(forecast))")
                 .font(.doto(28))
             Text("内訳")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(15, weight: .bold)
                 .padding(.top, 8)
             Text("基本給 \(Formatters.yen(parts.base))（\(Formatters.hours(minutes))）")
             Text("割増 \(Formatters.yen(parts.premium))")
@@ -226,16 +226,16 @@ struct PayPeriodDetailView: View {
             Text("お給料（交通費の前） \(Formatters.yen(parts.base + parts.premium + parts.allowance))")
             Text("支給の見込み \(Formatters.yen(forecast))")
             Text("税金・社会保険は計算していません。")
-                .font(.system(size: 12))
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
             group("確認済み", mine.filter { $0.attendanceConfirmed && $0.hasEnded() })
             group("未確認", mine.filter(\.needsAttendanceCheck))
             group("これからのシフト", mine.filter { !$0.hasEnded() })
             Text("おつかれさまでした、は「確認していない勤務」から開きます。勤務が終わったときは振動だけで、ここからは開きません。")
-                .font(.system(size: 12))
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
             Text("給与明細と照らし合わせる")
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .padding(.top, 8)
             slipField("総支給額", text: $gross)
             slipField("差引支給額", text: $net)
@@ -250,10 +250,10 @@ struct PayPeriodDetailView: View {
                 Text("差引支給額の差 \(Formatters.yen(netValue - forecast))（明細 − 見込み）")
             }
             Text("差は明細 − 見込みです。税金・社会保険は計算しません。未入力では保存できません。シフトは書き換えません。")
-                .font(.system(size: 12))
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
             Button("明細の金額を保存") { storeSlip() }
-                .font(.system(size: 16, weight: .bold))
+                .designFont(16, weight: .bold)
                 .foregroundStyle(Color.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -262,7 +262,7 @@ struct PayPeriodDetailView: View {
                 .disabled(!canStore)
             if saved {
                 Text("この端末に明細の金額を残しました。シフトは変えていません。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
             }
             NavigationLink("内訳を見る") {
@@ -287,10 +287,10 @@ struct PayPeriodDetailView: View {
     private func group(_ title: String, _ rows: [WorkShift]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(title) \(rows.count)件")
-                .font(.system(size: 14, weight: .bold))
+                .designFont(14, weight: .bold)
             ForEach(rows) { shift in
                 Text("\(Formatters.longDay(shift.date)) \(Formatters.clock(shift.startMinutes))〜\(Formatters.clock(shift.endMinutes))")
-                    .font(.system(size: 14, weight: .medium))
+                    .designFont(14, weight: .medium)
                     .foregroundStyle(shift.needsAttendanceCheck || !shift.hasEnded() ? Theme.muted : Theme.ink)
             }
         }
@@ -375,10 +375,10 @@ struct PayScheduleNote: View {
     var body: some View {
         ScreenScroll {
             Text("土日の支払日")
-                .font(.system(size: 22, weight: .black))
+                .designFont(22, weight: .black)
             Text("締め日から支払日まで")
             Text("支払日は、勤務先で選んだ曜日と日を使います。")
-                .font(.system(size: 13))
+                .designFont(13)
                 .foregroundStyle(Theme.muted)
         }
         .background(Theme.background)
@@ -462,9 +462,9 @@ struct AboutSheet: View {
         NavigationStack {
             ScreenScroll {
                 Text("IN/OUT について")
-                    .font(.system(size: 22, weight: .black))
+                    .designFont(22, weight: .black)
                 Text("シフトと給与の見込みを、この端末に残します。")
-                    .font(.system(size: 15))
+                    .designFont(15)
                     .foregroundStyle(Theme.muted)
             }
             .background(Theme.background)
@@ -804,17 +804,17 @@ struct RequestPlannerView: View {
                     Image(systemName: ConfirmedSymbols.planner)
                         .foregroundStyle(Theme.ink)
                     Text("テキスト生成")
-                        .font(.system(size: 22, weight: .black))
+                        .designFont(22, weight: .black)
                 }
                 Button("月の希望をすべて消す") { confirmDelete = true }
-                    .font(.system(size: 16, weight: .bold))
+                    .designFont(16, weight: .bold)
                     .foregroundStyle(Color.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Theme.ink)
                     .clipShape(Capsule())
                 Text("この月の希望をまとめて消します。シフトは残します。")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
             }
             .background(Theme.background)
@@ -847,7 +847,7 @@ struct HoursStockSheet: View {
         NavigationStack {
             ScreenScroll {
                 Text("時間のストック")
-                    .font(.system(size: 22, weight: .black))
+                    .designFont(22, weight: .black)
             }
             .background(Theme.background)
             .navigationTitle("時間のストック")

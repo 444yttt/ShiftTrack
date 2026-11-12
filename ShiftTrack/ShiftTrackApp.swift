@@ -20,7 +20,8 @@ struct ShiftTrackApp: App {
             RootView()
                 .environment(\.locale, Locale(identifier: "ja_JP"))
                 .preferredColorScheme(.light)
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility3)
         }
         .modelContainer(AppModel.container)
     }
@@ -68,12 +69,14 @@ struct RootView: View {
                 SettingsScreen().transition(.opacity)
             }
         }
+        // Screens own their side gutter (`ScreenScroll`). The old extra 20pt frame
+        // here stacked with it and left only about 320pt of a 393pt screen.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(ScreenInsets.rootWide)
         .background(Theme.background)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CustomTabBar(selection: $tab)
         }
+        .topSafeAreaCover()
         .background {
             ShiftEndPulse()
         }

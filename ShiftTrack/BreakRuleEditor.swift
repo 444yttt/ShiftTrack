@@ -6,7 +6,7 @@ struct BreakRuleEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("上にある規則が、同じ時間のときは先に使われます。")
-                .font(.system(size: 12))
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
             ForEach(rules.indices, id: \.self) { index in
                 ruleRow(index)
@@ -16,7 +16,7 @@ struct BreakRuleEditor: View {
                 rules.append(.init(overMinutes: 360, breakMinutes: 45))
             } label: {
                 Text("休憩の決まりを追加")
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(14, weight: .bold)
                     .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .background(Theme.lime)
@@ -34,7 +34,7 @@ struct BreakRuleEditor: View {
                 .foregroundStyle(Theme.muted)
             stepRow(value: rules[index].overMinutes, range: 0...1439) { rules[index].overMinutes = $0 }
             Text("休憩 \(Formatters.hours(rules[index].breakMinutes))")
-                .font(.system(size: 14, weight: .bold))
+                .designFont(14, weight: .bold)
                 .foregroundStyle(Theme.ink)
             stepRow(value: rules[index].breakMinutes, range: 0...600) { rules[index].breakMinutes = $0 }
             HStack(spacing: 8) {
@@ -84,7 +84,7 @@ struct BreakRuleEditor: View {
     private func smallButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .bold))
+                .designFont(12, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, minHeight: 36)
                 .background(Theme.card)

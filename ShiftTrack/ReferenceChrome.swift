@@ -6,14 +6,14 @@ struct InOutWordmark: View {
         VStack(alignment: .leading, spacing: -6) {
             HStack(spacing: 0) {
                 Image(systemName: "arrow.down")
-                    .font(.system(size: 16, weight: .black))
+                    .designFont(16, weight: .black)
                 Text("in")
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 16, weight: .black))
+                    .designFont(16, weight: .black)
             }
             Text("OUT")
         }
-        .font(.system(size: 22, weight: .black))
+        .designFont(22, weight: .black)
         .foregroundStyle(Theme.ink)
         .accessibilityLabel("しふとらっく")
     }
@@ -134,7 +134,7 @@ struct GuideCard: View {
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                 }
                 .accessibilityLabel("閉じる")
             }

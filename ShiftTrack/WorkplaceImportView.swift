@@ -62,7 +62,7 @@ struct WorkplaceImportView: View {
                 if let clip = UIPasteboard.general.string { link = clip }
             }
             .designFont(16, weight: .medium)
-            .foregroundStyle(Theme.lime)
+            .foregroundStyle(Theme.accentText)
             .padding(.top, 4)
             if !notice.isEmpty {
                 Text(notice)
@@ -71,7 +71,7 @@ struct WorkplaceImportView: View {
                     .padding(.top, 8)
             }
             if working {
-                ProgressView().tint(Theme.lime).frame(maxWidth: .infinity).padding(.top, 12)
+                ProgressView().tint(Theme.accentText).frame(maxWidth: .infinity).padding(.top, 12)
             } else {
                 LimeCapsuleButton(title: "リンクを読み取る", fillWidth: true, designSize: 16) {
                     readLink()
@@ -200,7 +200,7 @@ struct WorkplaceReadResult: View {
             field("営業時間", id: .hours, text: text(\.hours, \.hoursNote), note: draft.hoursNote, choicesOpen: $showHours)
             field("公式URL", id: .url, text: text(\.officialURL, \.urlNote), note: draft.urlNote, choicesOpen: $showURLs)
             if working {
-                ProgressView().tint(Theme.lime).frame(maxWidth: .infinity).padding(.top, 16)
+                ProgressView().tint(Theme.accentText).frame(maxWidth: .infinity).padding(.top, 16)
             } else {
                 LimeCapsuleButton(title: "勤務先を追加", fillWidth: true, designSize: 16) {
                     Task { await apply() }
@@ -292,7 +292,7 @@ struct WorkplaceReadResult: View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle("住所から位置を探す", isOn: $draft.locateFromAddress)
                 .designFont(16, weight: .bold)
-                .tint(Theme.lime)
+                .tint(Theme.accentText)
                 .disabled(draft.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             if draft.locateFromAddress, draft.hasCoordinate {
                 let coordinate = CLLocationCoordinate2D(latitude: draft.latitude, longitude: draft.longitude)

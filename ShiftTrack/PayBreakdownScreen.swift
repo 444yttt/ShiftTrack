@@ -20,14 +20,13 @@ struct PayBreakdownScreen: View {
                     .designFont(16, weight: .black)
                 Spacer()
                 Button("閉じる") { dismiss() }
-                    .foregroundStyle(Theme.lime)
+                    .foregroundStyle(Theme.accentText)
             }
             Text("支給見込み")
                 .designFont(13)
                 .foregroundStyle(Theme.muted)
             Text(Formatters.yen(total))
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                .designFont(34, weight: .semibold, design: .rounded, digits: true)
                 .foregroundStyle(Theme.ink)
             Text("深夜・休日の割増は、この内訳では分けていません。今日の見込とは別の計算です。")
                 .designFont(13)
@@ -50,8 +49,7 @@ struct PayBreakdownScreen: View {
                     }
                     Spacer()
                     Text(Formatters.yen(place.yen))
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
+                        .designFont(16, weight: .semibold, design: .rounded, digits: true)
                 }
                 .padding(.vertical, SpacingTokens.annualIncome[0])
             }
@@ -63,8 +61,7 @@ struct PayBreakdownScreen: View {
                     Text("\(group.day.month)月\(group.day.day)日")
                         .designFont(17, weight: .semibold)
                     Text(Formatters.yen(group.slices.reduce(0) { $0 + $1.total }))
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
+                        .designFont(20, weight: .semibold, design: .rounded, digits: true)
                     ForEach(group.slices) { slice in
                         Text("\(slice.workplaceName)  \(Formatters.yen(slice.total))")
                             .designFont(13)
@@ -144,8 +141,7 @@ struct PayBreakdownScreen: View {
                 .designFont(16)
             Spacer()
             Text(signed && yen > 0 ? "+\(Formatters.yen(yen))" : Formatters.yen(yen))
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                .designFont(16, weight: .semibold, design: .rounded, digits: true)
         }
         .padding(.vertical, 10)
     }
@@ -164,8 +160,7 @@ struct PayBreakdownScreen: View {
                         .designFont(13)
                         .foregroundStyle(Theme.muted)
                     Text(Formatters.yen(yen))
-                        .font(.system(size: 38, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
+                        .designFont(38, weight: .semibold, design: .rounded, digits: true)
                         .contentTransition(.numericText())
                         .animation(.snappy(duration: 0.18), value: yen)
                     Text("休憩の時刻が無い分は引いていません。表示は切り捨てです。")

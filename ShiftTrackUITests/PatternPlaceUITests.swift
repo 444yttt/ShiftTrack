@@ -41,7 +41,7 @@ final class PatternPlaceUITests: XCTestCase {
         tapIdentifier(app, "calendar.pattern.朝")
         let result = app.staticTexts["pattern.result"]
         XCTAssertTrue(result.waitForExistence(timeout: 4))
-        XCTAssertTrue(result.label.contains("置いた件数 1"))
+        XCTAssertTrue(result.label.contains("1件置きました"))
         let shift = app.buttons["calendar.shift"]
         XCTAssertTrue(shift.waitForExistence(timeout: 4))
         let todo = app.staticTexts["shift.todos"]
@@ -50,7 +50,7 @@ final class PatternPlaceUITests: XCTestCase {
         shot("11-placed")
 
         tapIdentifier(app, "calendar.pattern.朝")
-        XCTAssertTrue(result.label.contains("置いた件数 0"))
+        XCTAssertTrue(result.label.contains("0件置きました"))
         XCTAssertEqual(app.buttons.matching(identifier: "calendar.shift").count, 1)
         shot("12-same-part-skip")
 
@@ -78,7 +78,7 @@ final class PatternPlaceUITests: XCTestCase {
 
         tapVisible(app, days[1])
         tapIdentifier(app, "calendar.daychip.別")
-        XCTAssertTrue(result.label.contains("置いた件数 1"))
+        XCTAssertTrue(result.label.contains("1件置きました"))
         XCTAssertTrue(app.buttons["calendar.shift"].waitForExistence(timeout: 4))
         shot("14-daychip")
 
@@ -86,7 +86,7 @@ final class PatternPlaceUITests: XCTestCase {
         revealGrid(app)
         tapVisible(app, days[2])
         tapIdentifier(app, "calendar.pattern.夜")
-        XCTAssertTrue(result.label.contains("置いた件数 1"))
+        XCTAssertTrue(result.label.contains("1件置きました"))
         let overnight = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "22:00")).firstMatch
         XCTAssertTrue(overnight.waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "5:00")).firstMatch.exists)

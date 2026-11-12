@@ -62,7 +62,7 @@ struct WorkplaceWizard: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
+                    .designFont(14, weight: .bold)
                     .frame(width: 36, height: 36)
                     .background(Theme.cardRaised)
                     .clipShape(Circle())
@@ -256,7 +256,7 @@ struct WorkplaceWizard: View {
             Text(title)
                 .designFont(16, weight: .bold)
         }
-        .tint(Theme.lime)
+        .tint(Theme.accentText)
         .padding(14)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

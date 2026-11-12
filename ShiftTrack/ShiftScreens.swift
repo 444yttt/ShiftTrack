@@ -14,7 +14,7 @@ struct ShiftListScreen: View {
         ScreenScroll {
             HStack(alignment: .center) {
                 Text("シフト")
-                    .font(.system(size: 28, weight: .black))
+                    .designFont(28, weight: .black)
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 LimeCapsuleButton(title: "+ 追加") {
@@ -28,12 +28,12 @@ struct ShiftListScreen: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "text.viewfinder")
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                     Text("シフト表から取り込む")
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                     Spacer()
                 }
-                .foregroundStyle(Theme.lime)
+                .foregroundStyle(Theme.accentText)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
                 .background(Theme.card)
@@ -49,7 +49,7 @@ struct ShiftListScreen: View {
                     }
                 } label: {
                     Text("確認待ちの候補が \(router.stagedCount) 件あります")
-                        .font(.system(size: 13, weight: .medium))
+                        .designFont(13, weight: .medium)
                         .foregroundStyle(Theme.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -68,7 +68,7 @@ struct ShiftListScreen: View {
 
             if visible.isEmpty {
                 Text(showUpcoming ? "これからのシフトはありません" : "過去のシフトはありません")
-                    .font(.system(size: 14))
+                    .designFont(14)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 28)
@@ -107,7 +107,7 @@ struct ShiftListScreen: View {
     private func segment(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13, weight: .bold))
+                .designFont(13, weight: .bold)
                 .foregroundStyle(on ? Theme.ink : .white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
@@ -174,7 +174,7 @@ struct DayDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()
@@ -193,8 +193,10 @@ struct ShiftAddChooser: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Workplace.createdAt) private var workplaces: [Workplace]
     @Query(sort: \WorkShift.date, order: .reverse) private var shifts: [WorkShift]
+    @Query(sort: \ShiftPart.createdAt) private var parts: [ShiftPart]
     @Query private var settingsRows: [AppSettings]
     @State private var editor: EditorRoute?
+    @State private var partNote = ""
     @State private var tableText = ""
     @State private var tableError = ""
     @State private var modelReading: TypedShiftEntry.Reading?
@@ -305,12 +307,13 @@ struct ShiftAddChooser: View {
         NavigationStack {
             ScreenScroll {
                 Text(Formatters.longDay(day))
-                    .font(.system(size: 13, weight: .medium))
+                    .designFont(13, weight: .medium)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                tableSection
                 manualSection
+                partsSection
                 historySection
+                tableSection
             }
             .background(Theme.background)
             .navigationTitle("シフトを追加")
@@ -318,12 +321,12 @@ struct ShiftAddChooser: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("完了") { tableFocused = false }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()
@@ -339,15 +342,15 @@ struct ShiftAddChooser: View {
     private var tableSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("シフト表")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(15, weight: .bold)
                 .foregroundStyle(Theme.ink)
             Text(tableHint)
-                .font(.system(size: 12))
+                .designFont(12)
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $tableText)
-                    .font(.system(size: 15))
+                    .designFont(15)
                     .foregroundStyle(Theme.ink)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 120)
@@ -355,7 +358,7 @@ struct ShiftAddChooser: View {
                     .focused($tableFocused)
                 if tableText.isEmpty {
                     Text(tablePlaceholder)
-                        .font(.system(size: 15))
+                        .designFont(15)
                         .foregroundStyle(Theme.muted)
                         .padding(14)
                         .allowsHitTesting(false)
@@ -374,33 +377,33 @@ struct ShiftAddChooser: View {
                     Task { await askModel() }
                 }
                 .disabled(modelBusy)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Theme.lime)
+                .designFont(14, weight: .bold)
+                .foregroundStyle(Theme.accentText)
                 Text("規則で読めた文はそのままです。モデルは確認用で、追加はボタンを押したときだけです。")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 if !modelNote.isEmpty {
                     Text(modelNote)
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             if let typedReading, typedReading.repeatsWeekly {
                 Text(TypedShiftEntry.weeklyLine(typedReading))
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let typedReading, typedReading.canSave, typedReading.alternativeNoted {
                 Text(TypedShiftEntry.alternativeLine())
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !tableProblem.isEmpty, typedReading?.repeatsWeekly != true {
                 Text(tableProblem)
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.behind)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -411,7 +414,7 @@ struct ShiftAddChooser: View {
                     }
                     if drafts.count > 6 {
                         Text("ほか \(drafts.count - 6) 件")
-                            .font(.system(size: 12, weight: .medium))
+                            .designFont(12, weight: .medium)
                             .foregroundStyle(Theme.muted)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -421,9 +424,78 @@ struct ShiftAddChooser: View {
                 commitTable()
             }
             .disabled(drafts.isEmpty)
-            .opacity(drafts.isEmpty ? 0.4 : 1)
         }
         .padding(.top, 12)
+    }
+
+    private var partsSection: some View {
+        let visible = parts.filter { !$0.hidden }
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("パターンで追加")
+                .designFont(15, weight: .bold)
+                .foregroundStyle(Theme.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if visible.isEmpty {
+                Text("カレンダーで「パターンを作る」と、よく使う時間をここから1タップで追加できます。")
+                    .designFont(13)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(visible) { part in
+                            Button {
+                                placePart(part)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(part.name)
+                                        .designFont(15, weight: .bold)
+                                        .foregroundStyle(Theme.ink)
+                                    Text("\(Formatters.clock(part.startMinute))–\(Formatters.clock(part.endMinute))")
+                                        .designFont(13)
+                                        .foregroundStyle(Theme.muted)
+                                }
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 56)
+                                .background(Theme.card)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.border, lineWidth: 1))
+                            }
+                            .buttonStyle(PressableStyle())
+                            .accessibilityIdentifier("chooser.pattern.\(part.name)")
+                        }
+                    }
+                }
+            }
+            if !partNote.isEmpty {
+                Text(partNote)
+                    .designFont(13, weight: .medium)
+                    .foregroundStyle(Theme.behind)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    private func placePart(_ part: ShiftPart) {
+        let result = ShiftPartCommit.apply(part: part, days: [day], shifts: shifts, workplaces: workplaces, context: context)
+        if let failure = result.failure {
+            partNote = failure
+            return
+        }
+        switch result.outcome {
+        case .placed(let drafts):
+            if drafts.isEmpty {
+                partNote = "この日には、同じパターンがすでにあります。"
+            } else {
+                onSaved([day])
+                dismiss()
+            }
+        case .pending:
+            partNote = "この日には別のシフトがあります。重ねるときは「1件ずつ入力」から追加してください。"
+        case .missingWorkplace:
+            partNote = "このパターンの勤務先が見つかりません。"
+        }
     }
 
     private var tablePlaceholder: String {
@@ -439,20 +511,20 @@ struct ShiftAddChooser: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "square.and.pencil")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.lime)
+                    .designFont(16, weight: .semibold)
+                    .foregroundStyle(Theme.accentText)
                     .frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("1件ずつ入力")
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                         .foregroundStyle(Theme.ink)
                     Text("勤務先と時刻を画面で選びます")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .designFont(13, weight: .semibold)
                     .foregroundStyle(Theme.muted)
             }
             .padding(14)
@@ -466,12 +538,12 @@ struct ShiftAddChooser: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("履歴から追加")
-                .font(.system(size: 15, weight: .bold))
+                .designFont(15, weight: .bold)
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if history.isEmpty {
                 Text("まだ履歴がありません。追加すると、次から同じ時間を選べます。")
-                    .font(.system(size: 13))
+                    .designFont(13)
                     .foregroundStyle(Theme.muted)
             } else {
                 ForEach(history) { shift in
@@ -484,10 +556,10 @@ struct ShiftAddChooser: View {
                                 .frame(width: 12, height: 12)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(shift.workplace?.name ?? "勤務先")
-                                    .font(.system(size: 14, weight: .bold))
+                                    .designFont(14, weight: .bold)
                                     .foregroundStyle(Theme.ink)
                                 Text("\(Formatters.clock(shift.startMinutes))–\(Formatters.clock(shift.endMinutes))  休憩\(shift.breakMinutes)分")
-                                    .font(.system(size: 12))
+                                    .designFont(12)
                                     .foregroundStyle(Theme.muted)
                             }
                             Spacer()
@@ -510,10 +582,10 @@ struct ShiftAddChooser: View {
                 .frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text(draft.workplaceName)
-                    .font(.system(size: 13, weight: .bold))
+                    .designFont(13, weight: .bold)
                     .foregroundStyle(Theme.ink)
                 Text(draftCaption(draft))
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
             }
             Spacer()
@@ -751,6 +823,7 @@ struct ShiftEditorView: View {
                                         chosenPart = part.uuid
                                         startMinutes = part.startMinute
                                         endMinutes = part.endMinute
+                                        applyPartBreak(part)
                                     }
                                 }
                             }
@@ -762,15 +835,12 @@ struct ShiftEditorView: View {
                                 Text(selectedWorkplace?.name ?? "なし")
                                     .designFont(16, weight: .bold)
                             } else {
-                                Picker("勤務先", selection: $workplaceID) {
-                                    ForEach(workplaces) { workplace in
-                                        Text(workplace.name).tag(Optional(workplace.uuid))
-                                    }
-                                }
-                                .tint(Theme.lime)
+                                workplaceChoice
                             }
                         }
                         divider
+                        HStack(spacing: 8) {
+                        dayStepButton("chevron.left", label: "前の日", delta: -1)
                         Button {
                             draftDate = date
                             showDateEditor = true
@@ -793,10 +863,13 @@ struct ShiftEditorView: View {
                         .accessibilityLabel("日付")
                         .accessibilityValue(Formatters.longDay(date))
                         .accessibilityHint("日付を変えるときだけ開きます")
+                        dayStepButton("chevron.right", label: "次の日", delta: 1)
+                        }
                         HStack(alignment: .top, spacing: 10) {
                             MinutesTimePicker(title: "開始", minutes: $startMinutes)
                             MinutesTimePicker(title: "終了", minutes: $endMinutes)
                         }
+                        durationChips
                         ForEach(liveOverlap) { hit in
                             Text(ShiftOverlap.row(hit))
                                 .designFont(13)
@@ -819,7 +892,7 @@ struct ShiftEditorView: View {
                                 .foregroundStyle(Theme.muted)
                         } else {
                             Toggle("休憩を規則から入れる", isOn: breakFollowsBinding)
-                                .tint(Theme.lime)
+                                .tint(Theme.accentText)
                             Text(breakFollowsRules
                                  ? BreakRules.summary(
                                     customBreaks: selectedWorkplace?.customBreaks ?? false,
@@ -832,7 +905,7 @@ struct ShiftEditorView: View {
                             BreakMinutesControl(minutes: breakEntryBinding, range: 0...600)
                             Text("実働 \(Formatters.hours(draftMinutes))")
                                 .font(.subheadline.weight(.medium))
-                                .foregroundStyle(Theme.lime)
+                                .foregroundStyle(Theme.accentText)
                         }
                     }
                     formCard {
@@ -847,7 +920,8 @@ struct ShiftEditorView: View {
                             .designFont(16)
                             .focused($typing)
                         divider
-                        TextField("メモ", text: $notes, axis: .vertical)
+                        TextField("メモ（持ち物・連絡など）", text: $notes, axis: .vertical)
+                            .lineLimit(2...6)
                             .designFont(16)
                             .foregroundStyle(Theme.ink)
                             .focused($typing)
@@ -865,7 +939,7 @@ struct ShiftEditorView: View {
                         )
                         Text("給料 \(Formatters.yen(amount))")
                             .designFont(16, weight: .bold)
-                            .foregroundStyle(Theme.lime)
+                            .foregroundStyle(Theme.accentText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !shownError.isEmpty {
@@ -888,10 +962,6 @@ struct ShiftEditorView: View {
                             .designFont(13)
                             .foregroundStyle(Theme.muted)
                     }
-                    LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true, designSize: 16) { save() }
-                        .disabled(!canSave)
-                        .opacity(canSave ? 1 : 0.4)
-                        .padding(.top, 8)
                     if existing != nil {
                         Button("削除する") { confirmDelete = true }
                             .designFont(16, weight: .bold)
@@ -902,6 +972,15 @@ struct ShiftEditorView: View {
                 }
                 }
                 .padding(ScreenInsets.shiftEditor)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !workplaces.isEmpty {
+                    LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true, designSize: 17) { save() }
+                        .disabled(!canSave)
+                        .padding(.horizontal, Space.gutter)
+                        .padding(.vertical, 10)
+                        .background(Theme.background)
+                }
             }
             .background(Theme.background)
             .navigationTitle(existing == nil ? "シフトを追加" : "シフトの詳細")
@@ -919,7 +998,7 @@ struct ShiftEditorView: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("完了") { typing = false }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()
@@ -962,7 +1041,7 @@ struct ShiftEditorView: View {
                         .datePickerStyle(.graphical)
                         .labelsHidden()
                         .environment(\.locale, Locale(identifier: "ja_JP"))
-                        .tint(Theme.lime)
+                        .tint(Theme.accentText)
                         .padding(16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .background(Theme.background)
@@ -971,7 +1050,7 @@ struct ShiftEditorView: View {
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("キャンセル") { showDateEditor = false }
-                                    .foregroundStyle(Theme.lime)
+                                    .foregroundStyle(Theme.accentText)
                             }
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("決定") {
@@ -979,7 +1058,7 @@ struct ShiftEditorView: View {
                                     userEditedDate = true
                                     showDateEditor = false
                                 }
-                                .foregroundStyle(Theme.lime)
+                                .foregroundStyle(Theme.accentText)
                             }
                         }
                         .darkSheet()
@@ -1066,19 +1145,106 @@ struct ShiftEditorView: View {
         )
     }
 
+    /// Up to four workplaces are one tap each; more fall back to a menu.
+    @ViewBuilder private var workplaceChoice: some View {
+        if workplaces.count <= 4 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(workplaces) { workplace in
+                        patternChip(workplace.name, selected: workplaceID == workplace.uuid) {
+                            workplaceID = workplace.uuid
+                            chosenPart = nil
+                        }
+                    }
+                }
+            }
+        } else {
+            Picker("勤務先", selection: $workplaceID) {
+                ForEach(workplaces) { workplace in
+                    Text(workplace.name).tag(Optional(workplace.uuid))
+                }
+            }
+            .tint(Theme.accentText)
+        }
+    }
+
+    private func dayStepButton(_ symbol: String, label: String, delta: Int) -> some View {
+        Button {
+            if let next = Calendar.current.date(byAdding: .day, value: delta, to: date) {
+                date = Calendar.current.startOfDay(for: next)
+                userEditedDate = true
+            }
+        } label: {
+            Image(systemName: symbol)
+                .designFont(16, weight: .bold)
+                .foregroundStyle(Theme.ink)
+                .frame(width: 48, height: 56)
+                .background(Theme.cardRaised)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(label)
+    }
+
+    /// Sets the end from the start so a normal shift is two taps.
+    private var durationChips: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("開始からの長さ")
+                .designFont(13, weight: .medium)
+                .foregroundStyle(Theme.muted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach([3, 4, 5, 6, 8], id: \.self) { hours in
+                        Button {
+                            endMinutes = ShiftDatePolicy.clockMinutes(startMinutes + hours * 60)
+                        } label: {
+                            Text("\(hours)時間")
+                                .designFont(15, weight: .bold)
+                                .foregroundStyle(Theme.ink)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 44)
+                                .background(Theme.card)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                        }
+                        .buttonStyle(PressableStyle())
+                        .accessibilityLabel("終了を開始の\(hours)時間後にする")
+                    }
+                }
+            }
+        }
+    }
+
     private var workplaceParts: [ShiftPart] {
         parts.filter { $0.workplaceUUID == workplaceID && !$0.hidden }
+    }
+
+    /// A pattern that sets no break (older ones) leaves the break as it is.
+    private func applyPartBreak(_ part: ShiftPart) {
+        guard part.breakModeRaw != PatternBreakMode.fixed.rawValue || part.breakMinutes > 0 else { return }
+        let resolved = PatternBreak.resolve(
+            modeRaw: part.breakModeRaw,
+            fixedMinutes: part.breakMinutes,
+            customRulesRaw: part.breakRulesRaw,
+            startMinutes: ShiftPartPlace.clock(part.startMinute).minutes,
+            endMinutes: ShiftPartPlace.clock(part.endMinute).minutes,
+            workplace: selectedWorkplace
+        )
+        breakMinutes = resolved.minutes
+        breakFollowsRules = resolved.followsRules
     }
 
     private func patternChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .designFont(16, weight: .bold)
             .foregroundStyle(selected ? Color.white : Theme.ink)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(selected ? Theme.ink : Theme.cardRaised)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 44)
+            .background(selected ? Theme.ink : Theme.card)
             .clipShape(Capsule())
-            .buttonStyle(.plain)
+            .overlay(Capsule().stroke(selected ? Theme.ink : Theme.border, lineWidth: 1))
+            .buttonStyle(PressableStyle())
+            .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func save(force: Bool = false) {
@@ -1377,12 +1543,12 @@ struct TimeAdjustSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル", action: onCancel)
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                         .accessibilityIdentifier("time.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("決定", action: onCommit)
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()
@@ -1539,7 +1705,7 @@ struct WorkplaceEditorView: View {
                     field("営業時間", text: $openingHours)
                     field("公式サイト", text: $officialURL)
                     Text("カレンダーでの表示色")
-                        .font(.system(size: 12, weight: .medium))
+                        .designFont(12, weight: .medium)
                         .foregroundStyle(Theme.muted)
                     HStack(spacing: 10) {
                         ForEach(Theme.palette, id: \.self) { hex in
@@ -1589,14 +1755,14 @@ struct WorkplaceEditorView: View {
                         Text("翌月").tag(1)
                         Text("翌々月").tag(2)
                     }
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                     dayPicker("給料日", selection: $paydayDay)
                     Picker("支払周期", selection: $payCycle) {
                         ForEach(PayCycle.allCases) { cycle in
                             Text(cycle.title).tag(cycle)
                         }
                     }
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                     if payCycle == .week {
                         Picker("支払う曜日", selection: $payWeekday) {
                             Text("未選択").tag(0)
@@ -1608,24 +1774,24 @@ struct WorkplaceEditorView: View {
                             Text("金曜").tag(6)
                             Text("土曜").tag(7)
                         }
-                        .tint(Theme.lime)
+                        .tint(Theme.accentText)
                     }
                     Text(PayScheduleMath.sentence(closingDay: closingDay, paydayDay: paydayDay, monthOffset: paydayOffset))
-                        .font(.system(size: 13, weight: .bold))
+                        .designFont(13, weight: .bold)
                         .foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(nextPaydayLine)
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     if PayScheduleMath.breaksInShortFebruary(closingDay: closingDay, paydayDay: paydayDay, monthOffset: paydayOffset, calendar: ShiftOverlap.tokyo) {
                         Text("2月は、給料日が締め日以前になります。")
-                            .font(.system(size: 12, weight: .bold))
+                            .designFont(12, weight: .bold)
                             .foregroundStyle(Theme.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Text("月払いは、今までと同じ締め日と給料日です。週払いと日払いは、ここで選んだときだけ入金日が変わります。時給・日給の金額計算は変わりません。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1643,27 +1809,27 @@ struct WorkplaceEditorView: View {
                     }
                     field("交通費", text: $transportText, number: true)
                     DatePicker("適用開始日", selection: $payRuleDate, displayedComponents: .date)
-                        .tint(Theme.lime)
+                        .tint(Theme.accentText)
                     ForEach(Array(payRuleDates.enumerated()), id: \.offset) { index, day in
                         HStack {
                             Text(Formatters.longDay(day))
-                                .font(.system(size: 13))
+                                .designFont(13)
                                 .foregroundStyle(Theme.ink)
                             Spacer()
                             Button("削除") { payRuleDates.remove(at: index) }
-                                .font(.system(size: 12, weight: .bold))
+                                .designFont(12, weight: .bold)
                                 .foregroundStyle(Theme.destructive)
                         }
                     }
                     Button("お給料の決まりの適用開始日を足す") {
                         payRuleDates.append(payRuleDate)
                     }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.lime)
+                    .designFont(13, weight: .bold)
+                    .foregroundStyle(Theme.accentText)
                 }
                 formCard {
                     sectionTitle("休日・深夜・残業")
-                    Toggle("休日給料", isOn: $holidayOn).tint(Theme.lime)
+                    Toggle("休日給料", isOn: $holidayOn).tint(Theme.accentText)
                     if holidayOn {
                         VStack(alignment: .leading, spacing: 10) {
                             field("休日給料", text: $holidayText, number: true)
@@ -1673,7 +1839,7 @@ struct WorkplaceEditorView: View {
                     if !payIsDaily {
                         nightFields
                     }
-                    Toggle("残業手当", isOn: $overtimeOn).tint(Theme.lime)
+                    Toggle("残業手当", isOn: $overtimeOn).tint(Theme.accentText)
                     if overtimeOn {
                         VStack(alignment: .leading, spacing: 10) {
                             Stepper(value: $overtimeHours, in: 1...16) {
@@ -1684,14 +1850,14 @@ struct WorkplaceEditorView: View {
                                 Text("1時間あたり").tag(true)
                                 Text("1シフトあたり").tag(false)
                             }
-                            .tint(Theme.lime)
+                            .tint(Theme.accentText)
                             field("追加金額", text: $overtimeText, number: true)
                             Stepper(value: $overtimeRate, in: 0...100) {
                                 Text("割増 \(overtimeRate)%")
                                     .foregroundStyle(Theme.ink)
                             }
                             Text("しきい値を超えた分に、この割合を足します。")
-                                .font(.system(size: 12))
+                                .designFont(12)
                                 .foregroundStyle(Theme.muted)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -1700,21 +1866,21 @@ struct WorkplaceEditorView: View {
                 formCard {
                     sectionTitle("休憩")
                     Toggle("この勤務先の規則を使う", isOn: $customBreaks)
-                        .tint(Theme.lime)
+                        .tint(Theme.accentText)
                     if customBreaks {
                         Text("勤務時間が閾値を超えたとき、超えた中でいちばん長い閾値の休憩を入れます。保存済みのシフトは、ここでは書き換わりません。")
-                            .font(.system(size: 12))
+                            .designFont(12)
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         if breakRules.isEmpty {
                             Text("規則がないので、自動の休憩は0分です。")
-                                .font(.system(size: 12))
+                                .designFont(12)
                                 .foregroundStyle(Theme.muted)
                         }
                         BreakRuleEditor(rules: $breakRules)
                     } else {
                         Text("法律で決まった休憩で計算します（6時間を超えたら45分、8時間を超えたら60分）。保存済みのシフトは変わりません。")
-                            .font(.system(size: 12))
+                            .designFont(12)
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1722,7 +1888,7 @@ struct WorkplaceEditorView: View {
                 formCard {
                     sectionTitle("開始と終了の丸め")
                     Text("保存したシフトの時刻と、入っている給料の見込は、この設定だけでは変わりません。単位が2分未満のときは、その時刻を動かしません。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     Picker("単位", selection: $roundingUnit) {
@@ -1730,54 +1896,54 @@ struct WorkplaceEditorView: View {
                             Text(unit < 2 ? "\(unit)分（動かさない）" : "\(unit)分").tag(unit)
                         }
                     }
-                    .tint(Theme.lime)
+                    .tint(Theme.accentText)
                     roundingDirectionPicker("開始", selection: $roundingStart)
                     roundingDirectionPicker("終了", selection: $roundingEnd)
                     Toggle("早出は予定の開始から数える", isOn: $earlyFromPlan)
-                        .tint(Theme.lime)
+                        .tint(Theme.accentText)
                     Text("打刻そのものは変えません。予定より早い出勤を、給料では予定の開始から数えます。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(roundingPreview)
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 formCard {
                     sectionTitle("時給の履歴と時間帯")
                     Text("適用日がシフトの日以前の時給を使います。まだその日が来ていないときは、見込みを出しません。上の時給欄は、今月の見込みに使います。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     ForEach(Array(wageHistory.enumerated()), id: \.offset) { index, entry in
                         HStack {
                             Text("\(Formatters.longDay(entry.at))  \(Formatters.yen(entry.hourlyWage))")
-                                .font(.system(size: 13))
+                                .designFont(13)
                                 .foregroundStyle(Theme.ink)
                             Spacer()
                             Button("削除") { wageHistory.remove(at: index) }
-                                .font(.system(size: 12, weight: .bold))
+                                .designFont(12, weight: .bold)
                                 .foregroundStyle(Theme.destructive)
                         }
                     }
                     Text(wageAppendNote)
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("今の時給を履歴に足す") {
                         wageHistory.append(.init(at: .now, hourlyWage: yen(wageText)))
                     }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.lime)
+                    .designFont(13, weight: .bold)
+                    .foregroundStyle(Theme.accentText)
                     ForEach(Array(wageBands.enumerated()), id: \.offset) { index, band in
                         HStack {
                             Text("\(Formatters.clock(band.startMinutes))–\(Formatters.clock(band.endMinutes)) \(Formatters.yen(band.hourlyWage))")
-                                .font(.system(size: 13))
+                                .designFont(13)
                                 .foregroundStyle(Theme.ink)
                             Spacer()
                             Button("削除") { wageBands.remove(at: index) }
-                                .font(.system(size: 12, weight: .bold))
+                                .designFont(12, weight: .bold)
                                 .foregroundStyle(Theme.destructive)
                         }
                     }
@@ -1786,7 +1952,7 @@ struct WorkplaceEditorView: View {
                         MinutesTimePicker(title: "帯の終了", minutes: $bandEnd)
                     }
                     field("帯の時給", text: $bandWage, number: true)
-                    Toggle("この帯は深夜割増を含む", isOn: $bandIncludesNight).tint(Theme.lime)
+                    Toggle("この帯は深夜割増を含む", isOn: $bandIncludesNight).tint(Theme.accentText)
                     Button("時間帯を足す") {
                         wageBands.append(.init(
                             startMinutes: bandStart,
@@ -1795,8 +1961,8 @@ struct WorkplaceEditorView: View {
                             includesNightPremium: bandIncludesNight
                         ))
                     }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.lime)
+                    .designFont(13, weight: .bold)
+                    .foregroundStyle(Theme.accentText)
                     let names = ["日", "月", "火", "水", "木", "金", "土"]
                     ForEach(0..<7, id: \.self) { index in
                         Stepper(value: $holidayRates[index], in: 0...100) {
@@ -1805,7 +1971,7 @@ struct WorkplaceEditorView: View {
                         }
                     }
                     Text("休日の割合は曜日番号から1を引いた位置です。0%はその曜日に足しません。")
-                        .font(.system(size: 12))
+                        .designFont(12)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1815,14 +1981,14 @@ struct WorkplaceEditorView: View {
                 }
                 if !error.isEmpty {
                     Text(error)
-                        .font(.system(size: 13))
+                        .designFont(13)
                         .foregroundStyle(Theme.behind)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 LimeCapsuleButton(title: existing == nil ? "完了する" : "保存する", fillWidth: true) { save() }
                 if existing != nil {
                     Button("この勤務先を削除") { confirmDelete = true }
-                        .font(.system(size: 14, weight: .bold))
+                        .designFont(14, weight: .bold)
                         .foregroundStyle(Theme.destructive)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
@@ -1834,12 +2000,12 @@ struct WorkplaceEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("完了") { typing = false }
-                        .foregroundStyle(Theme.lime)
+                        .foregroundStyle(Theme.accentText)
                 }
             }
             .darkSheet()
@@ -1921,7 +2087,7 @@ struct WorkplaceEditorView: View {
 
     private var nightFields: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle("深夜給料", isOn: $nightOn).tint(Theme.lime)
+            Toggle("深夜給料", isOn: $nightOn).tint(Theme.accentText)
             if nightOn {
                 field("深夜給料", text: $nightText, number: true)
                 Stepper(value: $nightRate, in: 0...100) {
@@ -1929,7 +2095,7 @@ struct WorkplaceEditorView: View {
                         .foregroundStyle(Theme.ink)
                 }
                 Text("予定全体の時給分では、深夜の時間の基本給にこの割合を足します。0%なら足しません。上の深夜給料は、今の見込が時給を置き換える金額です。")
-                    .font(.system(size: 12))
+                    .designFont(12)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .top, spacing: 10) {
@@ -1938,7 +2104,7 @@ struct WorkplaceEditorView: View {
                 }
             }
             if holidayOn {
-                Toggle("休日深夜給料", isOn: $holidayNightOn).tint(Theme.lime)
+                Toggle("休日深夜給料", isOn: $holidayNightOn).tint(Theme.accentText)
                 if holidayNightOn {
                     field("休日深夜給料", text: $holidayNightText, number: true)
                     HStack(alignment: .top, spacing: 10) {
@@ -1966,7 +2132,7 @@ struct WorkplaceEditorView: View {
             Text("切り捨て").tag(2)
             Text("近い方").tag(3)
         }
-        .tint(Theme.lime)
+        .tint(Theme.accentText)
     }
 
     private var roundingPreview: String {
@@ -1991,14 +2157,14 @@ struct WorkplaceEditorView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 15, weight: .bold))
+            .designFont(15, weight: .bold)
             .foregroundStyle(Theme.ink)
     }
 
     private func editorLink(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold))
+                .designFont(15, weight: .bold)
             Spacer()
             Image(systemName: "chevron.right")
                 .foregroundStyle(Theme.muted)
@@ -2015,7 +2181,7 @@ struct WorkplaceEditorView: View {
                 Text("\(day)日").tag(day)
             }
         }
-        .tint(Theme.lime)
+        .tint(Theme.accentText)
     }
 
     private func save() {
@@ -2176,7 +2342,7 @@ struct WorkplaceEditorView: View {
                     if on { holidayDays.remove(day) } else { holidayDays.insert(day) }
                 } label: {
                     Text(names[day])
-                        .font(.system(size: 12, weight: .bold))
+                        .designFont(12, weight: .bold)
                         .foregroundStyle(on ? Theme.ink : .white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -2191,18 +2357,18 @@ struct WorkplaceEditorView: View {
     private func field(_ title: String, text: Binding<String>, number: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .designFont(12, weight: .medium)
                 .foregroundStyle(Theme.muted)
             HStack(spacing: 6) {
                 if number {
                     Text("¥")
-                        .font(.system(size: 16, weight: .bold))
+                        .designFont(16, weight: .bold)
                         .foregroundStyle(Theme.muted)
                 }
                 TextField(title, text: text)
                     .keyboardType(number ? .numberPad : .default)
                     .accessibilityIdentifier("field.\(title)")
-                    .font(.system(size: 16, weight: .medium))
+                    .designFont(16, weight: .medium)
                     .foregroundStyle(Theme.ink)
                     .focused($typing)
             }

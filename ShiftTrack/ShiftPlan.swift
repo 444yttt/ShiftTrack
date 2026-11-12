@@ -80,6 +80,11 @@ final class ShiftPattern {
     /// Calendar weekdays 1...7, Sunday first, comma separated.
     var weekdaysRaw: String
     var createdAt: Date
+    /// `PatternBreakMode` raw value. Rows saved before this field existed read 0
+    /// (fixed minutes), which is exactly how they were applied before.
+    var breakModeRaw: Int = 0
+    /// `BreakRules.encode` rows. Read only when the mode is `custom`.
+    var breakRulesRaw: String = ""
 
     init(
         name: String,
@@ -88,7 +93,9 @@ final class ShiftPattern {
         endMinutes: Int,
         breakMinutes: Int,
         weekdays: Set<Int>,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        breakModeRaw: Int = 0,
+        breakRulesRaw: String = ""
     ) {
         self.uuid = UUID()
         self.name = name
@@ -98,6 +105,8 @@ final class ShiftPattern {
         self.breakMinutes = breakMinutes
         self.weekdaysRaw = ShiftPatternPlan.encodeWeekdays(weekdays)
         self.createdAt = createdAt
+        self.breakModeRaw = breakModeRaw
+        self.breakRulesRaw = breakRulesRaw
     }
 
     var weekdays: Set<Int> {
@@ -107,7 +116,8 @@ final class ShiftPattern {
 }
 
 /// Recovered `ShiftPart` (`0x10044075c`). Stored like `AppData.shiftParts`.
-/// `breakMinutes` is kept on the part and is not copied by the place path.
+/// `breakMinutes`, `breakModeRaw` and `breakRulesRaw` decide the break on the
+/// shifts placed from it (see `PatternBreak`).
 /// Weekday repetition stays on `ShiftPattern` and is not this record.
 @Model
 final class ShiftPart {
@@ -121,6 +131,11 @@ final class ShiftPart {
     var hidden: Bool
     var colorHex: String
     var createdAt: Date
+    /// `PatternBreakMode` raw value. Existing rows read 0 (fixed minutes). The
+    /// old editor always stored 0 minutes, so their shifts still get no break.
+    var breakModeRaw: Int = 0
+    /// `BreakRules.encode` rows. Read only when the mode is `custom`.
+    var breakRulesRaw: String = ""
 
     init(
         name: String,
@@ -131,7 +146,9 @@ final class ShiftPart {
         defaultTodosRaw: String = "",
         hidden: Bool = false,
         colorHex: String = "C8FF00",
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        breakModeRaw: Int = 0,
+        breakRulesRaw: String = ""
     ) {
         self.uuid = UUID()
         self.name = name
@@ -143,6 +160,8 @@ final class ShiftPart {
         self.hidden = hidden
         self.colorHex = colorHex
         self.createdAt = createdAt
+        self.breakModeRaw = breakModeRaw
+        self.breakRulesRaw = breakRulesRaw
     }
 
     var defaultTodos: [ShiftTodoCodec.Item] {

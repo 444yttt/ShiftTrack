@@ -99,7 +99,7 @@ struct OnboardingScreen: View {
     private func pageCopy(title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 28, weight: .black))
+                .designFont(28, weight: .black)
                 .foregroundStyle(Theme.ink)
             Text(body)
                 .designFont(16)
