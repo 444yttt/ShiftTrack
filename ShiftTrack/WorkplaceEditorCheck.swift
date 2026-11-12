@@ -1,13 +1,13 @@
 import Foundation
 
-/// Save checks read by the workplace editor. Day equality uses the calendar
-/// the caller passes. A date shared by the wage list and the pay-rule list
-/// is not a duplicate; each list is checked on its own.
+/// Save checks of the workplace editor. Day equality uses the calendar the
+/// caller passes. A date shared by the wage list and the pay-rule list is not
+/// a duplicate; each list is checked on its own.
 enum WorkplaceEditorCheck {
-    static let emptyName = "勤務先の名前を入力してください。"
-    static let duplicateWageDate = "時給の適用開始日が重複しています。日付を変更してください。"
-    static let duplicatePayRuleDate = "お給料の決まりの適用開始日が重複しています。日付を変更してください。"
-    static let negativeWage = "時給を0円以上で入力してください。"
+    static let emptyName = "勤務先の名前を入れてください。"
+    static let duplicateWageDate = "時給の記録に同じ日付が2つあります。どちらかを消してください。"
+    static let duplicatePayRuleDate = "給料の決まりの開始日に同じ日付が2つあります。どちらかを消してください。"
+    static let negativeWage = "時給は0円以上で入れてください。"
 
     /// `hourlyWage` is nil when the form is not saving an hourly amount.
     /// The first failing check is the one the editor shows.

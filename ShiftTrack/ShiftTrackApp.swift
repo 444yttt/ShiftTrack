@@ -5,11 +5,25 @@ import UIKit
 @main
 struct ShiftTrackApp: App {
     init() {
+        FontRegistry.ensureDoto()
+        let paper = UIColor(
+            red: CGFloat((ThemeHex.background >> 16) & 0xFF) / 255,
+            green: CGFloat((ThemeHex.background >> 8) & 0xFF) / 255,
+            blue: CGFloat(ThemeHex.background & 0xFF) / 255,
+            alpha: 1
+        )
+        let ink = UIColor(
+            red: CGFloat((ThemeHex.ink >> 16) & 0xFF) / 255,
+            green: CGFloat((ThemeHex.ink >> 8) & 0xFF) / 255,
+            blue: CGFloat(ThemeHex.ink & 0xFF) / 255,
+            alpha: 1
+        )
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(red: 243 / 255, green: 241 / 255, blue: 236 / 255, alpha: 1)
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.black]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.black]
+        appearance.backgroundColor = paper
+        appearance.shadowColor = .clear
+        appearance.titleTextAttributes = [.foregroundColor: ink]
+        appearance.largeTitleTextAttributes = [.foregroundColor: ink]
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
