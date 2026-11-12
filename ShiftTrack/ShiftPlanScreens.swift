@@ -551,6 +551,7 @@ struct RequestEditorView: View {
                         Text("出勤したい").tag(ShiftRequestKind.hopedAttendance)
                         Text("休みたい").tag(ShiftRequestKind.hopedRest)
                     }
+                    RowDivider()
                     DatePicker(selection: $date, displayedComponents: .date) {
                         Text("日付")
                             .font(AppFont.body)
@@ -558,6 +559,7 @@ struct RequestEditorView: View {
                     }
                     .tint(Theme.signalInk)
                     .frame(minHeight: 44)
+                    RowDivider()
                     PickerRow(label: "勤務先", selection: $workplaceID, identifier: "request.workplace") {
                         Text("未定").tag(UUID?.none)
                         ForEach(workplaces) { workplace in
@@ -633,12 +635,12 @@ struct RequestEditorView: View {
             }
             return ShiftRequestLists.split(items, month: month)
         }()
-        return Card(spacing: Space.xs) {
-            Text("\(calendar.component(.month, from: date))月の希望")
-                .font(AppFont.label)
-                .foregroundStyle(Theme.ink)
-            ValueRow(title: "出勤したい", value: "\(pair.attendance.count)件")
-            ValueRow(title: "休みたい", value: "\(pair.rest.count)件")
+        return VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader(title: "\(calendar.component(.month, from: date))月の希望", detail: "この月に残している希望の数です。保存する前の入力は含みません。")
+            Card(spacing: Space.xs) {
+                ValueRow(title: "出勤したい", value: "\(pair.attendance.count)件")
+                ValueRow(title: "休みたい", value: "\(pair.rest.count)件")
+            }
         }
     }
 

@@ -248,7 +248,10 @@ struct ImportReviewView: View {
             if pending.candidates.isEmpty {
                 EmptyState(systemImage: "doc.text.magnifyingglass", message: "候補がありません")
             } else {
-                SectionHeader(title: "候補 \(pending.candidates.count)件", detail: "チェックを外した行は保存しません。行を押すと直せます。")
+                SectionHeader(
+                    title: "候補 \(pending.candidates.count)件",
+                    detail: "チェックを外した行は保存しません。行を押すと直せます。\(importSummary)"
+                )
                 ForEach($pending.candidates) { $candidate in
                     candidateRow($candidate)
                 }
@@ -287,6 +290,16 @@ struct ImportReviewView: View {
     }
 
     private var selectedCount: Int { pending.candidates.filter(\.included).count }
+
+    private var importSummary: String {
+        let chosen = pending.candidates.filter(\.included)
+        let fresh = chosen.filter(\.createWorkplace).count
+        let known = chosen.count - fresh
+        if chosen.isEmpty { return "保存する行がありません。" }
+        if fresh == 0 { return "登録済みの勤務先に \(known)件入れます。" }
+        if known == 0 { return "新しい勤務先として \(fresh)件追加します。" }
+        return "登録済みに \(known)件、新しい勤務先として \(fresh)件です。"
+    }
 
     private func candidateRow(_ candidate: Binding<ImportCandidate>) -> some View {
         let value = candidate.wrappedValue
@@ -459,11 +472,13 @@ struct CandidateEditor: View {
             ScreenScroll(spacing: Space.m) {
                 Card {
                     LabeledField(label: "勤務先の名前", text: $candidate.workplaceName, prompt: "例：架空茶房 北窓", identifier: "candidate.name")
+                    RowDivider()
                     SegmentedRow(label: "入れ方", selection: $candidate.createWorkplace, identifier: "candidate.mode") {
                         Text("この名前で新しく追加").tag(true)
                         Text("登録済みから選ぶ").tag(false)
                     }
                     if !candidate.createWorkplace {
+                        RowDivider()
                         PickerRow(label: "勤務先", selection: workplaceBinding, identifier: "candidate.workplace") {
                             Text("選んでください").tag(Optional<UUID>.none)
                             ForEach(workplaces) { workplace in
@@ -482,6 +497,7 @@ struct CandidateEditor: View {
                     .environment(\.locale, Locale(identifier: "ja_JP"))
                     .tint(Theme.signalInk)
                     .frame(minHeight: 44)
+                    RowDivider()
                     HStack(alignment: .top, spacing: Space.xs) {
                         MinutesTimePicker(title: "開始", minutes: $candidate.startMinutes)
                         MinutesTimePicker(title: "終了", minutes: $candidate.endMinutes)
@@ -499,6 +515,7 @@ struct CandidateEditor: View {
                             isOn: candidateBreakFollows,
                             identifier: "candidate.breakRules"
                         )
+                        RowDivider()
                         BreakMinutesControl(minutes: candidateBreakEntry, range: 0...600)
                     }
                     if PayMath.workedMinutes(

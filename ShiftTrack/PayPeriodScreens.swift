@@ -98,14 +98,17 @@ struct PayPeriodsView: View {
                 ForEach(shown) { workplace in
                     SectionHeader(title: workplace.name, detail: PayWindows.phrase(workplace))
                     Card(spacing: 0) {
-                        ForEach(PayWindows.recent(workplace), id: \.self) { window in
+                        let windows = PayWindows.recent(workplace)
+                        ForEach(Array(windows.enumerated()), id: \.element) { index, window in
                             NavigationLink {
                                 PayPeriodDetailView(workplaceID: workplace.uuid, window: window)
                             } label: {
                                 PayPeriodRow(workplace: workplace, window: window)
                             }
                             .buttonStyle(RowButtonStyle())
-                            RowDivider()
+                            if index < windows.count - 1 {
+                                RowDivider()
+                            }
                         }
                     }
                 }
@@ -240,12 +243,6 @@ struct PayPeriodDetailView: View {
                 YenField(label: "総支給額（明細）", text: $gross, identifier: "slip.gross")
                 YenField(label: "差引支給額（明細）", text: $net, identifier: "slip.net")
                 LabeledField(label: "メモ（任意）", text: $memo, prompt: "例：手当の内容", identifier: "slip.memo")
-                if let grossValue = yen(gross) {
-                    ValueRow(title: "総支給額 − 見込み", value: signed(grossValue - forecast))
-                }
-                if let netValue = yen(net) {
-                    ValueRow(title: "差引支給額 − 見込み", value: signed(netValue - forecast))
-                }
                 PrimaryButton(title: "明細の金額を残す", identifier: "slip.save") { storeSlip() }
                     .disabled(!canStore)
                 if !canStore {
@@ -253,6 +250,13 @@ struct PayPeriodDetailView: View {
                 }
                 if saved {
                     InfoNote(text: "この端末に残しました。", systemImage: "checkmark.circle")
+                }
+            }
+            if let grossValue = yen(gross), let netValue = yen(net) {
+                SectionHeader(title: "見込みとの差", detail: "プラスは明細の方が多い、マイナスは見込みの方が多い、という意味です。税金や社会保険は見込みに入っていません。")
+                Card(spacing: Space.xs) {
+                    slipDelta(title: "総支給額", slip: grossValue)
+                    slipDelta(title: "差引支給額", slip: netValue)
                 }
             }
         }
@@ -264,6 +268,27 @@ struct PayPeriodDetailView: View {
 
     private var canStore: Bool {
         yen(gross) != nil && yen(net) != nil
+    }
+
+    private func slipDelta(title: String, slip: Int) -> some View {
+        let delta = slip - forecast
+        return HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppFont.body)
+                    .foregroundStyle(Theme.ink)
+                Text(delta == 0 ? "見込みと同じ" : (delta > 0 ? "明細の方が多い" : "見込みの方が多い"))
+                    .font(AppFont.helper)
+                    .foregroundStyle(Theme.ink2)
+            }
+            Spacer(minLength: Space.xs)
+            Text(signed(delta))
+                .font(AppFont.value.weight(.bold))
+                .foregroundStyle(delta == 0 ? Theme.signalInk : Theme.danger)
+                .accessibilityIdentifier("slip.delta.\(title)")
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .combine)
     }
 
     private func signed(_ value: Int) -> String {

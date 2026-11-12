@@ -252,7 +252,7 @@ struct WorkplaceReadResult: View {
                 } label: {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .stroke(active ? Theme.ink : Theme.ink2, lineWidth: active ? 2 : 1)
-                        .background(active ? Theme.signal.opacity(0.45) : Theme.ink.opacity(0.06))
+.background(active ? Theme.signal.opacity(0.45) : Theme.ink.opacity(0.12))
                 }
                 .buttonStyle(.plain)
                 .frame(width: rect.width, height: rect.height)
