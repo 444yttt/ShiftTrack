@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - cursor/preview-tf-90ad-0c12
     paths:
       - "ShiftTrack/**"
       - "ShiftTrack.xcodeproj/**"

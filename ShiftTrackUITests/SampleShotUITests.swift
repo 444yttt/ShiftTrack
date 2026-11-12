@@ -38,6 +38,13 @@ final class SampleShotUITests: XCTestCase {
         app.buttons["tab.workplaces"].tap()
         show(app.buttons["workplace.add"])
         shot(app, "workplaces")
+        let edit = app.buttons["workplace.edit.架空茶房 北窓"]
+        show(edit)
+        edit.tap()
+        let workplaceEditor = app.navigationBars["勤務先を編集"]
+        XCTAssertTrue(workplaceEditor.waitForExistence(timeout: 6))
+        shot(app, "workplace-edit")
+        workplaceEditor.buttons["キャンセル"].tap()
         show(app.buttons["workplace.card"])
         app.buttons["workplace.card"].tap()
         show(app.buttons["workplace.pattern.add"])
