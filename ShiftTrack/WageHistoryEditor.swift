@@ -8,7 +8,7 @@ struct WageHistoryEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: Draft?
 
-    private struct Draft: Identifiable {
+    fileprivate struct Draft: Identifiable {
         var id = UUID()
         /// Index into `entries` while editing. Nil adds a period.
         var index: Int?
