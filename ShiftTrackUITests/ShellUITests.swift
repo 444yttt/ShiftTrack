@@ -102,7 +102,7 @@ final class ShellUITests: XCTestCase {
         XCTAssertFalse(app.otherElements["guide.card"].exists)
         let messages = app.buttons["settings.messages"]
         XCTAssertTrue(messages.waitForExistence(timeout: 6))
-        messages.tap()
+        tapVisible(app, messages)
         let messageTitle = app.navigationBars["連絡メッセージのひな形"]
         XCTAssertTrue(messageTitle.waitForExistence(timeout: 6))
         app.buttons["閉じる"].tap()

@@ -74,6 +74,29 @@ struct SettingsScreen: View {
             .sensoryFeedback(.selection, trigger: notifyAtEnd)
             .sensoryFeedback(.selection, trigger: notifyBefore)
 
+            SectionHeader(title: "連絡メッセージ", detail: "ホームと勤務先の「メッセージ」ボタンで、遅れるときの連絡に使う文章です。")
+            Card(spacing: Space.xs) {
+                Button {
+                    sheet = .messages
+                } label: {
+                    NavRow(systemImage: "text.bubble", title: "メッセージのひな形", subtitle: "宛名・理由・遅れる時間が入る文章を直せます")
+                }
+                .buttonStyle(RowButtonStyle())
+                .accessibilityIdentifier("settings.messages")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("いまのひな形で作ると")
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.ink2)
+                    Text(MessageTemplate.preview(MessageTemplate.current))
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Space.s)
+                        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .accessibilityIdentifier("settings.messages.preview")
+                }
+            }
+
             SectionHeader(title: "カレンダーとリマインダー", detail: "「しふとらっく」という名前のカレンダーとリストだけを作って更新します。ほかの予定やリマインダーは変えません。")
             Card(spacing: Space.s) {
                 ToggleRow(
@@ -100,29 +123,6 @@ struct SettingsScreen: View {
             .onChange(of: mirrorReminders) { _, on in Task { await updateReminders(on) } }
             .sensoryFeedback(.selection, trigger: mirrorCalendar)
             .sensoryFeedback(.selection, trigger: mirrorReminders)
-
-            SectionHeader(title: "連絡メッセージ", detail: "ホームと勤務先の「メッセージ」ボタンで、遅れるときの連絡に使う文章です。")
-            Card(spacing: Space.xs) {
-                Button {
-                    sheet = .messages
-                } label: {
-                    NavRow(systemImage: "text.bubble", title: "メッセージのひな形", subtitle: "宛名・理由・遅れる時間が入る文章を直せます")
-                }
-                .buttonStyle(RowButtonStyle())
-                .accessibilityIdentifier("settings.messages")
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("いまのひな形で作ると")
-                        .font(AppFont.helper)
-                        .foregroundStyle(Theme.ink2)
-                    Text(MessageTemplate.preview(MessageTemplate.current))
-                        .font(AppFont.helper)
-                        .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(Space.s)
-                        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
-                        .accessibilityIdentifier("settings.messages.preview")
-                }
-            }
 
             SectionHeader(title: "シフトの重なり")
             Card {

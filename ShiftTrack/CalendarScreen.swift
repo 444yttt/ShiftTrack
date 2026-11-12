@@ -315,7 +315,7 @@ struct CalendarScreen: View {
                     systemImage: "calendar",
                     message: selectedDay == nil ? "この月のシフトはまだありません" : "この日のシフトはありません",
                     actionTitle: selectedDay == nil ? "＋シフトを追加" : "この日に追加",
-                    actionIdentifier: "calendar.day.add"
+                    actionIdentifier: "calendar.addOnDay"
                 ) {
                     cover = .add(addDay)
                 }
@@ -333,7 +333,7 @@ struct CalendarScreen: View {
                 }
                 .animation(Motion.allowed(Motion.settle, reduce: reduceMotion), value: listedShifts.map(\.uuid))
                 if selectedDay != nil {
-                    SecondaryButton(title: "この日に追加", systemImage: "plus", identifier: "calendar.day.add") {
+                    SecondaryButton(title: "この日に追加", systemImage: "plus", identifier: "calendar.addOnDay") {
                         cover = .add(addDay)
                     }
                 }
