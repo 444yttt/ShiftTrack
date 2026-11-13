@@ -3,7 +3,7 @@ import XCTest
 /// The confirmation sheet edits the actual clocks and leaves the planned shift.
 /// Fictional workplace only: 架空茶房 北窓.
 final class ShiftCheckUITests: XCTestCase {
-    func testActualTimesAdjustOnTheConfirmationSheet() {
+    func testActualTimesAdjustOnTheConfirmationSheet() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else {
             throw XCTSkip("The confirmation sheet is opened from the iPhone home tab.")
         }
