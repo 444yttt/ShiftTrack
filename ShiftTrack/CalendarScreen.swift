@@ -123,7 +123,7 @@ struct CalendarScreen: View {
                 }
             }
             .highPriorityGesture(
-                DragGesture(minimumDistance: 28)
+                DragGesture(minimumDistance: 30)
                     .onChanged { value in
                         if abs(value.translation.width) > abs(value.translation.height) {
                             calendarDragging = true
