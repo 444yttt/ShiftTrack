@@ -43,6 +43,17 @@ enum SampleContent {
             workplace: place
         )
         context.insert(shift)
+        if ProcessInfo.processInfo.arguments.contains("-UITestingConfirm") {
+            let yesterday = calendar.date(byAdding: .day, value: -1, to: dayStart) ?? dayStart
+            let finished = WorkShift(
+                date: yesterday,
+                startMinutes: 10 * 60,
+                endMinutes: 15 * 60,
+                breakMinutes: 30,
+                workplace: place
+            )
+            context.insert(finished)
+        }
         try? context.save()
     }
 }
