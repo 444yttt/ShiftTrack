@@ -19,8 +19,7 @@ final class IPadShotUITests: XCTestCase {
         app.launch()
 
         revealSidebar(app)
-        let home = app.descendants(matching: .any)["pad.tab.ホーム"]
-        XCTAssertTrue(home.waitForExistence(timeout: 15))
+        XCTAssertTrue(tab(app, "ホーム").waitForExistence(timeout: 15))
         if app.buttons["閉じる"].waitForExistence(timeout: 2) {
             app.buttons["閉じる"].tap()
         }
@@ -55,8 +54,14 @@ final class IPadShotUITests: XCTestCase {
         shot(app, "ipad-landscape-settings")
     }
 
+    private func tab(_ app: XCUIApplication, _ title: String) -> XCUIElement {
+        // The identifier lands on the row and on its label, so a subscript query
+        // matches more than one element. The first button is the row.
+        app.buttons.matching(identifier: "pad.tab.\(title)").firstMatch
+    }
+
     private func revealSidebar(_ app: XCUIApplication) {
-        let row = app.descendants(matching: .any)["pad.tab.ホーム"]
+        let row = tab(app, "ホーム")
         if row.waitForExistence(timeout: 4), row.isHittable { return }
         let toggle = app.buttons["pad.sidebar"]
         if toggle.waitForExistence(timeout: 4) {
@@ -65,7 +70,7 @@ final class IPadShotUITests: XCTestCase {
     }
 
     private func open(_ app: XCUIApplication, _ title: String) {
-        let row = app.descendants(matching: .any)["pad.tab.\(title)"]
+        let row = tab(app, title)
         if row.waitForExistence(timeout: 4), row.isHittable {
             row.tap()
             return
