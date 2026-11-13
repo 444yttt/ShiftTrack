@@ -22,6 +22,10 @@ final class DesignTokenTests: XCTestCase {
         XCTAssertEqual(steps.prefix(7).map { $0 }, [4, 8, 12, 16, 20, 24, 32])
         XCTAssertLessThan(Radius.control, Radius.card)
         XCTAssertLessThan(Radius.card, Radius.hero)
+        // Fits an iPad mini portrait (744pt) with a margin, and stays a reading measure in landscape.
+        XCTAssertGreaterThanOrEqual(Readable.column, 640)
+        XCTAssertLessThanOrEqual(Readable.column, 720)
+        XCTAssertEqual(Readable.column.truncatingRemainder(dividingBy: 4), 0)
     }
 
     func testDotoStringsUseOnlyGlyphsTheFontHas() {
