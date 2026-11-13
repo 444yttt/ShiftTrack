@@ -66,7 +66,7 @@ final class PatternPlaceUITests: XCTestCase {
         let pending = app.otherElements["pattern.pending"]
         let pendingText = app.staticTexts["pattern.pending"]
         XCTAssertTrue(pending.waitForExistence(timeout: 4) || pendingText.waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "ほかのシフトがあります")).firstMatch.waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "時間がかぶります")).firstMatch.waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "置きませんでした")).firstMatch.exists)
         tapIdentifier(app, "calendar.pick.mode")
         revealGrid(app)
