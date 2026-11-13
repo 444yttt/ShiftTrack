@@ -46,16 +46,17 @@ enum PayMath {
 
     static func shiftYen(_ shift: WorkShift, includeTransport: Bool, calendar: Calendar = .current) -> Int {
         guard let workplace = shift.workplace else { return 0 }
+        let clocks = payableClocks(shift)
         return quote(
             workplace: workplace,
             day: shift.date,
-            start: shift.startMinutes,
-            end: shift.endMinutes,
+            start: clocks.start,
+            end: clocks.end,
             breakMinutes: shift.breakMinutes,
             customPay: shift.customPay,
             adjustment: shift.adjustmentYen,
             includeTransport: includeTransport,
-            paidOverride: shift.partID == nil ? nil : shift.workedMinutes,
+            paidOverride: clocks.paidOverride,
             calendar: calendar
         )
     }
@@ -66,26 +67,36 @@ enum PayMath {
     /// are all base.
     static func wageParts(_ shift: WorkShift, calendar: Calendar = .current) -> (base: Int, premium: Int) {
         guard let workplace = shift.workplace else { return (0, 0) }
-        let paidOverride = shift.partID == nil ? nil : shift.workedMinutes
+        let clocks = payableClocks(shift)
         let wage = quote(
             workplace: workplace,
             day: shift.date,
-            start: shift.startMinutes,
-            end: shift.endMinutes,
+            start: clocks.start,
+            end: clocks.end,
             breakMinutes: shift.breakMinutes,
             customPay: shift.customPay,
             adjustment: 0,
             includeTransport: false,
-            paidOverride: paidOverride,
+            paidOverride: clocks.paidOverride,
             calendar: calendar
         )
         if shift.customPay != nil || workplace.payIsDaily {
             return (wage, 0)
         }
-        let paid = paidOverride ?? workedMinutes(start: shift.startMinutes, end: shift.endMinutes, breakMinutes: shift.breakMinutes)
+        let paid = clocks.paidOverride ?? workedMinutes(start: clocks.start, end: clocks.end, breakMinutes: shift.breakMinutes)
         let plain = paid > 0 ? (max(0, workplace.hourlyWage) * paid + 30) / 60 : 0
         let base = min(plain, wage)
         return (base, max(0, wage - base))
+    }
+
+    /// Actual clocks replace the schedule only after 勤務の確認 stores them.
+    /// A pattern row keeps its stored span until that happens.
+    private static func payableClocks(_ shift: WorkShift) -> (start: Int, end: Int, paidOverride: Int?) {
+        if shift.timesDifferFromSchedule {
+            return (shift.payableStartMinutes, shift.payableEndMinutes, shift.workedMinutes)
+        }
+        let patternSpan = shift.partID == nil ? nil : shift.workedMinutes
+        return (shift.startMinutes, shift.endMinutes, patternSpan)
     }
 
     static func payday(for shiftDay: Date, workplace: Workplace, calendar: Calendar = .current) -> Date {

@@ -338,7 +338,7 @@ private struct SlipDraft: Codable {
     var memo: String
 }
 
-/// 勤務の確認: confirm the times and break of a finished shift.
+/// 勤務の確認: record the times actually worked. The scheduled start and end stay put.
 struct ShiftCheckView: View {
     var shift: WorkShift
     var onEdit: (() -> Void)? = nil
@@ -346,11 +346,14 @@ struct ShiftCheckView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var settingsRows: [AppSettings]
     @State private var breakMinutes = 0
+    @State private var draftStart = 0
+    @State private var draftEnd = 0
+    @State private var editing: CheckClock? = nil
     @State private var loaded = false
 
     private var includeTransport: Bool { settingsRows.first?.includeTransport ?? true }
     private var minutes: Int {
-        PayMath.workedMinutes(start: shift.startMinutes, end: shift.endMinutes, breakMinutes: breakMinutes)
+        PayMath.workedMinutes(start: draftStart, end: draftEnd, breakMinutes: breakMinutes)
     }
 
     private var yen: Int {
@@ -358,8 +361,8 @@ struct ShiftCheckView: View {
         return PayMath.quote(
             workplace: workplace,
             day: shift.date,
-            start: shift.startMinutes,
-            end: shift.endMinutes,
+            start: draftStart,
+            end: draftEnd,
             breakMinutes: breakMinutes,
             customPay: shift.customPay,
             adjustment: shift.adjustmentYen,
@@ -377,31 +380,43 @@ struct ShiftCheckView: View {
                     .font(AppFont.screenTitle)
                     .foregroundStyle(Theme.ink)
                     .accessibilityAddTraits(.isHeader)
-                Text("休憩が違うときはここで直して確定します。時間が違うときは「時間を直す」から編集してください。")
+                Text("開始と終了が違うときは、カードを押してここで直します。予定のシフトは変わりません。")
                     .font(AppFont.body)
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, Space.xs)
-            HStack(spacing: Space.xs) {
-                clockCard("開始", shift.startMinutes)
-                clockCard("終了", shift.endMinutes)
+            HStack(alignment: .top, spacing: Space.xs) {
+                clockCard(.start)
+                clockCard(.end)
+            }
+            if let editing {
+                clockAdjust(editing)
             }
             Card {
                 BreakMinutesControl(minutes: $breakMinutes, range: 0...600)
                 RowDivider()
                 ValueRow(title: "働いた時間", value: Formatters.hours(minutes), emphasized: true)
+                    .accessibilityIdentifier("check.worked")
                 HStack(alignment: .firstTextBaseline) {
                     Text("この勤務の給料")
                         .font(AppFont.body)
                         .foregroundStyle(Theme.ink)
                     Spacer(minLength: Space.xs)
                     DotoText("¥" + Formatters.yenDigits(yen), size: 28, spoken: "\(yen)円")
+                        .accessibilityIdentifier("check.yen")
                 }
                 InfoNote(text: includeTransport ? "交通費と天引・手当を含みます。税金・社会保険は計算していません。" : "天引・手当を含みます。交通費と税金・社会保険は含みません。")
             }
             if let onEdit {
-                SecondaryButton(title: "時間を直す", systemImage: "pencil", identifier: "check.edit", action: onEdit)
+                Button(action: onEdit) {
+                    Text("予定のシフトを編集")
+                        .font(AppFont.helper)
+                        .foregroundStyle(Theme.signalInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("check.edit")
             }
         }
         .background(Theme.paper)
@@ -416,29 +431,136 @@ struct ShiftCheckView: View {
         .onAppear {
             if !loaded {
                 breakMinutes = shift.breakMinutes
+                draftStart = ShiftDatePolicy.clockMinutes(shift.actualStartMinutes ?? shift.startMinutes)
+                draftEnd = ShiftDatePolicy.clockMinutes(shift.actualEndMinutes ?? shift.endMinutes)
                 loaded = true
             }
         }
     }
 
-    private func clockCard(_ title: String, _ minutes: Int) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(AppFont.label)
-                .foregroundStyle(Theme.ink2)
-            DotoText(Formatters.clock(minutes), size: 28, spoken: "\(title) \(Formatters.spokenClock(minutes))")
+    private func clockCard(_ field: CheckClock) -> some View {
+        let scheduled = ShiftDatePolicy.clockMinutes(field == .start ? shift.startMinutes : shift.endMinutes)
+        let current = field == .start ? draftStart : draftEnd
+        let changed = current != scheduled
+        return VStack(alignment: .leading, spacing: Space.xs) {
+            Button {
+                editing = editing == field ? nil : field
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(field.title)
+                        .font(AppFont.label)
+                        .foregroundStyle(Theme.ink2)
+                    DotoText(Formatters.clock(current), size: 28, spoken: "\(field.title) \(Formatters.spokenClock(current))")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityIdentifier(field.identifier)
+            .accessibilityHint("実際の時刻を直します。予定は変わりません。")
+            if changed {
+                Text("予定 \(Formatters.clock(scheduled))")
+                    .font(AppFont.helper)
+                    .foregroundStyle(Theme.ink2)
+                    .accessibilityIdentifier("check.changed.\(field.title)")
+            }
         }
         .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 
-    /// The confirmed flag is this app's own; the row then leaves the unconfirmed list.
+    private func clockAdjust(_ field: CheckClock) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text("\(field.title)の実際の時刻")
+                .font(AppFont.label)
+                .foregroundStyle(Theme.ink2)
+            HStack(spacing: Space.xs) {
+                nudge(field, delta: -15, title: "−15分", label: "15分早める", id: "minus15")
+                nudge(field, delta: 15, title: "+15分", label: "15分遅らせる", id: "plus15")
+                nudge(field, delta: -1, title: "−1分", label: "1分早める", id: "minus1")
+                nudge(field, delta: 1, title: "+1分", label: "1分遅らせる", id: "plus1")
+            }
+            DatePicker(
+                field.title,
+                selection: clockBinding(field),
+                displayedComponents: .hourAndMinute
+            )
+            .datePickerStyle(.compact)
+            .labelsHidden()
+            .environment(\.locale, Locale(identifier: "ja_JP"))
+            .accessibilityIdentifier("\(field.identifier).picker")
+        }
+        .padding(Space.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+    }
+
+    private func nudge(_ field: CheckClock, delta: Int, title: String, label: String, id: String) -> some View {
+        Button {
+            let current = field == .start ? draftStart : draftEnd
+            let next = ShiftDatePolicy.clockMinutes(current + delta)
+            if field == .start {
+                draftStart = next
+            } else {
+                draftEnd = next
+            }
+        } label: {
+            Text(title)
+                .font(AppFont.label.monospacedDigit())
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Theme.paper, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(label)
+        .accessibilityIdentifier("\(field.identifier).\(id)")
+    }
+
+    private func clockBinding(_ field: CheckClock) -> Binding<Date> {
+        Binding {
+            ShiftDatePolicy.clockDate(minutes: field == .start ? draftStart : draftEnd)
+        } set: { newValue in
+            let minutes = ShiftDatePolicy.clockMinutes(from: newValue)
+            if field == .start {
+                draftStart = minutes
+            } else {
+                draftEnd = minutes
+            }
+        }
+    }
+
+    /// Writes the actual clocks beside the schedule. Matching the schedule stores nil.
     private func confirm() {
+        let start = ShiftDatePolicy.clockMinutes(draftStart)
+        let end = ShiftDatePolicy.clockMinutes(draftEnd)
+        shift.actualStartMinutes = start == ShiftDatePolicy.clockMinutes(shift.startMinutes) ? nil : start
+        shift.actualEndMinutes = end == ShiftDatePolicy.clockMinutes(shift.endMinutes) ? nil : end
         shift.breakMinutes = breakMinutes
         shift.breakFollowsRules = false
         shift.attendanceConfirmed = true
         try? context.save()
         dismiss()
+    }
+}
+
+private enum CheckClock: Equatable {
+    case start, end
+
+    var title: String {
+        switch self {
+        case .start: "開始"
+        case .end: "終了"
+        }
+    }
+
+    var identifier: String {
+        switch self {
+        case .start: "check.start"
+        case .end: "check.end"
+        }
     }
 }

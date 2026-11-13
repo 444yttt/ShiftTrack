@@ -164,6 +164,30 @@ struct PayDomainTests {
     }
 
     @Test
+    func confirmedActualTimesLeaveTheScheduleAndChangeThePay() {
+        let place = Workplace(name: "架空茶房 北窓", colorHex: "C6F24E", hourlyWage: 1_600, transportAllowance: 0)
+        let day = Self.tokyo.date(from: DateComponents(year: 2026, month: 11, day: 12))!
+        let shift = WorkShift(date: day, startMinutes: 10 * 60, endMinutes: 15 * 60, breakMinutes: 30, workplace: place)
+        let scheduled = PayMath.shiftYen(shift, includeTransport: false, calendar: Self.tokyo)
+        #expect(shift.actualStartMinutes == nil)
+        #expect(shift.actualEndMinutes == nil)
+        #expect(shift.workedMinutes == 4 * 60 + 30)
+        #expect(scheduled == (1_600 * 270 + 30) / 60)
+
+        shift.actualEndMinutes = 14 * 60
+        #expect(shift.startMinutes == 10 * 60)
+        #expect(shift.endMinutes == 15 * 60)
+        #expect(shift.timesDifferFromSchedule)
+        #expect(shift.workedMinutes == 3 * 60 + 30)
+        let shorter = PayMath.shiftYen(shift, includeTransport: false, calendar: Self.tokyo)
+        #expect(shorter == (1_600 * 210 + 30) / 60)
+        #expect(shorter < scheduled)
+
+        shift.actualEndMinutes = nil
+        #expect(PayMath.shiftYen(shift, includeTransport: false, calendar: Self.tokyo) == scheduled)
+    }
+
+    @Test
     func scheduleSentenceNamesTheClosingDayAndPayday() {
         let text = PayScheduleMath.sentence(closingDay: 0, paydayDay: 25, monthOffset: 1)
         #expect(text.contains("末日"))

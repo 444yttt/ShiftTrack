@@ -249,8 +249,13 @@ final class WorkShift {
     var patternEndOnNextDay: Bool = false
     /// Copied todos. `done` stays false on the place path. Empty for older rows.
     var todosRaw: String = ""
-    /// Set only when the user taps 「このとおり」. Existing rows stay false.
+    /// Set only when the user taps 「この内容で確定」. Existing rows stay false.
     var attendanceConfirmed: Bool = false
+    /// Actual clock confirmed on 勤務の確認. Nil means the scheduled time.
+    /// Optional with a nil default so existing stores keep their rows.
+    var actualStartMinutes: Int? = nil
+    /// Actual clock confirmed on 勤務の確認. Nil means the scheduled time.
+    var actualEndMinutes: Int? = nil
     /// Optional trip target. Empty means the workplace itself. Does not change pay.
     var destinationName: String = ""
     var destinationPlace: String = ""
@@ -275,7 +280,9 @@ final class WorkShift {
         workplace: Workplace?,
         attendanceConfirmed: Bool = false,
         destinationName: String = "",
-        destinationPlace: String = ""
+        destinationPlace: String = "",
+        actualStartMinutes: Int? = nil,
+        actualEndMinutes: Int? = nil
     ) {
         self.uuid = UUID()
         self.date = Calendar.current.startOfDay(for: date)
@@ -294,8 +301,17 @@ final class WorkShift {
         self.attendanceConfirmed = attendanceConfirmed
         self.destinationName = destinationName
         self.destinationPlace = destinationPlace
+        self.actualStartMinutes = actualStartMinutes
+        self.actualEndMinutes = actualEndMinutes
         self.clockedInAt = nil
         self.clockedOutAt = nil
+    }
+
+    /// Clock used for pay. A nil actual time means the shift is still as scheduled.
+    var payableStartMinutes: Int { actualStartMinutes ?? startMinutes }
+    var payableEndMinutes: Int { actualEndMinutes ?? endMinutes }
+    var timesDifferFromSchedule: Bool {
+        actualStartMinutes != nil || actualEndMinutes != nil
     }
 
     var todos: [ShiftTodoCodec.Item] {
@@ -304,6 +320,9 @@ final class WorkShift {
     }
 
     var workedMinutes: Int {
+        if timesDifferFromSchedule {
+            return PayMath.workedMinutes(start: payableStartMinutes, end: payableEndMinutes, breakMinutes: breakMinutes)
+        }
         if partID == nil {
             return PayMath.workedMinutes(start: startMinutes, end: endMinutes, breakMinutes: breakMinutes)
         }

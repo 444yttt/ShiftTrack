@@ -754,6 +754,7 @@ struct UnconfirmedList: View {
                                 )
                             }
                             .buttonStyle(RowButtonStyle())
+                            .accessibilityIdentifier("check.open")
                             RowDivider()
                         }
                     }
