@@ -16,6 +16,9 @@ struct ShiftOverlapBoundaryTests {
         case .time:
             #expect(hits.count == 1)
             #expect(hits.first?.kind == .time)
+        case .sameDay:
+            #expect(hits.count == 1)
+            #expect(hits.first?.kind == .sameDay)
         case .travel(let minutes):
             #expect(hits.count == 1)
             #expect(hits.first?.kind == .travel(minutes: minutes))
@@ -71,6 +74,13 @@ struct ShiftOverlapBoundaryTests {
     }
 
     @Test
+    func sameWorkplaceOnTheSameDayUsesOurOwnSentence() {
+        let hits = compare(Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 16 * 60, otherEnd: 18 * 60, samePlace: true, travel: 0, expect: .sameDay))
+        #expect(hits.count == 1)
+        #expect(ShiftOverlap.row(hits[0]) == "架空書店（16:00〜18:00）は、同じ勤務先のこの日に入っています。")
+    }
+
+    @Test
     func newShiftsInOneBatchAreComparedWithEachOther() {
         let first = ShiftOverlap.span(id: "n1", name: "架空茶房", workplace: Self.placeA, day: day(0), start: 9 * 60, end: 12 * 60, calendar: Self.calendar)
         let second = ShiftOverlap.span(id: "n2", name: "架空書店", workplace: Self.placeB, day: day(0), start: 12 * 60 + 10, end: 15 * 60, calendar: Self.calendar)
@@ -104,7 +114,8 @@ struct ShiftOverlapBoundaryTests {
         Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60 + 30, otherEnd: 15 * 60, samePlace: false, travel: 30, expect: .none),
         Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60 + 31, otherEnd: 15 * 60, samePlace: false, travel: 30, expect: .none),
         Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60 + 10, otherEnd: 15 * 60, samePlace: false, travel: 0, expect: .none),
-        Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60 + 10, otherEnd: 15 * 60, samePlace: true, travel: 30, expect: .none),
+        Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60 + 10, otherEnd: 15 * 60, samePlace: true, travel: 30, expect: .sameDay),
+        Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 1, otherStart: 14 * 60, otherEnd: 17 * 60, samePlace: true, travel: 30, expect: .none),
         Sample(day: 0, start: 9 * 60, end: 12 * 60, otherDay: 0, otherStart: 12 * 60 + 10, otherEnd: 15 * 60, samePlace: false, travel: 30, expect: .travel(minutes: 10)),
         Sample(day: 0, start: 22 * 60, end: 2 * 60, otherDay: 1, otherStart: 1 * 60, otherEnd: 3 * 60, samePlace: false, travel: 0, expect: .time),
         Sample(day: 0, start: 22 * 60, end: 0, otherDay: 1, otherStart: 0, otherEnd: 8 * 60, samePlace: false, travel: 0, expect: .none),
@@ -129,6 +140,7 @@ struct Sample: Sendable {
     enum Expect: Equatable, Sendable {
         case none
         case time
+        case sameDay
         case travel(minutes: Int)
     }
 }

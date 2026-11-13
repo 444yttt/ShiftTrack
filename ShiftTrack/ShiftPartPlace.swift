@@ -23,18 +23,18 @@ enum ShiftTodoCodec {
 
 /// Place a `ShiftPart` on chosen days.
 ///
-/// Nothing is inserted while any chosen day already has a different shift:
-/// the outcome is `.pending` with one line per such day, and the screen shows
-/// them. A day that already has this pattern is skipped. Seconds are 0, and
-/// the end rolls to the next day when the start minute is at or after the end
+/// Nothing is inserted while any chosen day clashes with a different shift.
+/// A clash is the same rule used before saving a shift: overlapping hours,
+/// another shift at this workplace on that calendar day, or a gap shorter
+/// than the travel setting. A day that already has this pattern skips that
+/// pattern and still checks the other shifts. Seconds are 0, and the end
+/// rolls to the next day when the start minute is at or after the end
 /// minute. The pattern's to-dos are copied as new, not done.
 ///
 /// Break: each pattern carries its own (fixed minutes, the workplace's rules,
 /// or rules of its own); `ShiftPartCommit` resolves it with `PatternBreak`
 /// and hands it to `outcome`. Callers that pass nothing get 0 minutes.
 enum ShiftPartPlace {
-    /// Ending of a clash line; the line starts with the day.
-    static let clashText = "にはほかのシフトがあります"
 
     /// Line shown after a tap on a pattern.
     static func placedNote(count: Int) -> String {
@@ -45,8 +45,13 @@ enum ShiftPartPlace {
     static let saveFailedText = "保存できませんでした。少し待ってから、もう一度試してください。"
 
     struct Existing: Equatable {
+        var id: String = UUID().uuidString
         var day: Date
         var partID: UUID?
+        var workplaceID: UUID?
+        var name: String = ""
+        var startMinutes: Int = 0
+        var endMinutes: Int = 0
     }
 
     struct Draft: Equatable {
@@ -130,10 +135,22 @@ enum ShiftPartPlace {
         existing: [Existing],
         breakMinutes: Int = 0,
         breakFollowsRules: Bool = false,
+        travelMinutes: Int = 0,
         calendar: Calendar = .current
     ) -> Outcome {
         let days = uniqueDays(days, calendar: calendar)
-        let clashes = clashLines(partID: partID, days: days, existing: existing, calendar: calendar)
+        let clashes = workplaceID.map { place in
+            clashLines(
+                partID: partID,
+                workplaceID: place,
+                startMinute: startMinute,
+                endMinute: endMinute,
+                days: days,
+                existing: existing,
+                travelMinutes: travelMinutes,
+                calendar: calendar
+            )
+        } ?? []
         if !clashes.isEmpty {
             return .pending(Pending(id: UUID(), partID: partID, days: days, clashes: clashes))
         }
@@ -166,20 +183,52 @@ enum ShiftPartPlace {
         return .placed(drafts)
     }
 
-    /// One line per day that holds a shift other than this pattern. A day that
-    /// already has this pattern is not a clash (it is skipped instead).
+    /// One line per other shift that clashes. A shift of this same pattern is
+    /// skipped, and the other shifts on that day are still compared.
     static func clashLines(
         partID: UUID,
+        workplaceID: UUID,
+        startMinute: Int,
+        endMinute: Int,
         days: [Date],
         existing: [Existing],
+        travelMinutes: Int,
         calendar: Calendar
     ) -> [String] {
         var lines: [String] = []
         for day in days {
-            let onDay = existing.filter { calendar.isDate($0.day, inSameDayAs: day) }
-            if onDay.contains(where: { $0.partID == partID }) { continue }
-            if onDay.contains(where: { $0.partID != partID }) {
-                lines.append(Formatters.longDay(day, calendar: calendar) + clashText)
+            let others = existing.filter { row in
+                calendar.isDate(row.day, inSameDayAs: day) && row.partID != partID && row.workplaceID != nil
+            }
+            guard !others.isEmpty else { continue }
+            let proposed = ShiftOverlap.span(
+                id: "part",
+                name: "",
+                workplace: workplaceID,
+                day: day,
+                start: startMinute,
+                end: endMinute,
+                calendar: calendar
+            )
+            let spans = others.map { row in
+                ShiftOverlap.span(
+                    id: row.id,
+                    name: row.name.isEmpty ? "別のシフト" : row.name,
+                    workplace: row.workplaceID ?? workplaceID,
+                    day: row.day,
+                    start: row.startMinutes,
+                    end: row.endMinutes,
+                    calendar: calendar
+                )
+            }
+            let hits = ShiftOverlap.conflicts(
+                of: proposed,
+                among: spans,
+                travelMinutes: travelMinutes,
+                calendar: calendar
+            )
+            for hit in hits {
+                lines.append(Formatters.longDay(day, calendar: calendar) + " " + ShiftOverlap.row(hit))
             }
         }
         return lines
@@ -249,9 +298,19 @@ enum ShiftPartCommit {
             endMinute: part.endMinute,
             todos: part.defaultTodos,
             days: days,
-            existing: shifts.map { ShiftPartPlace.Existing(day: $0.date, partID: $0.partID) },
+            existing: shifts.map { shift in
+                ShiftPartPlace.Existing(
+                    day: shift.date,
+                    partID: shift.partID,
+                    workplaceID: shift.workplace?.uuid,
+                    name: shift.workplace?.name ?? "",
+                    startMinutes: shift.startMinutes,
+                    endMinutes: shift.endMinutes
+                )
+            },
             breakMinutes: resolvedBreak.minutes,
             breakFollowsRules: resolvedBreak.followsRules,
+            travelMinutes: storedTravelMinutes(),
             calendar: calendar
         )
         guard case .placed(let drafts) = outcome else {
@@ -288,5 +347,12 @@ enum ShiftPartCommit {
             return Result(outcome: outcome, failure: ShiftPartPlace.saveFailedText)
         }
         return Result(outcome: outcome, failure: nil, inserted: inserted)
+    }
+
+    /// The travel gap used before a shift is saved. Unset means the same 30 minutes.
+    private static func storedTravelMinutes() -> Int {
+        let key = "settings.travelMinutes"
+        guard UserDefaults.standard.object(forKey: key) != nil else { return 30 }
+        return max(0, UserDefaults.standard.integer(forKey: key))
     }
 }

@@ -105,23 +105,39 @@ final class ShiftPartPlaceTests: XCTestCase {
         XCTAssertNotEqual(drafts[0].breakMinutes, 60)
     }
 
-    func testClashHoldsEveryDayAndASamePartDayDoesNotClash() {
+    func testSameWorkplaceOnThatDayHoldsTheBatchAndAClearDayDoesNot() {
         let calendar = calendar()
         let blocked = day(2026, 11, 11)
         let open = day(2026, 11, 12)
         let part = UUID()
-        let other = UUID()
+        let place = UUID()
+        let otherPlace = UUID()
         let pending = ShiftPartPlace.outcome(
             partID: part,
-            workplaceID: UUID(),
+            workplaceID: place,
             startMinute: 10 * 60,
             endMinute: 15 * 60,
             todos: [],
             days: [blocked, open],
             existing: [
-                ShiftPartPlace.Existing(day: blocked, partID: nil),
-                ShiftPartPlace.Existing(day: open, partID: other),
+                ShiftPartPlace.Existing(
+                    day: blocked,
+                    partID: nil,
+                    workplaceID: place,
+                    name: "架空茶房 北窓",
+                    startMinutes: 16 * 60,
+                    endMinutes: 18 * 60
+                ),
+                ShiftPartPlace.Existing(
+                    day: open,
+                    partID: UUID(),
+                    workplaceID: otherPlace,
+                    name: "別の店",
+                    startMinutes: 18 * 60,
+                    endMinutes: 21 * 60
+                ),
             ],
+            travelMinutes: 0,
             calendar: calendar
         )
         guard case .pending(let hold) = pending else {
@@ -129,28 +145,81 @@ final class ShiftPartPlaceTests: XCTestCase {
         }
         XCTAssertEqual(hold.partID, part)
         XCTAssertEqual(hold.days, [blocked, open])
-        XCTAssertEqual(hold.clashes, [
-            Formatters.longDay(blocked, calendar: calendar) + ShiftPartPlace.clashText,
-            Formatters.longDay(open, calendar: calendar) + ShiftPartPlace.clashText,
-        ])
+        XCTAssertEqual(hold.clashes.count, 1)
+        XCTAssertTrue(hold.clashes[0].hasPrefix(Formatters.longDay(blocked, calendar: calendar)))
+        XCTAssertTrue(hold.clashes[0].contains("架空茶房 北窓"))
+        XCTAssertTrue(hold.clashes[0].contains("同じ勤務先のこの日"))
+        XCTAssertFalse(hold.clashes[0].contains("別の店"))
+    }
 
+    func testSamePatternIsSkippedAndADifferentClearShiftDoesNotClash() {
+        let calendar = calendar()
+        let blocked = day(2026, 11, 11)
+        let part = UUID()
+        let place = UUID()
         let again = ShiftPartPlace.outcome(
             partID: part,
-            workplaceID: UUID(),
+            workplaceID: place,
             startMinute: 10 * 60,
             endMinute: 15 * 60,
             todos: [],
             days: [blocked],
             existing: [
-                ShiftPartPlace.Existing(day: blocked, partID: part),
-                ShiftPartPlace.Existing(day: blocked, partID: other),
+                ShiftPartPlace.Existing(
+                    day: blocked,
+                    partID: part,
+                    workplaceID: place,
+                    startMinutes: 10 * 60,
+                    endMinutes: 15 * 60
+                ),
+                ShiftPartPlace.Existing(
+                    day: blocked,
+                    partID: UUID(),
+                    workplaceID: UUID(),
+                    name: "別の店",
+                    startMinutes: 18 * 60,
+                    endMinutes: 21 * 60
+                ),
             ],
+            travelMinutes: 0,
             calendar: calendar
         )
         guard case .placed(let skipped) = again else {
             return XCTFail("same part skips without a clash")
         }
         XCTAssertTrue(skipped.isEmpty)
+    }
+
+    func testAnotherShiftAtTheSameWorkplaceStillClashesWhenThisPatternIsAlreadyThere() {
+        let calendar = calendar()
+        let blocked = day(2026, 11, 11)
+        let part = UUID()
+        let place = UUID()
+        let pending = ShiftPartPlace.outcome(
+            partID: part,
+            workplaceID: place,
+            startMinute: 10 * 60,
+            endMinute: 15 * 60,
+            todos: [],
+            days: [blocked],
+            existing: [
+                ShiftPartPlace.Existing(day: blocked, partID: part, workplaceID: place, startMinutes: 10 * 60, endMinutes: 15 * 60),
+                ShiftPartPlace.Existing(
+                    day: blocked,
+                    partID: UUID(),
+                    workplaceID: place,
+                    name: "架空茶房 北窓",
+                    startMinutes: 18 * 60,
+                    endMinutes: 21 * 60
+                ),
+            ],
+            calendar: calendar
+        )
+        guard case .pending(let hold) = pending else {
+            return XCTFail("expected pending")
+        }
+        XCTAssertEqual(hold.clashes.count, 1)
+        XCTAssertTrue(hold.clashes[0].contains("同じ勤務先のこの日"))
     }
 
     func testMissingWorkplaceInsertsNothing() {

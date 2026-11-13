@@ -526,7 +526,7 @@ struct TodayScreen: View {
     // MARK: Week helpers
 
     private var weekSwipe: some Gesture {
-        DragGesture(minimumDistance: 28)
+        DragGesture(minimumDistance: 30)
             .onEnded { value in
                 guard abs(value.translation.width) > abs(value.translation.height), abs(value.translation.width) > 48 else { return }
                 moveWeek(value.translation.width < 0 ? 1 : -1)

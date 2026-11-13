@@ -3,11 +3,13 @@ import Foundation
 /// Overlap before save. The function does not read SwiftData or the device time zone.
 /// Pass `ShiftOverlap.tokyo`. Intervals are half-open minute instants `[start, end)`.
 /// Touching endpoints do not overlap. A gap equal to the travel setting is clear.
-/// Time overlap is kept even when the workplaces match. A short gap is kept only
-/// when the workplaces differ. One other shift is never both.
+/// Time overlap is kept even when the workplaces match. The same workplace on the
+/// same calendar day is a clash even when the hours do not meet. A short gap is
+/// kept only when the workplaces differ. One other shift is never more than one kind.
 enum ShiftOverlap {
     enum Kind: Equatable, Sendable {
         case time
+        case sameDay
         case travel(minutes: Int)
     }
 
@@ -34,6 +36,8 @@ enum ShiftOverlap {
             switch kind {
             case .time:
                 return otherID + ":time"
+            case .sameDay:
+                return otherID + ":day"
             case .travel(let minutes):
                 return otherID + ":travel:\(minutes)"
             }
@@ -97,14 +101,19 @@ enum ShiftOverlap {
         return others
             .map { aligned($0, calendar: calendar) }
             .filter { other in
-                other.id != proposed.id && !other.cancelled && intersects(windowStart, windowEnd, other.start, other.end)
+                guard other.id != proposed.id, !other.cancelled else { return false }
+                if other.workplace == proposed.workplace,
+                   calendar.isDate(proposed.start, inSameDayAs: other.start) {
+                    return true
+                }
+                return intersects(windowStart, windowEnd, other.start, other.end)
             }
             .sorted { lhs, rhs in
                 if lhs.start != rhs.start { return lhs.start < rhs.start }
                 return lhs.id < rhs.id
             }
             .compactMap { other in
-                guard let kind = kind(proposed, other, travelMinutes: travel) else { return nil }
+                guard let kind = kind(proposed, other, travelMinutes: travel, calendar: calendar) else { return nil }
                 return Hit(
                     otherID: other.id,
                     kind: kind,
@@ -151,6 +160,8 @@ enum ShiftOverlap {
         switch hit.kind {
         case .time:
             return "\(hit.name)（\(clocks)）と時間がかぶります。"
+        case .sameDay:
+            return "\(hit.name)（\(clocks)）は、同じ勤務先のこの日に入っています。"
         case .travel(let minutes):
             return "\(hit.name)（\(clocks)）との間が\(minutes)分です。移動にかかる時間より短くなります。"
         }
@@ -192,9 +203,13 @@ enum ShiftOverlap {
         return start < otherEnd && otherStart < end
     }
 
-    private static func kind(_ proposed: Span, _ other: Span, travelMinutes: Int) -> Kind? {
+    private static func kind(_ proposed: Span, _ other: Span, travelMinutes: Int, calendar: Calendar) -> Kind? {
         if intersects(proposed.start, proposed.end, other.start, other.end) {
             return .time
+        }
+        if proposed.workplace == other.workplace,
+           calendar.isDate(proposed.start, inSameDayAs: other.start) {
+            return .sameDay
         }
         guard proposed.workplace != other.workplace, travelMinutes > 0 else { return nil }
         let gap = separation(proposed, other)
@@ -211,6 +226,7 @@ enum ShiftOverlap {
     private static func kindKey(_ hit: Hit) -> String {
         switch hit.kind {
         case .time: return "time"
+        case .sameDay: return "day"
         case .travel: return "travel"
         }
     }
