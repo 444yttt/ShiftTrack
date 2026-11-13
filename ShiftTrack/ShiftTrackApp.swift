@@ -84,6 +84,7 @@ struct RootView: View {
     @Query(sort: \WorkShift.date) private var shifts: [WorkShift]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tab: AppTab = .list
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showOnboarding = false
     @State private var router = ImportRouter.shared
     @State private var draftRouter = WorkplaceDraftRouter.shared
@@ -96,7 +97,7 @@ struct RootView: View {
         // stays a reading measure (see `ScreenScroll`).
         Group {
             if UIDevice.current.userInterfaceIdiom == .pad {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: $columnVisibility) {
                     List(selection: sidebarSelection) {
                         ForEach(AppTab.allCases) { item in
                             Label(item.title, systemImage: item.symbol)
@@ -109,6 +110,19 @@ struct RootView: View {
                     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 300)
                 } detail: {
                     padDetail
+                        .toolbar {
+                            if columnVisibility == .detailOnly {
+                                ToolbarItem(placement: .topBarLeading) {
+                                    Button {
+                                        columnVisibility = .all
+                                    } label: {
+                                        Image(systemName: "sidebar.left")
+                                    }
+                                    .accessibilityIdentifier("pad.sidebar")
+                                    .accessibilityLabel("セクション")
+                                }
+                            }
+                        }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Theme.paper)
                         .topSafeAreaCover()

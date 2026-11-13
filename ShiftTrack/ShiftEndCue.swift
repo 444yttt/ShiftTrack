@@ -30,6 +30,18 @@ struct ShiftEndPulse: View {
     @State private var wasActive = false
 
     var body: some View {
+        // The one-second clock keeps the run loop awake, so UI tests never go idle.
+        if ProcessInfo.processInfo.arguments.contains("-UITestingSample")
+            || ProcessInfo.processInfo.arguments.contains("-UITestingReset") {
+            Color.clear
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        } else {
+            pulse
+        }
+    }
+
+    private var pulse: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             Color.clear
                 .onChange(of: context.date) { _, now in

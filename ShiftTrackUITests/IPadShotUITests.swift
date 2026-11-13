@@ -18,7 +18,8 @@ final class IPadShotUITests: XCTestCase {
         app.launchArguments = ["-UITestingSample"]
         app.launch()
 
-        let home = app.buttons["pad.tab.ホーム"]
+        revealSidebar(app)
+        let home = app.descendants(matching: .any)["pad.tab.ホーム"]
         XCTAssertTrue(home.waitForExistence(timeout: 15))
         if app.buttons["閉じる"].waitForExistence(timeout: 2) {
             app.buttons["閉じる"].tap()
@@ -54,14 +55,22 @@ final class IPadShotUITests: XCTestCase {
         shot(app, "ipad-landscape-settings")
     }
 
+    private func revealSidebar(_ app: XCUIApplication) {
+        let row = app.descendants(matching: .any)["pad.tab.ホーム"]
+        if row.waitForExistence(timeout: 4), row.isHittable { return }
+        let toggle = app.buttons["pad.sidebar"]
+        if toggle.waitForExistence(timeout: 4) {
+            toggle.tap()
+        }
+    }
+
     private func open(_ app: XCUIApplication, _ title: String) {
-        let row = app.buttons["pad.tab.\(title)"]
+        let row = app.descendants(matching: .any)["pad.tab.\(title)"]
         if row.waitForExistence(timeout: 4), row.isHittable {
             row.tap()
             return
         }
-        // Portrait can collapse the sidebar behind the column toggle.
-        let toggle = app.buttons["しふとらっく"]
+        let toggle = app.buttons["pad.sidebar"]
         if toggle.waitForExistence(timeout: 2) {
             toggle.tap()
         }
