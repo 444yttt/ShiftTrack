@@ -122,6 +122,48 @@ struct PayDomainTests {
     }
 
     @Test
+    func emptyHistoryKeepsTheHourlyWageOnTheWorkplace() {
+        let calendar = Self.tokyo
+        let place = Workplace(name: "架空茶房 北窓", colorHex: "C6F24E", hourlyWage: 1_600, transportAllowance: 0)
+        #expect(place.wageHistory.isEmpty)
+        let day = calendar.date(from: DateComponents(year: 2026, month: 11, day: 12))!
+        #expect(Self.hour(place, day, calendar) == 1_600)
+    }
+
+    @Test
+    func shiftUsesTheWageInEffectOnItsDay() {
+        let calendar = Self.tokyo
+        let place = Workplace(name: "架空茶房 北窓", colorHex: "C6F24E", hourlyWage: 1_600, transportAllowance: 0)
+        func day(_ year: Int, _ month: Int, _ date: Int) -> Date {
+            calendar.date(from: DateComponents(year: year, month: month, day: date))!
+        }
+        place.wageHistory = [
+            Workplace.WageHistoryEntry(at: day(2026, 4, 1), hourlyWage: 1_500),
+            Workplace.WageHistoryEntry(at: day(2026, 10, 1), hourlyWage: 1_800),
+        ]
+        #expect(Self.hour(place, day(2026, 3, 31), calendar) == 1_600)
+        #expect(Self.hour(place, day(2026, 4, 1), calendar) == 1_500)
+        #expect(Self.hour(place, day(2026, 9, 30), calendar) == 1_500)
+        #expect(Self.hour(place, day(2026, 10, 1), calendar) == 1_800)
+        place.wageHistory = [Workplace.WageHistoryEntry(at: day(2027, 1, 1), hourlyWage: 2_000)]
+        #expect(Self.hour(place, day(2026, 11, 12), calendar) == 1_600)
+    }
+
+    private static func hour(_ place: Workplace, _ day: Date, _ calendar: Calendar) -> Int {
+        PayMath.quote(
+            workplace: place,
+            day: day,
+            start: 9 * 60,
+            end: 10 * 60,
+            breakMinutes: 0,
+            customPay: nil,
+            adjustment: 0,
+            includeTransport: false,
+            calendar: calendar
+        )
+    }
+
+    @Test
     func scheduleSentenceNamesTheClosingDayAndPayday() {
         let text = PayScheduleMath.sentence(closingDay: 0, paydayDay: 25, monthOffset: 1)
         #expect(text.contains("末日"))

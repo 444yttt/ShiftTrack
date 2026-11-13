@@ -4,26 +4,39 @@ import Foundation
 /// and `EarningsSoFar` (the live number on the home screen) both read it, so a
 /// shift's live earnings end exactly where its estimate in the totals is.
 ///
-/// Base is `Workplace.hourlyWage`. A premium that is switched on uses its yen
-/// amount when one is set. When the amount is 0 it uses its percent on top of
-/// the base instead, so an enabled premium can never pay ¥0 for a minute.
-/// (The setup wizard used to switch night pay on with only a percent, and the
-/// old table then paid ¥0 for every night minute.)
+/// The base is the wage history entry in effect on the shift's day. An empty
+/// history, and a history whose dates are all still in the future, keep
+/// `Workplace.hourlyWage`, so workplaces saved before history was editable
+/// calculate exactly as they do now.
+///
+/// A premium that is switched on uses its yen amount when one is set. When the
+/// amount is 0 it uses its percent on top of the base instead, so an enabled
+/// premium can never pay ¥0 for a minute. (The setup wizard used to switch
+/// night pay on with only a percent, and the old table then paid ¥0 for every
+/// night minute.)
 struct PayRates {
     let workplace: Workplace
     /// True when holiday pay is on and the shift's day is one of its weekdays.
     let isHoliday: Bool
     /// Calendar weekday (1 = Sunday) of the shift's day.
     let weekday: Int
+    /// Hourly wage in effect on the shift day, after history and the fallback.
+    let baseWage: Int
 
     init(workplace: Workplace, day: Date, calendar: Calendar = .current) {
         self.workplace = workplace
         let weekday = calendar.component(.weekday, from: calendar.startOfDay(for: day))
         self.weekday = weekday
         self.isHoliday = workplace.holidayPayEnabled && workplace.holidayWeekdays.contains(weekday)
+        let points = workplace.wageHistory.map {
+            WagePoint(day: LocalDay.from($0.at, calendar: calendar), yen: $0.hourlyWage)
+        }
+        self.baseWage = max(0, WageLookup.yen(
+            on: LocalDay.from(day, calendar: calendar),
+            history: points,
+            fallback: workplace.hourlyWage
+        ))
     }
-
-    var baseWage: Int { max(0, workplace.hourlyWage) }
 
     /// Holiday percent for this weekday, from the seven stored percents.
     var holidayPercent: Int {

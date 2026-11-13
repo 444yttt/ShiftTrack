@@ -18,8 +18,8 @@ final class IPadShotUITests: XCTestCase {
         app.launchArguments = ["-UITestingSample"]
         app.launch()
 
-        let home = app.buttons["pad.tab.ホーム"]
-        XCTAssertTrue(home.waitForExistence(timeout: 15))
+        revealSidebar(app)
+        XCTAssertTrue(tab(app, "ホーム").waitForExistence(timeout: 15))
         if app.buttons["閉じる"].waitForExistence(timeout: 2) {
             app.buttons["閉じる"].tap()
         }
@@ -54,17 +54,32 @@ final class IPadShotUITests: XCTestCase {
         shot(app, "ipad-landscape-settings")
     }
 
+    private func tab(_ app: XCUIApplication, _ title: String) -> XCUIElement {
+        // The identifier is on the row and on its label. A subscript query
+        // refuses the tap when more than one matches, and the row is not a button.
+        let matches = app.descendants(matching: .any).matching(identifier: "pad.tab.\(title)")
+        let hittable = matches.allElementsBoundByIndex.first { $0.exists && $0.isHittable }
+        return hittable ?? matches.firstMatch
+    }
+
+    private func revealSidebar(_ app: XCUIApplication) {
+        if tab(app, "ホーム").waitForExistence(timeout: 4), tab(app, "ホーム").isHittable { return }
+        let toggle = app.buttons["pad.sidebar"]
+        if toggle.waitForExistence(timeout: 4) {
+            toggle.tap()
+        }
+    }
+
     private func open(_ app: XCUIApplication, _ title: String) {
-        let row = app.buttons["pad.tab.\(title)"]
-        if row.waitForExistence(timeout: 4), row.isHittable {
-            row.tap()
+        if tab(app, title).waitForExistence(timeout: 4), tab(app, title).isHittable {
+            tab(app, title).tap()
             return
         }
-        // Portrait can collapse the sidebar behind the column toggle.
-        let toggle = app.buttons["しふとらっく"]
+        let toggle = app.buttons["pad.sidebar"]
         if toggle.waitForExistence(timeout: 2) {
             toggle.tap()
         }
+        let row = tab(app, title)
         XCTAssertTrue(row.waitForExistence(timeout: 4))
         row.tap()
     }
