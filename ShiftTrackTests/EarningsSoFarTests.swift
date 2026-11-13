@@ -1,9 +1,8 @@
 import XCTest
 @testable import ShiftTrack
 
-/// Live “earnings so far” on the home screen. Regression tests for the ¥0 bug:
-/// the old number came from `ScheduledPay`, which reads the wage only from the
-/// (usually empty) wage history and so returned ¥0 while a shift was running.
+/// Live “earnings so far” on the home screen. An empty wage history still
+/// pays `Workplace.hourlyWage` for the time already worked.
 final class EarningsSoFarTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -32,13 +31,6 @@ final class EarningsSoFarTests: XCTestCase {
         XCTAssertTrue(place.wageHistory.isEmpty)
         let day = noon(2026, 11, 12)
         let now = at(2026, 11, 12, 12, 30)
-
-        // Root cause, kept as documentation: the old formula used only the history.
-        let old = ScheduledPay.hourlyAmount(
-            day: day, start: 10 * 60, end: 15 * 60, breakMinutes: 0,
-            workplace: place, customPay: nil, calendar: calendar
-        )
-        XCTAssertEqual(old?.total, 0)
 
         let progress = try XCTUnwrap(EarningsSoFar.progress(
             workplace: place, day: day, start: 10 * 60, end: 15 * 60, breakMinutes: 0,

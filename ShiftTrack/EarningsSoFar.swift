@@ -2,18 +2,14 @@ import Foundation
 
 /// “Earnings so far” for one shift, shown live on the home screen.
 ///
-/// Why the home screen showed ¥0 before: its number came from `ScheduledPay`,
-/// which looks the hourly wage up only in `Workplace.wageHistory`. That history
-/// is empty for every workplace made in the editor or by import, and an empty
-/// history returns a wage of 0, so `Workplace.hourlyWage` was never used. The
-/// number was also the whole scheduled shift, not the part already worked, and
-/// a shift that started yesterday (overnight) was not treated as in progress.
-///
-/// This type uses `PayMath` / `PayRates` (the same table as the monthly totals)
-/// and accrues the wage in proportion to the time elapsed. A break has no clock
-/// time in this app, so it is spread evenly over the shift; when the shift ends
-/// the value equals the shift's wage in the totals (transport and 天引・手当 are
-/// not wages earned by the minute and are shown separately).
+/// The home screen used to show ¥0 because an older formula read the wage only
+/// from `Workplace.wageHistory`, which is empty for workplaces made in the
+/// editor or by import. This type uses `PayMath` / `PayRates` (the same table
+/// as the monthly totals) and accrues the stored hourly wage for the time
+/// already worked, including a shift that started yesterday. A break has no
+/// clock time in this app, so it is spread evenly over the shift; when the
+/// shift ends the value equals the shift's wage in the totals (transport and
+/// 天引・手当 are not wages earned by the minute and are shown separately).
 enum EarningsSoFar {
     enum Phase: Equatable {
         /// Seconds until the start.
