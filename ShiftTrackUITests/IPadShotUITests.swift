@@ -55,14 +55,15 @@ final class IPadShotUITests: XCTestCase {
     }
 
     private func tab(_ app: XCUIApplication, _ title: String) -> XCUIElement {
-        // The identifier lands on the row and on its label, so a subscript query
-        // matches more than one element. The first button is the row.
-        app.buttons.matching(identifier: "pad.tab.\(title)").firstMatch
+        // The identifier is on the row and on its label. A subscript query
+        // refuses the tap when more than one matches, and the row is not a button.
+        let matches = app.descendants(matching: .any).matching(identifier: "pad.tab.\(title)")
+        let hittable = matches.allElementsBoundByIndex.first { $0.exists && $0.isHittable }
+        return hittable ?? matches.firstMatch
     }
 
     private func revealSidebar(_ app: XCUIApplication) {
-        let row = tab(app, "ホーム")
-        if row.waitForExistence(timeout: 4), row.isHittable { return }
+        if tab(app, "ホーム").waitForExistence(timeout: 4), tab(app, "ホーム").isHittable { return }
         let toggle = app.buttons["pad.sidebar"]
         if toggle.waitForExistence(timeout: 4) {
             toggle.tap()
@@ -70,15 +71,15 @@ final class IPadShotUITests: XCTestCase {
     }
 
     private func open(_ app: XCUIApplication, _ title: String) {
-        let row = tab(app, title)
-        if row.waitForExistence(timeout: 4), row.isHittable {
-            row.tap()
+        if tab(app, title).waitForExistence(timeout: 4), tab(app, title).isHittable {
+            tab(app, title).tap()
             return
         }
         let toggle = app.buttons["pad.sidebar"]
         if toggle.waitForExistence(timeout: 2) {
             toggle.tap()
         }
+        let row = tab(app, title)
         XCTAssertTrue(row.waitForExistence(timeout: 4))
         row.tap()
     }
